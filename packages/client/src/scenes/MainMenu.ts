@@ -28,7 +28,8 @@ export class MainMenu extends Scene {
 
     this.input.once("pointerdown", async () => {
       await authorizeDiscordUser();
-      this.scene.start("Game");
+      // Start the Lobby scene instead of the Game scene
+      this.scene.start("Lobby");
     });
   }
 }

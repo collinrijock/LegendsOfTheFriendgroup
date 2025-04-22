@@ -63,6 +63,9 @@ export class Preloader extends Scene {
     this.load.image("cross_2", "cross.png");
     this.load.image("cross_3", "cross.png");
     this.load.image("grid", "grid.png");
+
+    // Load card data
+    this.load.json("cardData", "data/cards.json");
   }
 
   create() {

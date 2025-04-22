@@ -1,0 +1,62 @@
+[
+  {
+    "id": "test_card_01",
+    "name": "Test Card",
+    "attack": 5,
+    "speed": 4,
+    "health": 10,
+    "brewCost": 5,
+    "description": "A basic test card.",
+    "isLegend": false
+  },
+  {
+    "id": "test_card_02",
+    "name": "Quick Jab",
+    "attack": 3,
+    "speed": 2,
+    "health": 8,
+    "brewCost": 4,
+    "description": "Fast but frail.",
+    "isLegend": false
+  },
+  {
+    "id": "test_card_03",
+    "name": "Tanky Boi",
+    "attack": 2,
+    "speed": 6,
+    "health": 20,
+    "brewCost": 6,
+    "description": "Takes a beating.",
+    "isLegend": false
+  },
+  {
+    "id": "test_card_04",
+    "name": "Glass Cannon",
+    "attack": 10,
+    "speed": 5,
+    "health": 5,
+    "brewCost": 7,
+    "description": "Hits hard, dies fast.",
+    "isLegend": false
+  },
+  {
+    "id": "test_card_05",
+    "name": "Balanced Bud",
+    "attack": 6,
+    "speed": 4,
+    "health": 12,
+    "brewCost": 6,
+    "description": "Good all-around.",
+    "isLegend": false
+  },
+  {
+    "id": "test_card_06",
+    "name": "Speedy Scout",
+    "attack": 4,
+    "speed": 1.5,
+    "health": 7,
+    "brewCost": 5,
+    "description": "Attacks very quickly.",
+    "isLegend": false
+  }
+]
