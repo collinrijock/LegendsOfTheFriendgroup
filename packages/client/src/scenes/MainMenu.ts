@@ -1,7 +1,11 @@
 import { Scene } from "phaser";
 import { authorizeDiscordUser } from "../utils/discordSDK";
+// Import the global room variable from the new colyseusClient.ts file
+import { colyseusRoom } from "../utils/colyseusClient"; // Updated import
 
 export class MainMenu extends Scene {
+  private statusText!: Phaser.GameObjects.Text;
+
   constructor() {
     super("MainMenu");
   }
@@ -16,7 +20,7 @@ export class MainMenu extends Scene {
     this.add.image(Number(this.game.config.width) * 0.5, 300, "logo");
 
     this.add
-      .text(Number(this.game.config.width) * 0.5, 460, "Main Menu", {
+      .text(Number(this.game.config.width) * 0.5, 460, "Click to Start", { // Changed text
         fontFamily: "Arial Black",
         fontSize: 38,
         color: "#ffffff",
@@ -26,10 +30,38 @@ export class MainMenu extends Scene {
       })
       .setOrigin(0.5);
 
+    // Add status text for feedback
+    this.statusText = this.add.text(this.cameras.main.centerX, 520, "", {
+        fontFamily: "Arial",
+        fontSize: 24,
+        color: "#ffff00",
+        align: "center",
+    }).setOrigin(0.5);
+
+
     this.input.once("pointerdown", async () => {
-      await authorizeDiscordUser();
-      // Start the Lobby scene instead of the Game scene
-      this.scene.start("Lobby");
+        this.statusText.setText("Authorizing with Discord...");
+        const authSuccess = await authorizeDiscordUser();
+
+        if (authSuccess) {
+            this.statusText.setText("Connecting to server...");
+            // Connection attempt happens within authorizeDiscordUser now
+            // Wait a short moment to allow connection attempt
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Adjust delay if needed
+
+            if (colyseusRoom) {
+                this.statusText.setText("Connected! Entering Lobby...");
+                // Successfully authorized and connected, start the Lobby scene
+                this.scene.start("Lobby");
+            } else {
+                 this.statusText.setText("Failed to connect to server. Please try again.");
+                 // Re-enable click listener? Or show a retry button.
+                 // For now, just display error.
+            }
+        } else {
+            this.statusText.setText("Discord authorization failed. Please try again.");
+            // Re-enable click listener?
+        }
     });
   }
 }
