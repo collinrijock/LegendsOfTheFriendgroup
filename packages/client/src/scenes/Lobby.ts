@@ -62,8 +62,8 @@ export class Lobby extends Scene {
       console.log("Starting game, entering Shop...");
       // Initialize game day, health, and starting brews
       this.registry.set('currentDay', 1);
-      this.registry.set('playerHealth', 50); // Starting health
-      this.registry.set('aiHealth', 50); // Starting AI health (for test mode)
+      this.registry.set('playerHealth', 100); // Starting health
+      this.registry.set('aiHealth', 100); // Starting AI health (for test mode)
       // Initialize persistent card states as empty arrays/nulls
       this.registry.set('playerHandState', [null, null, null, null, null]);
       this.registry.set('playerBattlefieldState', [null, null, null, null, null]);
