@@ -120,6 +120,16 @@
     "isLegend": false
   },
   {
+    "id": "humonculated_chungorian_01",
+    "name": "Humonculated Chungorian",
+    "attack": 16,
+    "speed": 8,
+    "health": 32,
+    "brewCost": 15,
+    "description": "Strong and chunky",
+    "isLegend": false
+  },
+  {
     "id": "fu-hsi_01",
     "name": "Fu-hsi",
     "attack": 1,
