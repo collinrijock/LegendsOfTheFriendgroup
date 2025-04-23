@@ -226,6 +226,27 @@ class BattleCard {
             ease: 'Sine.easeInOut'
         });
 
+        // --- START: Add Attack Line Visual ---
+        const attackerPos = this.gameObject.getCenter();
+        const targetPos = target.gameObject.getCenter();
+
+        if (attackerPos && targetPos) {
+            const attackLine = scene.add.line(
+                0, 0, // Position doesn't matter as we use setTo
+                attackerPos.x, attackerPos.y,
+                targetPos.x, targetPos.y,
+                0xffffff, // White color for the line
+                0.8 // Alpha transparency
+            ).setOrigin(0, 0).setLineWidth(2); // Set line width
+
+            // Destroy the line after a short delay
+            scene.time.delayedCall(250, () => {
+                attackLine.destroy();
+            });
+        }
+        // --- END: Add Attack Line Visual ---
+
+
       } else {
         // No living targets left
         // console.log(`${this.cardInstance.name} has no targets left.`); // Less console spam
@@ -298,25 +319,38 @@ export class Battle extends Scene {
     const aiSlotsY = 200; // AI slots upper half
 
     const allCards: CardData[] = this.cache.json.get("cardData");
-    // Simple AI logic: Add one random card for now
-    const aiCardData = Phaser.Utils.Array.GetRandom(allCards);
-    const aiCardPositions = [2]; // Place only ONE AI card in the middle slot (index 2)
+    if (!allCards || allCards.length === 0) {
+        console.error("Card data not loaded or empty! Cannot setup AI.");
+        return; // Exit if no cards are available
+    }
+
+    // Determine number of AI cards (1 to 4) - CHANGED FROM 1-5
+    const numAiCards = Phaser.Math.Between(1, 4);
+    const availableSlots = [0, 1, 2, 3, 4]; // Indices of AI slots
+    Phaser.Utils.Array.Shuffle(availableSlots); // Randomize slot order
 
     this.aiBoardCards = [null, null, null, null, null]; // Initialize AI board with nulls
-    aiCardPositions.forEach(index => {
-        if (aiCardData) {
-            const slotX = startAiSlotsX + index * (aiSlotWidth + aiSlotSpacing);
+
+    console.log(`Setting up AI with ${numAiCards} cards.`); // Log updated range implicitly
+
+    for (let i = 0; i < numAiCards; i++) {
+        const slotIndex = availableSlots[i]; // Get a random, unique slot index
+        const aiCardData = Phaser.Utils.Array.GetRandom(allCards); // Select a random card definition
+
+        if (aiCardData && slotIndex !== undefined) {
+            const slotX = startAiSlotsX + slotIndex * (aiSlotWidth + aiSlotSpacing);
             // Create a CardInstance for the AI card
             const aiCardInstance: CardInstance = {
                 ...aiCardData, // Copy base data
-                instanceId: `ai_${aiCardData.id}_${Date.now()}_${index}`, // Simple unique ID for AI instance
+                instanceId: `ai_${aiCardData.id}_${Date.now()}_${slotIndex}`, // Simple unique ID for AI instance
                 currentHp: aiCardData.health // Start at full health
             };
-            this.aiBoardCards[index] = new BattleCard(this, slotX, aiSlotsY, aiCardInstance, false);
+            this.aiBoardCards[slotIndex] = new BattleCard(this, slotX, aiSlotsY, aiCardInstance, false);
+            console.log(`AI placed ${aiCardData.name} in slot ${slotIndex}`);
         } else {
-            console.error("Failed to load AI card data!");
+            console.error("Failed to get random card data or slot index for AI setup.");
         }
-    });
+    }
 
      // --- Display Player Hand (Read-Only) ---
      const handSlotY = this.cameras.main.height - 80; // Position hand display lower in battle
@@ -546,11 +580,11 @@ export class Battle extends Scene {
             finalPlayerBattlefieldState[index] = null; // Card died or slot was empty
         }
     });
-
-    // Add flat 4 brews reward
-    const flatBrewReward = 4;
+    
+    // Add flat brew reward scaling with day
+    const flatBrewReward = this.currentDay * 3; // CHANGED FROM 4
     const finalBrews = this.playerBrewsAtStart + this.playerBrewsEarned + flatBrewReward;
-
+    
     this.registry.set('playerHealth', playerHealth);
     this.registry.set('aiHealth', aiHealth);
     this.registry.set('playerHandState', finalPlayerHandState); // Save potentially unchanged hand state
@@ -623,9 +657,9 @@ export class Battle extends Scene {
             const nextDay = this.currentDay + 1;
             this.registry.set('currentDay', nextDay);
             // State (health, brews, hand, battlefield) is already saved in registry
-            // Update log message to reflect total brews earned
+            // Update log message to reflect total brews earned and the formula
             const totalBrewsEarnedThisRound = this.playerBrewsEarned + flatBrewReward;
-            console.log(`Battle ended. Earned ${totalBrewsEarnedThisRound} brews (Kills: ${this.playerBrewsEarned}, Flat: ${flatBrewReward}). Total: ${finalBrews}. Starting Day ${nextDay}`);
+            console.log(`Battle ended. Earned ${totalBrewsEarnedThisRound} brews (Kills: ${this.playerBrewsEarned}, Day Bonus: ${flatBrewReward}). Total: ${finalBrews}. Starting Day ${nextDay}`);
             // Shop scene will read the updated state from the registry
             this.scene.start("Shop", { /* Pass minimal data if needed, like day */ currentDay: nextDay });
         });
