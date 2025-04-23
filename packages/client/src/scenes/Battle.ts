@@ -418,12 +418,7 @@ export class Battle extends Scene {
 
 
     // Day/Phase Display (Center)
-    this.add.text(centerX, navbarY, `Day ${currentDay} - Battle Phase`, {
-        fontFamily: "Arial",
-        fontSize: 24,
-        color: "#ffffff",
-        align: "center"
-    }).setOrigin(0.5);
+
 
     // Brews Display (Right) - Store reference to update later
     this.playerBrewsText = this.add.text(this.cameras.main.width - 50, navbarY, `Brews: ${playerBrews}`, {
@@ -435,16 +430,7 @@ export class Battle extends Scene {
     // --- End Navbar ---
 
     // Title (Adjust Y position below navbar)
-    this.add
-      .text(centerX, 80, "Battle Phase!", { // Adjusted Y
-        fontFamily: "Arial Black",
-        fontSize: 48,
-        color: "#ff8c00", // Orange color for battle
-        stroke: "#000000",
-        strokeThickness: 8,
-        align: "center",
-      })
-      .setOrigin(0.5);
+  
 
     // Result Text (initially hidden)
     this.resultText = this.add.text(centerX, this.cameras.main.centerY, "", {
