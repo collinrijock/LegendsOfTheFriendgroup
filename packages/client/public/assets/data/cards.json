@@ -22,9 +22,9 @@
   {
     "id": "glass_cannon_01",
     "name": "Glass Cannon",
-    "attack": 15,
-    "speed": 6,
-    "health": 5,
+    "attack": 14,
+    "speed": 5,
+    "health": 4,
     "brewCost": 6,
     "description": "Hits hard, dies fast.",
     "isLegend": false
@@ -44,9 +44,9 @@
     "name": "Speedy Scout",
     "attack": 3,
     "speed": 3,
-    "health": 7,
-    "brewCost": 5,
-    "description": "Attacks very quickly.",
+    "health": 10,
+    "brewCost": 6,
+    "description": "Attacks quickly.",
     "isLegend": false
   },
   {
@@ -117,6 +117,16 @@
     "health": 18,
     "brewCost": 12,
     "description": "Pew pew pew.",
+    "isLegend": false
+  },
+  {
+    "id": "fu-hsi_01",
+    "name": "Fu-hsi",
+    "attack": 1,
+    "speed": 2.5,
+    "health": 8,
+    "brewCost": 2,
+    "description": "Cheap and well rounded.",
     "isLegend": false
   }
 ]
