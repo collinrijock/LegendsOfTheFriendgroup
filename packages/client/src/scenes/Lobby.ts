@@ -107,22 +107,57 @@ export class Lobby extends Scene {
 
 
     // --- Colyseus State Handling ---
+    // Add logging here
+    console.log(`Lobby: create() - Checking colyseusRoom status. Is connected: ${!!colyseusRoom}, Room ID: ${colyseusRoom?.roomId}`);
 
     // Wait for the initial state to be received before setting up player listeners
     colyseusRoom.onStateChange.once((state) => {
-      console.log("Lobby: Initial state received, setting up listeners.");
-      if (!this.scene.isActive()) return; // Guard against scene being destroyed before state arrives
+      // Add logging here
+      console.log("Lobby: Initial state received inside onStateChange.once. Setting up listeners.");
+      if (!this.scene.isActive()) {
+          console.log("Lobby: Scene inactive, aborting listener setup.");
+          return; // Guard against scene being destroyed before state arrives
+      }
+
+      // --- BEGIN DEBUG LOGGING ---
+      console.log("Lobby: State object received:", state);
+      console.log("Lobby: state.players object:", state.players);
+      console.log("Lobby: typeof state.players:", typeof state.players);
+      // Check if players exists and has the onAdd method
+      if (state && state.players) {
+          console.log("Lobby: state.players.onAdd exists?", typeof state.players.onAdd === 'function');
+          // --- MORE DETAILED LOGGING ---
+          try {
+              const proto = Object.getPrototypeOf(state.players);
+              console.log("Lobby: state.players prototype:", proto);
+              console.log("Lobby: state.players constructor name:", state.players.constructor?.name);
+              console.log("Lobby: state.players own keys:", Object.keys(state.players));
+              if (proto) {
+                  console.log("Lobby: state.players prototype keys:", Object.getOwnPropertyNames(proto));
+              }
+          } catch (e) {
+              console.error("Lobby: Error inspecting state.players prototype/constructor:", e);
+          }
+          // --- END MORE DETAILED LOGGING ---
+      } else {
+          console.log("Lobby: state or state.players is null/undefined before attaching listeners.");
+      }
+      // --- END DEBUG LOGGING ---
+
 
       // REMOVED: Initial player list display - rely on onAdd/onRemove
       // this.updatePlayerList();
 
       // Listen for players joining/leaving using standard MapSchema methods
       // Store unsubscribe functions
-      this.playerAddListenerUnsub = state.players.onAdd((player, sessionId) => {
+      this.playerAddListenerUnsub = state.players.onAdd((player, sessionId) => { // This line (or around here) causes the error
         if (!this.scene.isActive()) return; // Guard
-        console.log("Player joined lobby:", player.username, sessionId);
+        // Add logging here
+        console.log(`Lobby: state.players.onAdd fired for sessionId: ${sessionId}, username: ${player?.username}`);
         // Add listener for changes within this specific player (especially isReady)
         const unsub = player.onChange(() => {
+            // Add logging here
+            console.log(`Lobby: onChange triggered for player ${sessionId}`);
             if (this.scene.isActive()) this.updateLobbyUI();
         });
         this.playerStateListeners.set(sessionId, unsub);
@@ -142,6 +177,8 @@ export class Lobby extends Scene {
       // Add listeners for existing players (in case state arrives with players already)
       state.players.forEach((player, sessionId) => {
           const unsub = player.onChange(() => {
+              // Add logging here
+              console.log(`Lobby: onChange triggered for existing player ${sessionId}`);
               if (this.scene.isActive()) this.updateLobbyUI();
           });
           this.playerStateListeners.set(sessionId, unsub);
@@ -160,7 +197,11 @@ export class Lobby extends Scene {
             if (currentPhase === Phase.Shop) {
               this.statusText.setText("Starting Game!");
               this.time.delayedCall(500, () => {
-                if (this.scene.isActive()) this.scene.start("Shop"); // Check active before starting
+                // Stop the current scene before starting the next
+                if (this.scene.isActive()) {
+                    this.scene.stop(); // Stop Lobby scene
+                    this.scene.start("Shop");
+                }
               });
             } else if (currentPhase === Phase.Lobby) {
               // If phase reverts to Lobby (e.g., game ended, error)
@@ -269,10 +310,14 @@ export class Lobby extends Scene {
   updatePlayerList() {
     if (!colyseusRoom || !colyseusRoom.state || !this.scene.isActive()) return; // Add active check
 
+    // Add logging here
+    console.log(`Lobby: updatePlayerList called. Player count in state: ${colyseusRoom.state.players.size}`);
+
     // Clear existing text objects that are no longer in the room state
     const currentSessionIds = new Set(colyseusRoom.state.players.keys());
     this.playerTextObjects.forEach((textObject, sessionId) => {
       if (!currentSessionIds.has(sessionId)) {
+        console.log(`Lobby: Removing text for absent player ${sessionId}`); // Log removal
         this.removePlayerText(sessionId); // Use helper to destroy and remove from map
       }
     });
@@ -285,15 +330,20 @@ export class Lobby extends Scene {
       const isReady = player.isReady; // Get ready status
       const isSelf = sessionId === colyseusRoom.sessionId;
 
+      // Add logging here
+      console.log(`Lobby: Processing player - ID: ${sessionId}, Name: ${playerName}, Ready: ${isReady}, IsSelf: ${isSelf}`);
+
       let playerText = this.playerTextObjects.get(sessionId);
       const displayText = `${playerName}${isSelf ? " (You)" : ""} ${isReady ? "✅" : "⏳"}`; // Add ready indicator
 
       if (playerText) {
         // Update existing text object position and text (including username and ready status)
+        console.log(`Lobby: Updating text for player ${sessionId}`); // Log update
         playerText.setY(yPos);
         playerText.setText(displayText);
       } else {
         // Create new text object displaying the username and ready status
+        console.log(`Lobby: Creating new text for player ${sessionId}`); // Log creation
         playerText = this.add
           .text(
             this.cameras.main.centerX,

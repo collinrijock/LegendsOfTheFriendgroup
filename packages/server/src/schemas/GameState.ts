@@ -64,6 +64,9 @@ export class PlayerState extends Schema {
     @type({ map: CardInstanceSchema }) hand = new MapSchema<CardInstanceSchema>(); // Keyed by slot index "0"-"4"
     @type({ map: CardInstanceSchema }) battlefield = new MapSchema<CardInstanceSchema>(); // Keyed by slot index "0"-"4"
     @type("boolean") isReady: boolean = false; // Ready for next phase transition
+
+    // --- Add Shop Offers ---
+    @type(["string"]) shopOfferIds = new ArraySchema<string>(); // IDs of cards offered in the shop this phase
 }
 
 // Define Main Game State Schema

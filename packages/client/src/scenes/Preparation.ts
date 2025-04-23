@@ -39,6 +39,19 @@ export class Preparation extends Scene {
   private battlefieldListener: (() => void) | null = null;
   private phaseListener: (() => void) | null = null;
 
+  // Colyseus listeners - Store unsubscribe functions
+  private playerStateListenerUnsub: (() => void) | null = null;
+  private handAddUnsub: (() => void) | null = null;
+  private handRemoveUnsub: (() => void) | null = null;
+  private handChangeUnsub: (() => void) | null = null; // Assuming onChange returns unsub
+  private battlefieldAddUnsub: (() => void) | null = null;
+  private battlefieldRemoveUnsub: (() => void) | null = null;
+  private battlefieldChangeUnsub: (() => void) | null = null; // Assuming onChange returns unsub
+  private phaseListenerUnsub: (() => void) | null = null;
+  private otherPlayerChangeListeners: Map<string, () => void> = new Map(); // For other players' onChange
+  private otherPlayerAddUnsub: (() => void) | null = null;
+  private otherPlayerRemoveUnsub: (() => void) | null = null;
+
 
   constructor() {
     super("Preparation");
@@ -68,6 +81,14 @@ export class Preparation extends Scene {
     const currentDay = colyseusRoom.state.currentDay;
     const playerHealth = myPlayerState?.health ?? 50;
     const playerBrews = myPlayerState?.brews ?? 0;
+
+    // --- Log Hand State ---
+    if (myPlayerState) {
+        console.log("Preparation Create: Initial myPlayerState.hand contents:", JSON.stringify(Object.fromEntries(myPlayerState.hand.entries())));
+    } else {
+        console.log("Preparation Create: myPlayerState not found initially.");
+    }
+    // --- End Log ---
 
     // --- Navbar ---
     const navbarY = 25;
@@ -299,110 +320,125 @@ setupColyseusListeners() {
   const player = colyseusRoom.state.players.get(myPlayerId);
   if (player) {
       // Use onChange for the whole player object or listen for specific props
-      this.playerStateListener = player.onChange(() => {
+      // Store the returned unsubscribe function
+      this.playerStateListenerUnsub = player.onChange(() => {
           if (!this.scene.isActive()) return; // Guard against updates after shutdown
           this.updateNavbar();
           this.updateWaitingStatus();
       });
 
-      // Listen to hand changes (server state dictates the board)
-      // Store the listener function if needed for cleanup, though Colyseus might handle it
-      player.hand.onAdd((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      player.hand.onRemove((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      player.hand.onChange((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); }); // If card instance itself changes
-      this.handListener = () => { // Placeholder if specific cleanup needed, adjust based on SDK
-          player?.hand?.onAdd(null);
-          player?.hand?.onRemove(null);
-          player?.hand?.onChange(null);
-      };
+      // Listen to hand changes
+      this.handAddUnsub = player.hand.onAdd((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      this.handRemoveUnsub = player.hand.onRemove((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      // Assuming onChange on MapSchema items also returns an unsubscribe function
+      // Note: Colyseus 0.15 might require iterating and adding onChange to each item.
+      // If direct onChange on the map doesn't work as expected, this needs adjustment.
+      // For now, assume it works like this or is handled by onAdd/onRemove triggering updateBoardFromState.
+      // this.handChangeUnsub = player.hand.onChange((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
 
 
       // Listen to battlefield changes
-      player.battlefield.onAdd((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      player.battlefield.onRemove((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      player.battlefield.onChange((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      this.battlefieldListener = () => { // Placeholder if specific cleanup needed
-          player?.battlefield?.onAdd(null);
-          player?.battlefield?.onRemove(null);
-          player?.battlefield?.onChange(null);
-      };
+      this.battlefieldAddUnsub = player.battlefield.onAdd((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      this.battlefieldRemoveUnsub = player.battlefield.onRemove((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      // this.battlefieldChangeUnsub = player.battlefield.onChange((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
 
   } else {
       console.error("Preparation Scene: My player state not found on init.");
   }
 
   // Listen for phase changes
-  this.phaseListener = colyseusRoom.state.listen("currentPhase", (currentPhase) => {
+  // Store the returned unsubscribe function
+  this.phaseListenerUnsub = colyseusRoom.state.listen("currentPhase", (currentPhase) => {
       if (!this.scene.isActive()) return;
       console.log(`Preparation Scene: Phase changed to ${currentPhase}`);
       this.updateDayPhaseText();
       if (currentPhase === Phase.Battle) {
-          // Cleanup happens in shutdown
-          this.scene.start("Battle");
+          // Stop the current scene before starting the next
+          if (this.scene.isActive()) {
+              this.scene.stop(); // Stop Preparation scene
+              this.scene.start("Battle");
+          }
       } else if (currentPhase !== Phase.Preparation) {
           console.warn(`Preparation Scene: Unexpected phase change to ${currentPhase}. Returning to Lobby.`);
-          // Cleanup happens in shutdown
-          this.scene.start("Lobby");
+          // Stop the current scene before starting the next
+          if (this.scene.isActive()) {
+              this.scene.stop(); // Stop Preparation scene
+              this.scene.start("Lobby");
+          }
       }
       this.updateWaitingStatus();
   });
 
-   // Listen for changes in other players' ready status
-   // Use players.onChange which triggers when any player changes at a key
-   colyseusRoom.state.players.onChange((changedPlayer, sessionId) => {
-       // Check if the scene is still active before processing
-       if (!this.scene.isActive()) return;
-       if (sessionId !== myPlayerId) {
-           // We only care if their 'isReady' changed, but onChange triggers for any change.
-           // Re-evaluating waiting status is generally safe.
+   // Listen for changes in other players' ready status & join/leave
+   // Store the returned unsubscribe functions
+   this.otherPlayerAddUnsub = colyseusRoom.state.players.onAdd((addedPlayer, sessionId) => {
+       if (this.scene.isActive()) {
+           if (sessionId !== myPlayerId) {
+               // Listen for changes on the added player
+               const unsub = addedPlayer.onChange(() => {
+                   if (this.scene.isActive()) this.updateWaitingStatus();
+               });
+               this.otherPlayerChangeListeners.set(sessionId, unsub);
+           }
            this.updateWaitingStatus();
        }
    });
-   // Also handle players joining/leaving if necessary
-   colyseusRoom.state.players.onAdd((addedPlayer, sessionId) => {
-       if (this.scene.isActive()) this.updateWaitingStatus();
+   this.otherPlayerRemoveUnsub = colyseusRoom.state.players.onRemove((removedPlayer, sessionId) => {
+       if (this.scene.isActive()) {
+           // Remove the specific listener for the removed player
+           const unsub = this.otherPlayerChangeListeners.get(sessionId);
+           unsub?.();
+           this.otherPlayerChangeListeners.delete(sessionId);
+           this.updateWaitingStatus();
+       }
    });
-   colyseusRoom.state.players.onRemove((removedPlayer, sessionId) => {
-       if (this.scene.isActive()) this.updateWaitingStatus();
+   // Add listeners for existing other players
+   colyseusRoom.state.players.forEach((existingPlayer, sessionId) => {
+        if (sessionId !== myPlayerId) {
+            const unsub = existingPlayer.onChange(() => {
+                if (this.scene.isActive()) this.updateWaitingStatus();
+            });
+            this.otherPlayerChangeListeners.set(sessionId, unsub);
+        }
    });
 }
 
 cleanupListeners() {
   console.log("Preparation Scene: Cleaning up listeners.");
-   // No need to check room/sessionId here, listeners should handle null checks or be absent
 
-   // Remove specific listeners using stored unsubscribe functions or Colyseus methods
-   this.playerStateListener?.(); // Assumes onChange returns unsubscribe function
+  // Call stored unsubscribe functions
+  this.playerStateListenerUnsub?.();
+  this.handAddUnsub?.();
+  this.handRemoveUnsub?.();
+  this.handChangeUnsub?.(); // Call if stored
+  this.battlefieldAddUnsub?.();
+  this.battlefieldRemoveUnsub?.();
+  this.battlefieldChangeUnsub?.(); // Call if stored
+  this.phaseListenerUnsub?.();
+  this.otherPlayerAddUnsub?.();
+  this.otherPlayerRemoveUnsub?.();
+  this.otherPlayerChangeListeners.forEach(unsub => unsub()); // Unsubscribe from each other player
 
-   // Remove MapSchema listeners (onAdd, onRemove, onChange)
-   // Call stored cleanup functions or use Colyseus methods if available
-   this.handListener?.();
-   this.battlefieldListener?.();
+  // Clear stored functions/maps
+  this.playerStateListenerUnsub = null;
+  this.handAddUnsub = null;
+  this.handRemoveUnsub = null;
+  this.handChangeUnsub = null;
+  this.battlefieldAddUnsub = null;
+  this.battlefieldRemoveUnsub = null;
+  this.battlefieldChangeUnsub = null;
+  this.phaseListenerUnsub = null;
+  this.otherPlayerAddUnsub = null;
+  this.otherPlayerRemoveUnsub = null;
+  this.otherPlayerChangeListeners.clear();
 
-   // Remove phase listener
-   // Use stopListening if listen returns void, or remove specific listener if it returns one
-   colyseusRoom?.state.stopListening("currentPhase"); // General stopListening might be okay if only one listener
-
-   // Remove general players map listeners - Colyseus 0.15+ uses removeAllListeners() or specific removal
-   // For older versions, setting callbacks to null might work, but check SDK docs
-   colyseusRoom?.state.players.onAdd(null);
-   colyseusRoom?.state.players.onRemove(null);
-   colyseusRoom?.state.players.onChange(null);
-
-
-   // Reset listener references
-   this.playerStateListener = null;
-   this.handListener = null;
-   this.battlefieldListener = null;
-   this.phaseListener = null; // This might not be an unsubscribe function
-
-   // Remove input listeners
-   this.input.off('dragstart');
-   this.input.off('drag');
-   this.input.off('dragend');
-   this.startBattleButton?.off('pointerdown');
-   this.startBattleButton?.off('pointerover');
-   this.startBattleButton?.off('pointerout');
+  // Remove input listeners
+  this.input.off('dragstart');
+  this.input.off('drag');
+  this.input.off('dragend');
+  this.startBattleButton?.off('pointerdown');
+  this.startBattleButton?.off('pointerover');
+  this.startBattleButton?.off('pointerout');
 }
 
   // --- UI Update Functions ---
@@ -426,26 +462,91 @@ cleanupListeners() {
 
   // Reads the server state and updates the entire visual board
 updateBoardFromState() {
-  if (!colyseusRoom || !colyseusRoom.sessionId || !this.scene.isActive()) return; // Add scene active check
-  const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
-  if (!myPlayerState) return;
+  // --- Add Log ---
+  console.log("Preparation updateBoardFromState: Function called.");
+  // --- End Log ---
+  if (!colyseusRoom || !colyseusRoom.sessionId ) {
+      console.log("Preparation updateBoardFromState: Exiting early - Room/Session/Scene inactive."); // Log exit reason
+      console.log("Colyseus Room:", colyseusRoom);
+      console.log("Session ID:", colyseusRoom?.sessionId);
+      console.log("Scene active:", this.scene.isActive());
+      return; // Add scene active check
+  }
+  // --- Add Log After First Guard ---
+  console.log("Preparation updateBoardFromState: Passed first guard (Room/Session/Scene active).");
+  // --- End Log ---
 
+  const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
+  if (!myPlayerState) {
+      console.log("Preparation updateBoardFromState: Exiting early - myPlayerState not found."); // Log exit reason
+      return;
+  }
+  // --- Add Log After Second Guard ---
+  console.log("Preparation updateBoardFromState: Passed second guard (myPlayerState found).");
+  // --- End Log ---
+  // --- End Log ---
   // Clear existing draggable objects first
   this.draggableCardObjects.forEach(obj => obj.destroy());
   this.draggableCardObjects = [];
   this.handCardObjects.clear();
   this.battlefieldCardObjects.clear();
 
+  // --- Log Hand Size Before Loop ---
+  console.log(`Preparation updateBoardFromState: Hand size before loop: ${myPlayerState.hand.size}`);
+  // --- End Log ---
+
+  // --- Add Detailed Logging Before Loop ---
+  console.log("Preparation updateBoardFromState: Logging hand state right before loop:");
+  console.log("  myPlayerState.hand object:", myPlayerState.hand);
+  console.log("  myPlayerState.hand.size:", myPlayerState.hand.size);
+  console.log("  typeof myPlayerState.hand.forEach:", typeof myPlayerState.hand.forEach);
+  try {
+      console.log("  myPlayerState.hand keys:", Array.from(myPlayerState.hand.keys()));
+  } catch (e) {
+      console.error("  Error getting hand keys:", e);
+  }
+  // --- End Detailed Logging ---
+
   // Populate Hand Visuals
   myPlayerState.hand.forEach((cardInstanceSchema, slotIndex) => {
+      // --- Log Inside Loop Start ---
+      console.log(`Preparation updateBoardFromState: Entering hand.forEach for slotIndex: ${slotIndex}`);
+      // --- End Log ---
       const slotNumber = parseInt(slotIndex, 10);
       // Add check for cardInstanceSchema existence
-      if (isNaN(slotNumber) || slotNumber < 0 || slotNumber >= this.handSlots.length || !cardInstanceSchema) return;
+      if (isNaN(slotNumber) || slotNumber < 0 || slotNumber >= this.handSlots.length || !cardInstanceSchema) {
+          console.warn(`Preparation updateBoardFromState: Skipping invalid hand slot data for index ${slotIndex}`);
+          return; // Use return instead of continue for forEach
+      }
+      // --- Log Card ---
+      console.log(`Preparation updateBoardFromState: Processing hand card in slot ${slotIndex}: ID=${cardInstanceSchema.cardId}, InstanceID=${cardInstanceSchema.instanceId}`);
+      // --- End Log ---
       const slot = this.handSlots[slotNumber];
+      // --- Add Log Before createCardText ---
+      console.log(`Preparation updateBoardFromState: About to call createCardText for slot ${slotIndex}`);
+      // --- End Log ---
       const cardText = this.createCardText(cardInstanceSchema, slot.centerX, slot.centerY, this.handSlotObjects[slotNumber].width, this.handSlotObjects[slotNumber].height, "#444488");
+      // --- Log Card Text Creation ---
+      if (cardText) {
+          console.log(`Preparation updateBoardFromState: Created cardText for hand slot ${slotIndex}`);
+      } else {
+          console.error(`Preparation updateBoardFromState: Failed to create cardText for hand slot ${slotIndex}`);
+          return; // Skip setup if text creation failed
+      }
+      // --- End Log ---
       this.handCardObjects.set(slotIndex, cardText);
+      // --- Add Log Before setupDraggableCard ---
+      console.log(`Preparation updateBoardFromState: About to call setupDraggableCard for slot ${slotIndex}`);
+      // --- End Log ---
       this.setupDraggableCard(cardText, cardInstanceSchema, 'hand', slotIndex);
   });
+
+  // --- Log Hand Size After Loop ---
+  console.log(`Preparation updateBoardFromState: Hand size after loop: ${myPlayerState.hand.size}`);
+  console.log(`Preparation updateBoardFromState: handCardObjects map size: ${this.handCardObjects.size}`);
+  // --- Log Draggable Objects After Hand Loop ---
+  console.log(`Preparation updateBoardFromState: Draggable objects after hand loop: ${this.draggableCardObjects.length}`);
+  // --- End Log ---
 
   // Populate Battlefield Visuals
   myPlayerState.battlefield.forEach((cardInstanceSchema, slotIndex) => {
@@ -498,7 +599,12 @@ updateBoardFromState() {
   }
 
   updateStartButtonState() {
-    if (!this.startBattleButton) return; // Guard if called too early
+    // --- Add Null Check ---
+    if (!this.startBattleButton || !this.startBattleButton.active) {
+        console.warn("updateStartButtonState called but button is null or inactive.");
+        return; // Guard if called too early or after shutdown
+    }
+    // --- End Null Check ---
 
     // Enable button only if at least one card is placed on the BATTLEFIELD visually
     const canStart = this.battlefieldCardObjects.size > 0;
@@ -517,10 +623,12 @@ updateBoardFromState() {
         this.startBattleButton.on('pointerout', () => this.startBattleButton.setColor('#00ff00'));
     } else {
         // Keep disabled color unless actively waiting (handled by updateWaitingStatus)
-        if (!this.waitingText.visible) {
+        // Check waitingText visibility *before* potentially accessing it
+        if (this.waitingText && !this.waitingText.visible) {
              this.startBattleButton.setColor("#888888");
         }
-        this.startBattleButton.disableInteractive();
+        // This is the line causing the error if this.startBattleButton is null
+        this.startBattleButton.disableInteractive(); // Error occurs here if button is null
         this.startBattleButton.off('pointerdown');
         this.startBattleButton.off('pointerover');
         this.startBattleButton.off('pointerout');
@@ -569,7 +677,7 @@ confirmPreparation() {
           ? `${cardInstance.currentHp}/${cardInstance.health}`
           : `${cardInstance.health}`;
 
-      return this.add.text(
+      const cardText = this.add.text(
           x, y,
           `${cardInstance.name}\nAtk: ${cardInstance.attack}\nHP: ${hpDisplay}\nSpd: ${cardInstance.speed}`,
           {
@@ -584,6 +692,13 @@ confirmPreparation() {
             wordWrap: { width: width - 10 }
           } // Add styles matching previous implementation
       ).setOrigin(0.5);
+
+      // --- Set Depth and Log ---
+      cardText.setDepth(10); // Ensure it's above slots/background
+      console.log(`createCardText: Created text for ${cardInstance.name}. Properties: x=${cardText.x}, y=${cardText.y}, visible=${cardText.visible}, alpha=${cardText.alpha}, depth=${cardText.depth}`);
+      // --- End Set Depth and Log ---
+
+      return cardText;
   }
 
   // Helper to setup draggable card visuals
@@ -593,6 +708,9 @@ confirmPreparation() {
       initialLocation: 'hand' | 'battlefield',
       initialIndex: string // Use string index for map keys
   ) {
+      // --- Add Logging ---
+      console.log(`setupDraggableCard: Setting up card '${cardInstance.name}' (Instance: ${cardInstance.instanceId}) for location '${initialLocation}', index '${initialIndex}'. Valid text object: ${!!cardText}`);
+      // --- End Logging ---
       cardText.setData("cardInstance", cardInstance);
       cardText.setData("location", initialLocation);
       cardText.setData("currentSlotIndex", initialIndex);

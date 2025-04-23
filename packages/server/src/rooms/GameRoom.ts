@@ -14,6 +14,11 @@ const cardDatabase: any[] = [
     { id: "test_card_06", name: "Speedy Scout", attack: 4, speed: 1.5, health: 7, brewCost: 5, description: "Attacks very quickly.", isLegend: false }
 ]; // Load properly in a real scenario
 
+// --- Constants for Rewards ---
+const DAILY_BREW_BONUS = 5;
+const BREW_PER_KILL = 1;
+// --- End Constants ---
+
 // Helper function for unique IDs (consider a more robust library like uuid)
 function generateUniqueId(): string {
     return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -49,9 +54,10 @@ export class GameRoom extends Room<GameState> {
         }
     });
 
-    this.onMessage("buyCard", (client, message: { cardData: any, handSlotIndex: number }) => {
+    // Update message type hint to expect cardId (string)
+    this.onMessage("buyCard", (client, message: { cardId: string, handSlotIndex: number }) => {
         const player = this.state.players.get(client.sessionId);
-        const cardData = message.cardData; // The base data of the card being bought
+        const cardId = message.cardId; // Get the base card ID being bought
         const slotIndex = message.handSlotIndex;
 
         if (!player || this.state.currentPhase !== Phase.Shop) {
@@ -66,9 +72,19 @@ export class GameRoom extends Room<GameState> {
             console.warn(`Buy attempt failed: Hand slot ${slotIndex} is already full.`);
             return; // Slot already full
         }
+        // --- Validate against shopOfferIds ---
+        if (!player.shopOfferIds.includes(cardId)) {
+            console.warn(`Buy attempt failed: Card ID ${cardId} not found in player's shop offers.`);
+            return; // Card not offered to this player
+        }
+        // --- End Validation ---
+
+        // Fetch full card data using the ID
+        const cardData = this.getCardDataById(cardId);
+
         if (!cardData || typeof cardData.brewCost !== 'number') {
-             console.warn(`Buy attempt failed: Invalid card data received.`);
-             return; // Invalid card data
+             console.warn(`Buy attempt failed: Invalid card data found for ID ${cardId}.`);
+             return; // Invalid card data in database?
         }
         if (player.brews < cardData.brewCost) {
             console.warn(`Buy attempt failed: Insufficient brews (Player: ${player.brews}, Cost: ${cardData.brewCost})`);
@@ -81,11 +97,23 @@ export class GameRoom extends Room<GameState> {
         const newCardInstance = CardInstanceSchema.fromCardData(cardData, newInstanceId);
         player.hand.set(String(slotIndex), newCardInstance);
 
-        console.log(`Player ${client.sessionId} bought ${cardData.name} for ${cardData.brewCost}. Placed in hand slot ${slotIndex}. Remaining brews: ${player.brews}`);
+        console.log(`Player ${client.sessionId} bought ${cardData.name} (ID: ${cardId}) for ${cardData.brewCost}. Placed in hand slot ${slotIndex}. Remaining brews: ${player.brews}`);
+
+        // --- Remove bought card ID from shop offers ---
+        const offerIndex = player.shopOfferIds.findIndex(id => id === cardId);
+        if (offerIndex > -1) {
+            player.shopOfferIds.splice(offerIndex, 1);
+            console.log(`Removed card ID ${cardId} from shop offers for player ${client.sessionId}.`);
+        } else {
+            console.warn(`Could not find bought card ID ${cardId} in shop offers for player ${client.sessionId} to remove it.`);
+        }
+        // --- End Remove ---
+
         // Client UI should update based on state change automatically
     });
 
-    this.onMessage("setPreparation", (client, message: { handLayout: (any | null)[], battlefieldLayout: (any | null)[] }) => {
+    // Update the type hint for the message payload to expect objects
+    this.onMessage("setPreparation", (client, message: { handLayout: { [key: string]: any | null }, battlefieldLayout: { [key: string]: any | null } }) => {
         const player = this.state.players.get(client.sessionId);
         if (!player || this.state.currentPhase !== Phase.Preparation) {
             console.warn(`SetPreparation failed: Invalid state (Player: ${!!player}, Phase: ${this.state.currentPhase})`);
@@ -98,26 +126,42 @@ export class GameRoom extends Room<GameState> {
         player.hand.clear();
         player.battlefield.clear();
 
-        message.handLayout.forEach((cardInstanceData, index) => {
+        // Iterate over the handLayout object
+        Object.entries(message.handLayout).forEach(([index, cardInstanceData]) => {
             if (cardInstanceData) {
                 // Re-create schema instance - assumes client sends full CardInstance data
                 const card = new CardInstanceSchema();
                 Object.assign(card, cardInstanceData); // Copy properties
-                player.hand.set(String(index), card);
+                player.hand.set(String(index), card); // Use the string index as the key
             }
         });
 
-        message.battlefieldLayout.forEach((cardInstanceData, index) => {
+        // Iterate over the battlefieldLayout object
+        Object.entries(message.battlefieldLayout).forEach(([index, cardInstanceData]) => {
             if (cardInstanceData) {
                 const card = new CardInstanceSchema();
                 Object.assign(card, cardInstanceData);
-                player.battlefield.set(String(index), card);
+                player.battlefield.set(String(index), card); // Use the string index as the key
             }
         });
 
         player.isReady = true;
         this.checkPhaseTransition();
     });
+
+    // --- Add clientBattleOver handler ---
+    this.onMessage("clientBattleOver", (client) => {
+        const player = this.state.players.get(client.sessionId);
+        console.log(`Received clientBattleOver message from ${player?.username ?? client.sessionId}`);
+        // Check if we are actually in the Battle phase before ending it
+        if (this.state.currentPhase === Phase.Battle) {
+            console.log("clientBattleOver handler: Phase is Battle. Calling endBattle."); // Log before call
+            this.endBattle(false); // End battle, not due to timeout
+        } else {
+            console.warn(`Received clientBattleOver message during non-Battle phase (${this.state.currentPhase}). Ignoring.`);
+        }
+    });
+    // --- End clientBattleOver handler ---
 
     // Remove old "move" message handler if present
     /*
@@ -127,10 +171,15 @@ export class GameRoom extends Room<GameState> {
 
   onJoin(client: Client, options?: any, auth?: any): void | Promise<any> {
     console.log(`Client joined: ${client.sessionId}`);
+    // Log the received options to check for username
+    console.log(`Received options for ${client.sessionId}:`, JSON.stringify(options));
 
     const newPlayer = new PlayerState();
     newPlayer.sessionId = client.sessionId;
-    newPlayer.username = options?.username || `Player_${client.sessionId.substring(0, 4)}`; // Get username from options if provided
+    // Assign username from options, log the result
+    newPlayer.username = options?.username || `Player_${client.sessionId.substring(0, 4)}`;
+    console.log(`Assigned username for ${client.sessionId}: ${newPlayer.username}`);
+
     newPlayer.health = 50;
     newPlayer.brews = 10; // Starting brews
     newPlayer.isReady = false;
@@ -231,6 +280,18 @@ export class GameRoom extends Room<GameState> {
   }
 
   transitionToPhase(newPhase: Phase) {
+    // --- Add Logging Here ---
+    console.log(`--- Preparing for Phase Transition: ${this.state.currentPhase} -> ${newPhase} ---`);
+    this.state.players.forEach((player, sessionId) => {
+        const handContents = JSON.stringify(Object.fromEntries(player.hand.entries()));
+        const battlefieldContents = JSON.stringify(Object.fromEntries(player.battlefield.entries()));
+        console.log(`Player ${player.username} (${sessionId}) State:`);
+        console.log(`  Hand: ${handContents}`);
+        console.log(`  Battlefield: ${battlefieldContents}`);
+    });
+    console.log(`--- End State Log ---`);
+    // --- End Logging ---
+
     console.log(`Transitioning phase: ${this.state.currentPhase} -> ${newPhase}`);
     this.state.currentPhase = newPhase;
 
@@ -239,7 +300,24 @@ export class GameRoom extends Room<GameState> {
         player.isReady = false;
     });
 
+    // --- Add Post-Transition Logging Here ---
+    console.log(`--- State AFTER Transition to: ${newPhase} ---`);
+    this.state.players.forEach((player, sessionId) => {
+        const handContents = JSON.stringify(Object.fromEntries(player.hand.entries()));
+        const battlefieldContents = JSON.stringify(Object.fromEntries(player.battlefield.entries()));
+        console.log(`Player ${player.username} (${sessionId}) State:`);
+        console.log(`  Hand: ${handContents}`);
+        console.log(`  Battlefield: ${battlefieldContents}`);
+        console.log(`  IsReady: ${player.isReady}`); // Also log ready status
+    });
+    console.log(`--- End Post-Transition State Log ---`);
+    // --- End Logging ---
+
+
     // Phase-specific start actions
+    if (newPhase === Phase.Shop) {
+        this.generateShopOffers(); // Generate new offers for each player
+    }
     if (newPhase === Phase.Battle) {
         this.startBattle();
     }
@@ -264,10 +342,48 @@ export class GameRoom extends Room<GameState> {
     // Start server-side timer countdown
     this.battleTimerInterval = this.clock.setInterval(() => {
         if (this.state.currentPhase === Phase.Battle) {
+
+            // --- Check for Battle End by Board Clear ---
+            let player1Cleared = true;
+            let player2Cleared = true;
+            const playerIds = Array.from(this.state.players.keys());
+            if (playerIds.length === 2) {
+                const player1 = this.state.players.get(playerIds[0]);
+                const player2 = this.state.players.get(playerIds[1]);
+
+                if (player1 && player1.battlefield.size > 0) { // Only check if board has cards
+                    player1.battlefield.forEach(card => {
+                        if (card.currentHp > 0) player1Cleared = false;
+                    });
+                } else {
+                    player1Cleared = false; // Cannot be cleared if empty initially? Or treat as cleared? Decide logic. Assume not cleared if empty.
+                }
+
+                if (player2 && player2.battlefield.size > 0) { // Only check if board has cards
+                    player2.battlefield.forEach(card => {
+                        if (card.currentHp > 0) player2Cleared = false;
+                    });
+                 } else {
+                    player2Cleared = false; // Assume not cleared if empty.
+                 }
+
+                // If one side is cleared AND the board wasn't empty to begin with (or both boards were non-empty initially)
+                const wasPlayer1BoardPopulated = player1 && player1.battlefield.size > 0;
+                const wasPlayer2BoardPopulated = player2 && player2.battlefield.size > 0;
+
+                if ((player1Cleared && wasPlayer1BoardPopulated) || (player2Cleared && wasPlayer2BoardPopulated)) {
+                    console.log(`Battle timer loop: Board clear detected. Player 1 Cleared: ${player1Cleared}, Player 2 Cleared: ${player2Cleared}. Calling endBattle.`); // Log before call
+                    this.endBattle(false); // End battle, not due to timeout
+                    return; // Stop further processing for this interval tick
+                }
+            }
+            // --- End Board Clear Check ---
+
+
             this.state.battleTimer--;
             // console.log(`Battle timer: ${this.state.battleTimer}`); // Optional: Log countdown
             if (this.state.battleTimer <= 0) {
-                console.log("Battle timer reached zero.");
+                console.log("Battle timer loop: Timer reached zero. Calling endBattle."); // Log before call
                 this.endBattle(true); // End battle due to time limit
             }
             // TODO: Add check for board empty condition if needed
@@ -277,82 +393,188 @@ export class GameRoom extends Room<GameState> {
     }, 1000); // Update every second
   }
 
-  // Called when battle ends (timer, or potentially board clear)
-  endBattle(timeoutReached: boolean = false) {
-    if (this.state.currentPhase !== Phase.Battle) return; // Prevent double execution
+    // Called when battle ends (timer, board clear, or client message)
+    endBattle(timeoutReached: boolean = false) {
+        console.log(`--- Entering endBattle function --- Timeout: ${timeoutReached}`); // Log entry
+        if (this.state.currentPhase !== Phase.Battle) {
+             console.log(`--- endBattle exiting early: Current phase is ${this.state.currentPhase}, not Battle. ---`); // Log exit reason
+             return; // Prevent double execution
+        }
 
-    console.log(`Ending Battle Phase. Timeout: ${timeoutReached}`);
-    if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Stop the timer
+        console.log(`--- Starting endBattle ---`);
+        console.log(`Ending Battle Phase. Timeout: ${timeoutReached}`);
+        if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Stop the timer
 
-    // --- Calculate Results (Server-Side) ---
-    let player1SessionId = "";
-    let player2SessionId = "";
-    let player1: PlayerState | undefined;
-    let player2: PlayerState | undefined;
+        // --- Calculate Results (Server-Side) ---
+        let player1SessionId = "";
+        let player2SessionId = "";
+        let player1: PlayerState | undefined;
+        let player2: PlayerState | undefined;
 
-    const playerIds = Array.from(this.state.players.keys());
-    if (playerIds.length === 2) {
-        player1SessionId = playerIds[0];
-        player2SessionId = playerIds[1];
-        player1 = this.state.players.get(player1SessionId);
-        player2 = this.state.players.get(player2SessionId);
-    } else {
-        console.error("Cannot calculate battle results without exactly 2 players.");
-        this.transitionToPhase(Phase.GameOver); // Or handle appropriately
-        return;
-    }
+        const playerIds = Array.from(this.state.players.keys());
+        if (playerIds.length === 2) {
+            player1SessionId = playerIds[0];
+            player2SessionId = playerIds[1];
+            player1 = this.state.players.get(player1SessionId);
+            player2 = this.state.players.get(player2SessionId);
+        } else {
+            console.error("endBattle: Cannot calculate battle results without exactly 2 players.");
+            this.transitionToPhase(Phase.GameOver); // Or handle appropriately
+            return;
+        }
 
-    if (!player1 || !player2) {
-         console.error("Player state missing during battle end calculation.");
-         this.transitionToPhase(Phase.GameOver);
-         return;
-    }
+        if (!player1 || !player2) {
+             console.error("endBattle: Player state missing during battle end calculation.");
+             this.transitionToPhase(Phase.GameOver);
+             return;
+        }
 
-    // Determine survivors (based on current server state)
-    const player1Survivors = Array.from(player1.battlefield.values()).filter(card => card && card.currentHp > 0);
-    const player2Survivors = Array.from(player2.battlefield.values()).filter(card => card && card.currentHp > 0);
+        // --- Log Initial Battlefield States ---
+        console.log(`endBattle: Player 1 (${player1.username}) Battlefield State:`);
+        player1.battlefield.forEach((card, key) => {
+            console.log(`  Slot ${key}: ${card.name} (ID: ${card.cardId}, HP: ${card.currentHp}/${card.health})`);
+        });
+        console.log(`endBattle: Player 2 (${player2.username}) Battlefield State:`);
+        player2.battlefield.forEach((card, key) => {
+            console.log(`  Slot ${key}: ${card.name} (ID: ${card.cardId}, HP: ${card.currentHp}/${card.health})`);
+        });
+        // --- End Log ---
 
-    // Calculate face damage
-    const p1FaceDamage = player2Survivors.reduce((sum, card) => sum + card.attack, 0);
-    const p2FaceDamage = player1Survivors.reduce((sum, card) => sum + card.attack, 0);
+        // Determine survivors (based on current server state)
+        const player1Survivors = Array.from(player1.battlefield.values()).filter(card => card && card.currentHp > 0);
+        const player2Survivors = Array.from(player2.battlefield.values()).filter(card => card && card.currentHp > 0);
 
-    player1.health = Math.max(0, player1.health - p1FaceDamage);
-    player2.health = Math.max(0, player2.health - p2FaceDamage);
+        // --- Log Survivor Counts ---
+        console.log(`endBattle: Player 1 Survivors Count: ${player1Survivors.length}`);
+        console.log(`endBattle: Player 2 Survivors Count: ${player2Survivors.length}`);
+        // --- End Log ---
 
-    // Calculate brews earned (flat + kills - simplified: assume client reports kills or derive if needed)
-    // For now, just flat reward
-    const flatBrewReward = 4;
-    player1.brews += flatBrewReward;
-    player2.brews += flatBrewReward;
-    // TODO: Add brew calculation based on kills if implementing server-side tracking or client reports
+        // Determine winner/loser based on survivors
+        let winner: PlayerState | null = null;
+        let loser: PlayerState | null = null;
+        let isDraw = false;
 
-    // Update board/hand state (cards persist with current HP)
-    // This happens implicitly as we modify the state directly.
-    // We need to ensure dead cards are removed or marked if not done by client updates.
-    // For simplicity, assume client `setPreparation` handles the state correctly before battle.
-    // We might need to explicitly update currentHp based on a more detailed simulation or client reports if needed.
-    // For now, health is updated, brews are added. Hand/Board structure remains as set in Prep.
+        // --- Determine Winner/Loser/Draw ---
+        if (player1Survivors.length > 0 && player2Survivors.length === 0) {
+            // Player 1 wins if they have survivors and Player 2 does not
+            winner = player1;
+            loser = player2;
+            console.log(`endBattle: Winner determined: Player 1 (${winner.username})`);
+        } else if (player2Survivors.length > 0 && player1Survivors.length === 0) {
+            // Player 2 wins if they have survivors and Player 1 does not
+            winner = player2;
+            loser = player1;
+            console.log(`endBattle: Winner determined: Player 2 (${winner.username})`);
+        } else if (player1Survivors.length === 0 && player2Survivors.length === 0) {
+            // Draw if both players have no survivors
+            isDraw = true;
+            console.log(`endBattle: Battle determined as Draw (both boards cleared).`);
+        } else {
+            // Draw if both players have survivors (e.g., timeout)
+            // Note: Could add logic here to determine winner by total HP/attack if desired for timeout draws
+            isDraw = true;
+            console.log(`endBattle: Battle determined as Draw (both have survivors or timeout).`);
+        }
+        // --- End Winner/Loser/Draw Determination ---
 
-    console.log(`Battle Results: P1 HP=${player1.health}, P2 HP=${player2.health}. P1 Brews=${player1.brews}, P2 Brews=${player2.brews}`);
 
-    // Check Game Over conditions
-    if (player1.health <= 0 || player2.health <= 0) {
-        this.determineWinnerByHealth(); // This will transition to GameOver
-    } else {
-        // Transition to BattleEnd phase to show results
-        this.transitionToPhase(Phase.BattleEnd);
+        // Calculate face damage based on opponent survivors
+        const p1FaceDamage = player2Survivors.reduce((sum, card) => sum + card.attack, 0);
+        const p2FaceDamage = player1Survivors.reduce((sum, card) => sum + card.attack, 0);
 
-        // Add a delay before automatically transitioning to the next Shop phase
-        if (this.battleEndTimeout) this.battleEndTimeout.clear();
-        this.battleEndTimeout = this.clock.setTimeout(() => {
-            if (this.state.currentPhase === Phase.BattleEnd) { // Check if still in BattleEnd
-                 // Players don't need to ready up from BattleEnd, server controls transition
-                 this.state.players.forEach(p => p.isReady = true); // Mark as ready
-                 this.checkPhaseTransition(); // Trigger transition Shop
+        // --- Log Calculated Damage ---
+        console.log(`endBattle: Calculated Face Damage for Player 1: ${p1FaceDamage} (from ${player2Survivors.length} P2 survivors)`);
+        console.log(`endBattle: Calculated Face Damage for Player 2: ${p2FaceDamage} (from ${player1Survivors.length} P1 survivors)`);
+        // --- End Log ---
+
+        // --- Log Health Before Damage ---
+        console.log(`endBattle: Player 1 Health BEFORE damage: ${player1.health}`);
+        console.log(`endBattle: Player 2 Health BEFORE damage: ${player2.health}`);
+        // --- End Log ---
+
+        // Apply face damage ONLY to the loser, or both if it's a draw
+        // --- Add Detailed Damage Application Logging ---
+        if (loser === player1 || isDraw) {
+            // Apply damage to Player 1 if they lost OR if it's a draw
+            console.log(`endBattle: Applying ${p1FaceDamage} damage to Player 1 (${player1.username}) because ${isDraw ? 'it was a draw' : 'they were the loser'}.`);
+            player1.health = Math.max(0, player1.health - p1FaceDamage);
+            console.log(`endBattle: Player 1 New HP: ${player1.health}`);
+        } else {
+             // Player 1 won, do not apply damage
+             console.log(`endBattle: NOT applying ${p1FaceDamage} damage to Player 1 (${player1.username}) because they won.`);
+        }
+        if (loser === player2 || isDraw) {
+            // Apply damage to Player 2 if they lost OR if it's a draw
+            console.log(`endBattle: Applying ${p2FaceDamage} damage to Player 2 (${player2.username}) because ${isDraw ? 'it was a draw' : 'they were the loser'}.`);
+            player2.health = Math.max(0, player2.health - p2FaceDamage);
+            console.log(`endBattle: Player 2 New HP: ${player2.health}`);
+        } else {
+             // Player 2 won, do not apply damage
+             console.log(`endBattle: NOT applying ${p2FaceDamage} damage to Player 2 (${player2.username}) because they won.`);
+        }
+        // --- End Detailed Damage Application Logging ---
+
+        // Calculate brews earned based on opponent's dead cards + daily bonus
+        const player1OpponentDeadCards = Array.from(player2.battlefield.values()).filter(card => card && card.currentHp <= 0).length;
+        const player2OpponentDeadCards = Array.from(player1.battlefield.values()).filter(card => card && card.currentHp <= 0).length;
+
+        const p1BrewReward = DAILY_BREW_BONUS + (player1OpponentDeadCards * BREW_PER_KILL);
+        const p2BrewReward = DAILY_BREW_BONUS + (player2OpponentDeadCards * BREW_PER_KILL);
+
+        // --- Log Brew Calculation ---
+        console.log(`endBattle: Player 1 Brew Reward Calculation: Daily=${DAILY_BREW_BONUS}, Kills=${player1OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p1BrewReward}`);
+        console.log(`endBattle: Player 2 Brew Reward Calculation: Daily=${DAILY_BREW_BONUS}, Kills=${player2OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p2BrewReward}`);
+        console.log(`endBattle: Player 1 Brews BEFORE reward: ${player1.brews}`);
+        console.log(`endBattle: Player 2 Brews BEFORE reward: ${player2.brews}`);
+        // --- End Log ---
+
+        player1.brews += p1BrewReward;
+        player2.brews += p2BrewReward;
+
+        console.log(`endBattle: Final Battle Results: P1 HP=${player1.health}, P2 HP=${player2.health}.`);
+        console.log(`endBattle: P1 Brews: +${p1BrewReward} => Total: ${player1.brews}`);
+        console.log(`endBattle: P2 Brews: +${p2BrewReward} => Total: ${player2.brews}`);
+
+        // --- Remove Dead Cards from Battlefield State ---
+        console.log("endBattle: Removing dead cards from battlefield state...");
+        player1.battlefield.forEach((card, key) => {
+            if (card.currentHp <= 0) {
+                console.log(`  Removing P1 card: ${card.name} (Key: ${key})`);
+                player1.battlefield.delete(key);
             }
-        }, 5000); // 5 second delay to show results
+        });
+        player2.battlefield.forEach((card, key) => {
+            if (card.currentHp <= 0) {
+                console.log(`  Removing P2 card: ${card.name} (Key: ${key})`);
+                player2.battlefield.delete(key);
+            }
+        });
+        console.log("endBattle: Finished removing dead cards.");
+        // --- End Remove Dead Cards ---
+
+        // Check Game Over conditions
+        if (player1.health <= 0 || player2.health <= 0) {
+            console.log("endBattle: Game Over condition met (player health <= 0). Determining winner by health.");
+            this.determineWinnerByHealth(); // This will transition to GameOver
+        } else {
+            // Transition to BattleEnd phase to show results
+            console.log("endBattle: Transitioning to BattleEnd phase.");
+            this.transitionToPhase(Phase.BattleEnd);
+
+            // Add a delay before automatically transitioning to the next Shop phase
+            if (this.battleEndTimeout) this.battleEndTimeout.clear();
+            this.battleEndTimeout = this.clock.setTimeout(() => {
+                if (this.state.currentPhase === Phase.BattleEnd) { // Check if still in BattleEnd
+                     console.log("endBattle: BattleEnd timeout reached. Marking players ready and checking phase transition.");
+                     this.state.players.forEach(p => p.isReady = true); // Mark as ready
+                     this.checkPhaseTransition(); // Trigger transition Shop
+                } else {
+                    console.log("endBattle: BattleEnd timeout reached, but phase is no longer BattleEnd. No transition triggered.");
+                }
+            }, 5000); // 5 second delay to show results
+        }
+        console.log(`--- Finished endBattle ---`);
     }
-  }
 
   determineWinnerByHealth() {
       let winner: PlayerState | null = null;
@@ -393,6 +615,27 @@ export class GameRoom extends Room<GameState> {
       }
       this.transitionToPhase(Phase.GameOver);
       // TODO: Broadcast winner/loser/draw message
+  }
+
+  // --- Shop Generation ---
+  generateShopOffers() {
+    console.log("Generating new shop offers for all players...");
+    const allCards = cardDatabase.filter(card => !card.isLegend); // Filter out legends
+
+    this.state.players.forEach(player => {
+        player.shopOfferIds.clear(); // Clear previous offers
+        const availableCards = [...allCards]; // Create a copy to modify
+        const selectedIds = new Set<string>();
+
+        while (selectedIds.size < 4 && availableCards.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availableCards.length);
+            const chosenCard = availableCards.splice(randomIndex, 1)[0];
+            selectedIds.add(chosenCard.id);
+        }
+
+        selectedIds.forEach(id => player.shopOfferIds.push(id));
+        console.log(`Generated shop offers for ${player.username}: [${player.shopOfferIds.join(', ')}]`);
+    });
   }
 
   // Utility to get card data from the "database"

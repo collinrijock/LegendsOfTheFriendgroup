@@ -45,11 +45,28 @@ export async function connectColyseus(accessToken: string, username: string) {
     });
 
   } catch (e) {
+    // Log the specific error object first
     console.error("Failed to connect to Colyseus:", e);
-    colyseusRoom = null;
-    // Handle connection failure (e.g., show error message)
-    alert(`Failed to connect to game server: ${e.message || e}`);
-    // Rethrow or return false to indicate failure to the caller
-    throw e; // Rethrow the error so the caller knows connection failed
+
+    // Check if it's a network-level event
+    if (e instanceof ProgressEvent) {
+        console.error("Connection failed: Network error (ProgressEvent). Potential causes:");
+        console.error("- Colyseus server might not be running or accessible at the target URL:", url);
+        console.error("- WebSocket connection blocked by firewall or proxy.");
+        console.error("- Incorrect WebSocket proxy configuration on the deployment server (if applicable).");
+        alert(`Failed to connect to game server: Network Error. Please ensure the server is running and accessible.`);
+    } else if (e instanceof Error) {
+        // Handle standard errors
+        console.error("Connection failed due to error:", e.message);
+        alert(`Failed to connect to game server: ${e.message}`);
+    } else {
+        // Handle other potential throw types
+        console.error("Connection failed due to unknown error:", e);
+        alert(`Failed to connect to game server: An unknown error occurred.`);
+    }
+
+    colyseusRoom = null; // Reset room variable on any connection error
+    // Rethrow the error so the caller (e.g., authorizeDiscordUser) knows connection failed
+    throw e;
   }
 }

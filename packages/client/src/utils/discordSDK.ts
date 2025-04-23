@@ -86,6 +86,7 @@ const authorizeDiscordUser = async () => {
   }
 
   // --- Embedded Flow ---
+  let step = "authorize"; // Track the current step
   try {
       console.log("Requesting Discord authorization...");
       const { code } = await discordSdk.commands.authorize({
@@ -99,7 +100,8 @@ const authorizeDiscordUser = async () => {
       console.log("Authorization code received:", code);
 
       // Retrieve an access_token from your application's server
-      console.log("Fetching access token...");
+      step = "fetchToken";
+      console.log("Fetching access token from /.proxy/api/token...");
       const response = await fetch("/.proxy/api/token", {
         method: "POST",
         headers: {
@@ -109,28 +111,59 @@ const authorizeDiscordUser = async () => {
           code,
         }),
       });
+      console.log("Token fetch response received. Status:", response.status);
 
       if (!response.ok) {
-          throw new Error(`Token fetch failed: ${response.statusText}`);
+          const errorText = await response.text();
+          console.error("Token fetch failed:", response.status, response.statusText, errorText);
+          throw new Error(`Token fetch failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const { access_token } = await response.json();
-      console.log("Access token received.");
+      console.log("Access token received successfully.");
 
       // Authenticate with Discord client (using the access_token)
+      step = "discordAuthenticate";
       console.log("Authenticating with Discord SDK...");
       auth = await discordSdk.commands.authenticate({
         access_token,
       });
-      console.log("Discord SDK Authentication successful:", auth);
+      if (!auth?.user) {
+          console.error("Discord SDK Authentication failed: No user data received.", auth);
+          throw new Error("Discord SDK Authentication failed to return user data.");
+      }
+      console.log("Discord SDK Authentication successful:", auth.user.username);
 
       // --- Connect to Colyseus AFTER successful Discord Auth ---
-      await connectColyseus(auth.access_token, auth.user.username);
+      step = "connectColyseus";
+      console.log("Connecting to Colyseus...");
+      try {
+          await connectColyseus(auth.access_token, auth.user.username);
+          console.log("Colyseus connection successful.");
+      } catch (colyseusError) {
+          console.error("Colyseus connection failed:", colyseusError);
+          // Rethrow or handle specifically if needed, outer catch will grab it
+          throw colyseusError; // Rethrow to be caught by the outer catch
+      }
+
       return true; // Indicate success
 
   } catch (error) {
+      console.error(`Error during step: ${step}`);
+      // Log the specific error object for more details
       console.error("Discord authorization or Colyseus connection failed:", error);
+
+      // Check if it's a ProgressEvent, often related to network issues during fetch
+      if (error instanceof ProgressEvent) {
+          console.error("Network error (ProgressEvent) occurred, likely during fetch.");
+      } else if (error.message && error.message.includes("Token fetch failed")) {
+          console.error("Error specifically during token fetch step.");
+      } else if (step === "connectColyseus") {
+          console.error("Error specifically during Colyseus connection step.");
+      }
+
       // Handle error appropriately, maybe show a message to the user
+      auth = null; // Clear auth on failure
       return false; // Indicate failure
   }
 };

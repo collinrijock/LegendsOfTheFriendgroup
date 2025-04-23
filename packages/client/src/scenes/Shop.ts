@@ -50,7 +50,11 @@ export class Shop extends Scene {
   private playerStateListenerUnsub: (() => void) | null = null; // Store unsubscribe function
   private handListenersUnsub: (() => void)[] = []; // Store multiple unsubscribe functions for hand
   private phaseListenerUnsub: (() => void) | null = null; // Store unsubscribe function
-  private otherPlayerListenersUnsub: (() => void)[] = []; // Store unsubscribe functions for other players
+  // --- Use Map for other player listeners ---
+  private otherPlayerChangeListeners: Map<string, () => void> = new Map(); // Key: sessionId
+  // --- End Use Map ---
+  // --- Add listener storage for shop offers ---
+  private shopOfferListenersUnsub: (() => void)[] = [];
 
   constructor() {
     super("Shop");
@@ -193,75 +197,186 @@ export class Shop extends Scene {
 
     // --- Colyseus Listeners ---
     this.setupColyseusListeners();
-  
+
     // Initial UI update based on current state
     this.updateNavbar(); // Update health/brews based on initial fetch
     this.updateHandDisplay(); // Update hand based on initial state
+    // --- Call createShopCards explicitly after listeners are set up ---
+    this.createShopCards(centerX, centerY, gameWidth); // Display initial shop offers
+    // --- End Call ---
     this.updateWaitingStatus(); // Update button/waiting text based on initial readiness
   }
-  
+
   // --- UI Creation Helpers ---
-  // ... (createHandSlots, createShopCards remain the same) ...
-  
+  // Add the missing createHandSlots method
+  createHandSlots(centerX: number, gameHeight: number) {
+    const handSlotY = gameHeight - 120;
+    const handSlotWidth = 100;
+    const handSlotHeight = 140;
+    const handSlotSpacing = 15;
+    const totalHandSlotsWidth = 5 * handSlotWidth + 4 * handSlotSpacing;
+    const startHandSlotsX = centerX - totalHandSlotsWidth / 2 + handSlotWidth / 2;
+
+    this.handSlots = [];
+    this.handSlotObjects = [];
+    this.handCardDisplayObjects.clear(); // Clear any previous display objects
+
+    for (let i = 0; i < 5; i++) {
+        const slotX = startHandSlotsX + i * (handSlotWidth + handSlotSpacing);
+        const slotRect = new Phaser.Geom.Rectangle(slotX - handSlotWidth / 2, handSlotY - handSlotHeight / 2, handSlotWidth, handSlotHeight);
+        this.handSlots.push(slotRect);
+        // Create visual representation of the slot
+        const slotGraphics = this.add.rectangle(slotX, handSlotY, handSlotWidth, handSlotHeight, 0x222222, 0.4) // Dark grey, semi-transparent
+            .setStrokeStyle(1, 0xaaaaaa); // Light grey outline
+        this.handSlotObjects.push(slotGraphics);
+    }
+  }
+
+  createShopCards(centerX: number, centerY: number, gameWidth: number) {
+    // Clear existing shop card visuals first
+    this.shopCardObjects.forEach(obj => obj.destroy());
+    this.shopCardObjects = [];
+    // this.cardsInShop = []; // Don't need client-side data array anymore
+
+    // --- Read Shop Offers from Server State ---
+    const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId);
+    const shopOfferIds = myPlayerState?.shopOfferIds; // This is an ArraySchema<string>
+
+    if (!shopOfferIds || shopOfferIds.length === 0) {
+        console.log("No shop offers available from server state yet.");
+        // Optionally display a "Loading shop..." message
+        return;
+    }
+
+    const allCardsData = this.cache.json.get("cardData") as CardData[]; // Get local cache
+    if (!allCardsData) {
+        console.error("Card data cache not loaded!");
+        return;
+    }
+
+    // --- Display Shop Cards based on IDs from state ---
+    const shopCardWidth = 100;
+    const shopCardHeight = 140;
+    const shopCardSpacing = 20;
+    const totalShopWidth = shopOfferIds.length * shopCardWidth + (shopOfferIds.length - 1) * shopCardSpacing;
+    const startShopX = centerX - totalShopWidth / 2 + shopCardWidth / 2;
+    const shopY = centerY - 100; // Position shop cards above center
+
+    shopOfferIds.forEach((cardId, index) => {
+        const cardData = allCardsData.find(c => c.id === cardId); // Find full data from cache
+        if (!cardData) {
+            console.warn(`Card data not found in cache for ID: ${cardId}`);
+            return; // Skip if data missing
+        }
+
+        const cardX = startShopX + index * (shopCardWidth + shopCardSpacing);
+        const cardText = this.add.text(
+            cardX, shopY,
+            `${cardData.name}\nCost: ${cardData.brewCost}\nAtk: ${cardData.attack}\nHP: ${cardData.health}\nSpd: ${cardData.speed}`,
+            {
+                fontFamily: "Arial",
+                fontSize: 14,
+                color: "#ffffff",
+                backgroundColor: "#333366", // Shop card color
+                padding: { x: 5, y: 3 },
+                align: "center",
+                fixedWidth: shopCardWidth,
+                fixedHeight: shopCardHeight,
+                wordWrap: { width: shopCardWidth - 10 }
+            }
+        ).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        cardText.setData("cardId", cardData.id); // Store the CARD ID for purchase message
+        cardText.setData("cardData", cardData); // Store full data for potential display/tooltip use
+        this.input.setDraggable(cardText);
+        this.shopCardObjects.push(cardText);
+    });
+    // Re-setup drag/drop listeners for the new shop objects
+    this.setupDragAndDrop();
+  }
+
   // --- Drag and Drop ---
-  // ... (setupDragAndDrop remains the same, but relies on server state for validation) ...
    setupDragAndDrop() {
+    // --- Clear existing drag listeners first ---
+    this.input.off('dragstart');
+    this.input.off('drag');
+    this.input.off('dragend');
+    // --- End Clear ---
+
     this.input.on('dragstart', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject) => {
         // Ensure it's a Text object and one of our shop cards
         if (!(gameObject instanceof Phaser.GameObjects.Text) || !this.shopCardObjects.includes(gameObject)) return;
         // Check if dragging is enabled (based on waiting status)
         if (!gameObject.input?.enabled) return;
-  
+
         this.children.bringToTop(gameObject);
         gameObject.setAlpha(0.7);
         gameObject.setData('startX', gameObject.x);
         gameObject.setData('startY', gameObject.y);
     });
-  
+
     this.input.on('drag', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject, dragX: number, dragY: number) => {
         if (!(gameObject instanceof Phaser.GameObjects.Text) || !this.shopCardObjects.includes(gameObject)) return;
         if (!gameObject.input?.enabled) return;
-  
+
         gameObject.x = dragX;
         gameObject.y = dragY;
     });
-  
+
     this.input.on('dragend', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject) => {
         if (!colyseusRoom || !(gameObject instanceof Phaser.GameObjects.Text) || !this.shopCardObjects.includes(gameObject)) return;
         // No need to check input.enabled here, drag wouldn't have started if disabled
-  
+
         gameObject.setAlpha(1.0);
         const droppedX = gameObject.x;
         const droppedY = gameObject.y;
         let buyAttempted = false;
+        let droppedOnValidSlot = false; // Track if dropped on *any* hand slot
         const myPlayerId = colyseusRoom.sessionId;
-  
+
         for (let i = 0; i < this.handSlots.length; i++) {
             const slotRect = this.handSlots[i];
             if (slotRect && Phaser.Geom.Rectangle.Contains(slotRect, droppedX, droppedY)) {
+                droppedOnValidSlot = true; // Dropped on a hand slot zone
                 const myPlayerState = colyseusRoom.state.players.get(myPlayerId);
                 // Check if server state shows slot as empty
                 if (myPlayerState && !myPlayerState.hand.has(String(i))) {
                     const cardData = gameObject.getData("cardData") as CardData;
-                    if (cardData) {
-                        console.log(`Attempting to buy ${cardData.name} for slot ${i}`);
-                        // Send buy message to server - send full card data for server to create instance
-                        colyseusRoom.send("buyCard", { cardData: cardData, handSlotIndex: i });
+                    const cardId = gameObject.getData("cardId") as string; // Get the card ID
+                    if (cardId) { // Check if cardId exists
+                        console.log(`Attempting to buy ${cardData?.name ?? cardId} for slot ${i}`);
+                        // Send buy message to server - send CARD ID and slot index
+                        colyseusRoom.send("buyCard", { cardId: cardId, handSlotIndex: i });
                         buyAttempted = true;
-                        // Destroy the shop card visual immediately for responsiveness.
-                        // Server state update will handle adding it to the hand visually if successful.
-                        gameObject.destroy();
-                        this.shopCardObjects = this.shopCardObjects.filter(obj => obj !== gameObject);
-                        break;
+                        // Visual snaps back, server state handles hand update
+                        break; // Exit loop once buy is attempted for a slot
+                    } else {
+                        console.error("Shop card missing cardId data!");
                     }
                 } else {
                      console.log(`Hand slot ${i} is full or player state unavailable.`);
-                     buyAttempted = true; // Attempted, but failed due to full slot or state issue
-                     break;
+                     // Still counts as a drop attempt on a valid slot, but buy not sent
+                     break; // Exit loop
                 }
             }
         }
-  
+
+        // If not dropped on any hand slot OR if dropped on a full slot (buy not attempted), snap back.
+        // If buy *was* attempted (dropped on empty slot), it will also snap back here.
+        // Server state change is the source of truth for the hand.
+        if (gameObject.active) { // Check if gameObject still exists
+            gameObject.x = gameObject.getData('startX');
+            gameObject.y = gameObject.getData('startY');
+            if (buyAttempted) {
+                 console.log("Buy attempted. Visual snapped back. Waiting for server state update for hand.");
+            } else if (droppedOnValidSlot) {
+                 console.log("Drop target slot was full or invalid. Snapping back.");
+            } else {
+                 console.log("Dropped outside hand slots. Snapping back.");
+            }
+        }
+        // --- OLD LOGIC REMOVED ---
+        /*
         // If not dropped on a valid empty slot, or buy failed server-side (e.g. brews), snap back.
         // Since we destroy optimistically, we only snap back if no buy was attempted.
         if (!buyAttempted && gameObject.active) { // Check if gameObject still exists and wasn't destroyed
@@ -279,84 +394,139 @@ export class Shop extends Scene {
              gameObject.y = gameObject.getData('startY');
              console.log("Drop target slot was full. Snapping back.");
         }
+        */
+        // --- END OLD LOGIC REMOVAL ---
     });
   }
-  
+
   // --- Colyseus State Synchronization ---
-  
+
   setupColyseusListeners() {
     if (!colyseusRoom || !colyseusRoom.sessionId) return;
-  
+
     const myPlayerId = colyseusRoom.sessionId;
-  
+
     // --- Listen to changes in *my* player state (health, brews, isReady) ---
     const player = colyseusRoom.state.players.get(myPlayerId);
     if (player) {
         // Use listen for specific properties for finer control
         this.playerStateListenerUnsub = player.onChange(() => {
+            // Add scene active check here for safety, though cleanup should handle it
+            if (!this.scene.isActive()) {
+                console.warn("Shop: player.onChange called while scene inactive.");
+                return;
+            }
             console.log("My player state changed (Shop)");
             this.updateNavbar();
             this.updateWaitingStatus(); // Update based on isReady changes
         });
-  
+
         // --- Listen specifically to hand changes for *my* player ---
         // Use onAdd/onRemove for the map itself
         this.handListenersUnsub.push(player.hand.onAdd((card, key) => {
-            console.log("Card added to hand (Shop):", key);
+            if (!this.scene.isActive()) return; // Guard against scene changes
+            console.log("Card added to hand (Shop):", key, card.name);
             this.updateHandDisplay();
-            // If needed, attach listener to the new card instance
-            // this.handListenersUnsub.push(card.onChange(() => this.updateHandDisplay()));
+            // --- Refresh Shop Display ---
+            console.log("Refreshing shop display due to hand update.");
+            // Re-call createShopCards to redraw shop, excluding newly added hand card
+            const centerX = this.cameras.main.centerX;
+            const centerY = this.cameras.main.centerY;
+            const gameWidth = this.cameras.main.width;
+            this.createShopCards(centerX, centerY, gameWidth);
+            // Re-setup drag/drop for the potentially new shop cards
+            this.setupDragAndDrop();
+            // --- End Refresh ---
         }));
         this.handListenersUnsub.push(player.hand.onRemove((card, key) => {
+            if (!this.scene.isActive()) return; // Guard against scene changes
             console.log("Card removed from hand (Shop):", key);
             this.updateHandDisplay();
-            // Remove listeners associated with the removed card if necessary
         }));
-        // Add listeners for existing cards in hand
-        player.hand.forEach((card, key) => {
-             // this.handListenersUnsub.push(card.onChange(() => this.updateHandDisplay()));
-        });
-  
+        // Add listeners for existing cards in hand (if needed, currently relying on onAdd/Remove)
+        // player.hand.forEach((card, key) => { ... });
+
+        // --- Listen to shop offer changes for *my* player ---
+        this.shopOfferListenersUnsub.push(player.shopOfferIds.onAdd((cardId, index) => {
+            if (!this.scene.isActive()) return;
+            console.log(`Shop offer added (ID: ${cardId}) at index ${index}`);
+            const centerX = this.cameras.main.centerX;
+            const centerY = this.cameras.main.centerY;
+            const gameWidth = this.cameras.main.width;
+            this.createShopCards(centerX, centerY, gameWidth);
+        }));
+        this.shopOfferListenersUnsub.push(player.shopOfferIds.onRemove((cardId, index) => {
+             if (!this.scene.isActive()) return;
+             console.log(`Shop offer removed (ID: ${cardId}) at index ${index}`);
+             const centerX = this.cameras.main.centerX;
+             const centerY = this.cameras.main.centerY;
+             const gameWidth = this.cameras.main.width;
+             this.createShopCards(centerX, centerY, gameWidth);
+        }));
+
     } else {
         console.error("Shop Scene: My player state not found on init.");
     }
-  
-  
+
+
     // --- Listen for phase changes ---
+    // Ensure the unsubscribe function returned by state.listen is stored
     this.phaseListenerUnsub = colyseusRoom.state.listen("currentPhase", (currentPhase, previousPhase) => {
+        // Add scene active check here for safety
+        if (!this.scene.isActive()) {
+            console.warn(`Shop: Phase listener triggered (${previousPhase} -> ${currentPhase}) while scene inactive.`);
+            return;
+        }
         console.log(`Shop Scene: Phase changed from ${previousPhase} to ${currentPhase}`);
         this.updateDayPhaseText(); // Update navbar text
         if (currentPhase === Phase.Preparation) {
-            // Cleanup happens in shutdown
-            this.scene.start("Preparation");
+            // Stop the current scene before starting the next
+            if (this.scene.isActive()) {
+                this.scene.stop(); // Stop Shop scene
+                this.scene.start("Preparation");
+            }
         } else if (currentPhase !== Phase.Shop) {
             // If phase changes to something unexpected, handle it
             console.warn(`Shop Scene: Unexpected phase change to ${currentPhase}. Returning to Lobby.`);
-            // Cleanup happens in shutdown
-            this.scene.start("Lobby"); // Or MainMenu
+            // Stop the current scene before starting the next
+            if (this.scene.isActive()) {
+                this.scene.stop(); // Stop Shop scene
+                this.scene.start("Lobby"); // Or MainMenu
+            }
         }
         // Update button/waiting status based on new phase
         this.updateWaitingStatus();
     });
-  
+
      // --- Listen for changes in other players' ready status ---
      colyseusRoom.state.players.onAdd((otherPlayer, sessionId) => {
         if (sessionId !== myPlayerId) {
             console.log("Other player added (Shop):", sessionId);
             // Listen to the isReady property of the other player
             const unsub = otherPlayer.listen("isReady", () => {
+                if (!this.scene.isActive()) return; // Add guard
                 console.log(`Other player ${sessionId} readiness changed (Shop)`);
                 this.updateWaitingStatus();
             });
-            this.otherPlayerListenersUnsub.push(unsub); // Store the unsubscribe function
+            // --- Store unsubscribe for new player in Map ---
+            this.otherPlayerChangeListeners.set(sessionId, unsub);
+            // --- End Store ---
             this.updateWaitingStatus(); // Update immediately on add
         }
      });
      colyseusRoom.state.players.onRemove((otherPlayer, sessionId) => {
         if (sessionId !== myPlayerId) {
             console.log("Other player removed (Shop):", sessionId);
-            // Find and remove the listener? Colyseus might handle this, but explicit removal is safer if tracked.
-            // For now, just update status. Listeners might become stale if not removed.
+            // --- Remove the specific listener for the removed player ---
+            const unsub = this.otherPlayerChangeListeners.get(sessionId);
+            if (unsub) {
+                unsub(); // Call the unsubscribe function
+                this.otherPlayerChangeListeners.delete(sessionId); // Remove from map
+                console.log(`Removed listener for player ${sessionId}`);
+            } else {
+                console.warn(`Could not find listener to remove for player ${sessionId}`);
+            }
+            // --- End Remove ---
             this.updateWaitingStatus();
         }
      });
@@ -364,46 +534,70 @@ export class Shop extends Scene {
      colyseusRoom.state.players.forEach((otherPlayer, sessionId) => {
         if (sessionId !== myPlayerId) {
              const unsub = otherPlayer.listen("isReady", () => {
+                if (!this.scene.isActive()) return; // Add guard
                 console.log(`Other player ${sessionId} readiness changed (Shop) - initial setup`);
                 this.updateWaitingStatus();
             });
-            this.otherPlayerListenersUnsub.push(unsub);
+            // --- Store unsubscribe for existing players in Map ---
+            this.otherPlayerChangeListeners.set(sessionId, unsub);
+            // --- End Store ---
         }
      });
   }
-  
+
   cleanupListeners() {
     console.log("Shop Scene: Cleaning up listeners.");
-  
+
+    // --- Add Specific Logging ---
+    if (this.playerStateListenerUnsub) {
+        console.log("Shop Scene: Attempting to call playerStateListenerUnsub().");
+        this.playerStateListenerUnsub();
+        console.log("Shop Scene: playerStateListenerUnsub() called.");
+    } else {
+        console.log("Shop Scene: playerStateListenerUnsub was null or undefined.");
+    }
+
+    if (this.phaseListenerUnsub) {
+        console.log("Shop Scene: Attempting to call phaseListenerUnsub().");
+        this.phaseListenerUnsub();
+        console.log("Shop Scene: phaseListenerUnsub() called.");
+    } else {
+        console.log("Shop Scene: phaseListenerUnsub was null or undefined.");
+    }
+    // --- End Specific Logging ---
+
+
     // Call unsubscribe functions obtained from listen/onChange/onAdd etc.
-    this.playerStateListenerUnsub?.();
-    this.phaseListenerUnsub?.(); // This should be the function returned by listen()
-    this.handListenersUnsub.forEach(unsub => unsub());
-    this.otherPlayerListenersUnsub.forEach(unsub => unsub());
-  
+    // this.playerStateListenerUnsub?.(); // Covered by logging above
+    // this.phaseListenerUnsub?.(); // Covered by logging above
+
+    this.handListenersUnsub.forEach((unsub, index) => {
+        console.log(`Shop Scene: Cleaning up hand listener index ${index}`);
+        unsub();
+    });
+    this.otherPlayerChangeListeners.forEach((unsub, sessionId) => {
+        console.log(`Shop Scene: Cleaning up listener for other player ${sessionId}`);
+        unsub();
+    });
+    this.otherPlayerChangeListeners.clear();
+    this.shopOfferListenersUnsub.forEach((unsub, index) => {
+        console.log(`Shop Scene: Cleaning up shop offer listener index ${index}`);
+        unsub();
+    });
+
     // Clear arrays
     this.handListenersUnsub = [];
-    this.otherPlayerListenersUnsub = [];
-  
+    this.shopOfferListenersUnsub = [];
+
     // Reset listener references
     this.playerStateListenerUnsub = null;
     this.phaseListenerUnsub = null;
-  
-    // Remove listeners attached directly to room.state or MapSchemas if needed
-    // Colyseus client SDK generally handles listener cleanup when unsub functions are called
-    // or when the room connection is closed. Explicitly removing listeners like below
-    // might be redundant or interfere with the SDK's internal management.
-    // Relying on calling the stored unsubscribe functions is the standard practice.
-    // colyseusRoom?.state?.stopListening("currentPhase"); // Example if listen returns void - Not standard API
-    // colyseusRoom?.state?.players?.onAdd(null); // Remove all onAdd - Not standard API
-    // colyseusRoom?.state?.players?.onRemove(null); // Remove all onRemove - Not standard API
-    // Need to iterate players and remove onChange/listen listeners if they weren't tracked individually - Handled by unsub array
-  
+
+
      // Remove Phaser input listeners
      this.input.off('dragstart');
      this.input.off('drag');
      this.input.off('dragend');
-     // Remove button listeners if added directly
      this.continueButton?.off('pointerdown');
      this.continueButton?.off('pointerover');
      this.continueButton?.off('pointerout');

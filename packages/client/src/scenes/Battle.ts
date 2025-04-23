@@ -211,6 +211,22 @@ class BattleCard {
         const target = Phaser.Utils.Array.GetRandom(livingTargets);
         // console.log(`${this.cardInstance.name} attacks ${target.cardInstance.name}`); // Less verbose log
         target.takeDamage(this.cardInstance.attack, scene);
+
+        // --- Draw Attack Line ---
+        const attackLine = scene.add.line(
+            0, 0, // x/y position doesn't matter for line geometry
+            this.gameObject.x, this.gameObject.y - this.gameObject.displayHeight / 2, // Start point (adjust Y slightly)
+            target.gameObject.x, target.gameObject.y - target.gameObject.displayHeight / 2, // End point (adjust Y slightly)
+            0xff0000, // Red color
+            0.8 // Alpha
+        ).setOrigin(0, 0).setLineWidth(1.5); // Thin line
+
+        // Destroy the line after a short delay
+        scene.time.delayedCall(200, () => {
+            attackLine.destroy();
+        });
+        // --- End Draw Attack Line ---
+
         // Add attack visual tween as before...
          scene.tweens.add({ targets: this.gameObject, scaleX: 1.1, scaleY: 1.1, duration: 100, yoyo: true, ease: 'Sine.easeInOut' });
       }
@@ -238,6 +254,9 @@ export class Battle extends Scene {
   // Colyseus listeners
   private phaseListenerUnsubscribe: (() => void) | null = null; // Store unsubscribe function
   private playerStateListeners: Map<string, () => void> = new Map(); // Track listeners per player
+  // Add properties to store onAdd/onRemove unsubscribe functions
+  private playerAddListenerUnsubscribe: (() => void) | null = null;
+  private playerRemoveListenerUnsubscribe: (() => void) | null = null;
 
   constructor() {
     super("Battle");
@@ -398,17 +417,22 @@ export class Battle extends Scene {
         if (currentPhase === Phase.BattleEnd) {
             this.handleBattleEnd(); // Trigger results display
         } else if (currentPhase === Phase.Shop) {
-            // Transition directly to shop after BattleEnd is processed by server
-            // Cleanup happens in shutdown() which is called by scene.start()
-            this.scene.start("Shop");
+            // Stop the current scene before starting the next
+            if (this.scene.isActive()) {
+                this.scene.stop(); // Stop Battle scene
+                this.scene.start("Shop");
+            }
         } else if (currentPhase === Phase.GameOver) {
             this.handleGameOver(); // Show final game over message
         } else if (currentPhase !== Phase.Battle) {
             // Unexpected phase, return to Lobby
             console.warn(`Battle Scene: Unexpected phase change to ${currentPhase}. Returning to Lobby.`);
-            // Cleanup happens in shutdown()
-            try { colyseusRoom?.leave(); } catch(e) {} // Attempt to leave
-            this.scene.start("Lobby");
+            // Stop the current scene before starting the next
+            if (this.scene.isActive()) {
+                try { colyseusRoom?.leave(); } catch(e) {} // Attempt to leave
+                this.scene.stop(); // Stop Battle scene
+                this.scene.start("Lobby");
+            }
         }
     });
 
@@ -424,48 +448,53 @@ export class Battle extends Scene {
         this.playerStateListeners.set(sessionId, unsubscribe);
     });
 
-     // Also handle players joining/leaving during battle? Unlikely but possible.
-     colyseusRoom.state.players.onAdd((player, sessionId) => {
-         if (!this.scene.isActive()) return;
-         // If a player joins mid-battle? Error state? Or maybe spectator?
-         console.warn(`Player ${sessionId} joined mid-battle?`);
-         this.updateNavbar(); // Update just in case
-         // Add listener for the new player
-         const unsubscribe = player.onChange(() => {
-             if (this.scene.isActive()) this.updateNavbar();
-         });
-         this.playerStateListeners.set(sessionId, unsubscribe);
-         // Recreate board visuals if opponent was missing?
-         const myId = colyseusRoom?.sessionId;
-         if (myId && sessionId !== myId) {
-             this.createBoardVisuals(myId, sessionId);
-         }
-     });
+   // Also handle players joining/leaving during battle? Unlikely but possible.
+   // Ensure state and players map exist before attaching listeners
+   if (colyseusRoom.state.players) {
+       this.playerAddListenerUnsubscribe = colyseusRoom.state.players.onAdd((player, sessionId) => {
+           if (!this.scene.isActive()) return;
+           // If a player joins mid-battle? Error state? Or maybe spectator?
+           console.warn(`Player ${sessionId} joined mid-battle?`);
+           this.updateNavbar(); // Update just in case
+           // Add listener for the new player
+           const unsubscribe = player.onChange(() => {
+               if (this.scene.isActive()) this.updateNavbar();
+           });
+           this.playerStateListeners.set(sessionId, unsubscribe);
+           // Recreate board visuals if opponent was missing?
+           const myId = colyseusRoom?.sessionId;
+           if (myId && sessionId !== myId) {
+               this.createBoardVisuals(myId, sessionId);
+           }
+       });
 
-     colyseusRoom.state.players.onRemove((player, sessionId) => {
-         if (!this.scene.isActive()) return;
-         console.log(`Player ${sessionId} removed mid-battle`);
-         // Remove listener
-         const unsubscribe = this.playerStateListeners.get(sessionId);
-         if (unsubscribe) {
-             unsubscribe(); // Call the stored unsubscribe function
-             this.playerStateListeners.delete(sessionId);
-         }
-         this.updateNavbar(); // Update display
-         // Clear the removed player's board visuals
-         const board = this.playerBoardCards.get(sessionId);
-         board?.forEach(card => {
-             card?.gameObject?.destroy(); // Add null checks
-             card?.hpText?.destroy();
-             card?.attackBarBg?.destroy();
-             card?.attackBarFill?.destroy();
-         });
-         this.playerBoardCards.delete(sessionId);
-         // Server should handle game over logic if needed
-     });
-  }
+       this.playerRemoveListenerUnsubscribe = colyseusRoom.state.players.onRemove((player, sessionId) => {
+           if (!this.scene.isActive()) return;
+           console.log(`Player ${sessionId} removed mid-battle`);
+           // Remove listener
+           const unsubscribe = this.playerStateListeners.get(sessionId);
+           if (unsubscribe) {
+               unsubscribe(); // Call the stored unsubscribe function
+               this.playerStateListeners.delete(sessionId);
+           }
+           this.updateNavbar(); // Update display
+           // Clear the removed player's board visuals
+           const board = this.playerBoardCards.get(sessionId);
+           board?.forEach(card => {
+               card?.gameObject?.destroy(); // Add null checks
+               card?.hpText?.destroy();
+               card?.attackBarBg?.destroy();
+               card?.attackBarFill?.destroy();
+           });
+           this.playerBoardCards.delete(sessionId);
+           // Server should handle game over logic if needed
+       });
+   } else {
+       console.error("Battle Scene: colyseusRoom.state.players is not available when attaching onAdd/onRemove listeners.");
+   }
+}
 
-  cleanupListeners() {
+cleanupListeners() {
     console.log("Battle Scene: Cleaning up listeners.");
     // Remove phase listener
     this.phaseListenerUnsubscribe?.(); // Call the stored unsubscribe function
@@ -476,10 +505,16 @@ export class Battle extends Scene {
         unsubscribe(); // Call each player's unsubscribe function
     });
     this.playerStateListeners.clear(); // Clear the map
-
+  
     // Remove Colyseus general player add/remove listeners
     // Note: Using null as the callback effectively removes the listener
     // Ensure this is the correct way for your Colyseus version or use specific unsubscribe methods if available
+    // Call the stored unsubscribe functions instead of assigning null
+    this.playerAddListenerUnsubscribe?.();
+    this.playerRemoveListenerUnsubscribe?.();
+    this.playerAddListenerUnsubscribe = null; // Clear references
+    this.playerRemoveListenerUnsubscribe = null;
+    /* // Old method - potentially incorrect for 0.16
     try {
         colyseusRoom?.state?.players?.onAdd(null as any); // Cast to any if TS complains
         colyseusRoom?.state?.players?.onRemove(null as any);
@@ -487,8 +522,9 @@ export class Battle extends Scene {
         console.warn("Error removing onAdd/onRemove listeners:", e);
         // Fallback or alternative cleanup if needed
     }
+    */
   }
-
+  
   // --- UI Update Functions ---
   updateNavbar() {
     // Added checks for text elements existence
@@ -544,7 +580,25 @@ export class Battle extends Scene {
 
     const activePlayerCards = myBoard.filter(card => card && card.isAlive) as BattleCard[];
     const activeOpponentCards = opponentBoard.filter(card => card && card.isAlive) as BattleCard[];
+  
+    // --- Check for Client-Side Battle End ---
+    // Check if one side has no living cards left, but had cards initially
+    const playerBoardHadCards = myBoard.some(c => c !== null);
+    const opponentBoardHadCards = opponentBoard.some(c => c !== null);
 
+    if ((activePlayerCards.length === 0 && playerBoardHadCards) || (activeOpponentCards.length === 0 && opponentBoardHadCards)) {
+        console.log("Client detected battle end (board clear). Stopping local simulation and notifying server.");
+        this.battleOver = true; // Stop further updates locally
+        // --- Send message to server ---
+        if (colyseusRoom) {
+            colyseusRoom.send("clientBattleOver");
+        }
+        // --- End Send message ---
+        // Server will eventually send BattleEnd phase change to trigger results display
+        return; // Stop processing this frame
+    }
+    // --- End Client-Side Check ---
+  
     // Update Player Cards (Target Opponent Cards)
     activePlayerCards.forEach(card => {
       card.update(delta, activeOpponentCards, this);
