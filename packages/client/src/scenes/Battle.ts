@@ -3,6 +3,8 @@ import { Scene } from "phaser";
 import { colyseusRoom } from "../utils/colyseusClient"; // Updated import
 // Import schemas for type safety (adjust path)
 import { Phase, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState"; // Adjust path
+// Import getStateCallbacks for 0.16 listener syntax
+import { getStateCallbacks } from "colyseus.js";
 
 // --- Interfaces --- (Keep CardData if needed locally)
 interface CardData {
@@ -25,7 +27,7 @@ export interface CardInstance extends CardData {
 // --- BattleCard Class --- (Modify constructor and updates)
 class BattleCard {
   gameObject: Phaser.GameObjects.Text;
-  cardInstance: CardInstance; // Use client interface type
+  cardInstance: CardInstance; // Use client interface type (contains instanceId, currentHp etc.)
   attackTimer: number;
   isAlive: boolean = true;
   isPlayerCard: boolean; // Is this card owned by the *local* client?
@@ -38,8 +40,8 @@ class BattleCard {
   // Constructor now takes CardInstanceSchema from server state
   constructor(scene: Scene, x: number, y: number, instanceSchema: CardInstanceSchema, ownerId: string, isLocalPlayer: boolean) {
     // Convert schema to local interface type if necessary, or use schema directly if compatible
-    // For simplicity, assume direct compatibility or simple mapping here
-    this.cardInstance = instanceSchema as any as CardInstance; // Cast or map properties
+    // IMPORTANT: Store the schema itself or a copy to access instanceId and server-driven currentHp
+    this.cardInstance = { ...instanceSchema } as any as CardInstance; // Copy schema data
     this.ownerSessionId = ownerId;
     this.isPlayerCard = isLocalPlayer;
 
@@ -105,40 +107,54 @@ class BattleCard {
 
      // Set text content using this.cardInstance data
      this.gameObject.setText(`${this.cardInstance.name}\nAtk: ${this.cardInstance.attack}\nSpd: ${this.cardInstance.speed}s`);
-     this.updateHpDisplay(); // Initial HP text
+     this.updateHpDisplay(); // Initial HP text based on server state
      this.updateAttackBar(); // Initial bar state
 
+    // Store instanceId for easy lookup
     this.gameObject.setData("battleCard", this);
+    this.gameObject.setData("instanceId", this.cardInstance.instanceId);
   }
 
-  // takeDamage: Updates local cardInstance.currentHp, shows damage number, updates HP display.
-  // Does NOT send updates to server - battle is client-simulated for now.
+  // takeDamage: ONLY shows damage number. HP update comes from server listener calling updateHpDisplay.
   takeDamage(damage: number, scene: Scene) {
     if (!this.isAlive) return;
-    this.cardInstance.currentHp -= damage;
+    // --- REMOVED HP modification ---
+    // this.cardInstance.currentHp -= damage;
     this.showDamageNumber(damage, scene);
-    this.updateHpDisplay();
-    if (this.cardInstance.currentHp <= 0) {
-        this.die(scene);
-    }
+    // --- REMOVED HP display update and death check (handled by server listener) ---
+    // this.updateHpDisplay();
+    // if (this.cardInstance.currentHp <= 0) {
+    //     this.die(scene);
+    // }
   }
 
-  // updateHpDisplay: Updates HP text and color based on currentHp/health.
+  // updateHpDisplay: Updates HP text and color based on cardInstance.currentHp (driven by server).
+  // Also checks for death based on server-driven HP.
   updateHpDisplay() {
       if (!this.hpText || !this.hpText.active) return; // Check if text object is still valid
-      const hp = Math.max(0, this.cardInstance.currentHp); // Ensure HP doesn't go below 0 visually
+
+      // Use currentHp from the cardInstance, which is updated by the server listener
+      const hp = Math.max(0, this.cardInstance.currentHp);
       const maxHp = this.cardInstance.health;
       this.hpText.setText(`HP: ${hp}/${maxHp}`);
-      // Set color based on HP percentage (red/yellow/green)
+
+      // Set color based on HP percentage
       const hpPercent = maxHp > 0 ? hp / maxHp : 0;
        if (!this.isAlive || hp <= 0) { this.hpText.setColor("#ff0000"); } // Red when dead or 0 HP
        else if (hpPercent < 0.3) { this.hpText.setColor("#ff0000"); } // Red when low
        else if (hpPercent < 0.6) { this.hpText.setColor("#ffff00"); } // Yellow when medium
        else { this.hpText.setColor("#00ff00"); } // Green when high
+
+      // --- Check for death based on server-driven HP ---
+      if (this.isAlive && hp <= 0) {
+          this.die(this.gameObject.scene); // Call die method if HP is 0 or less
+      }
+      // --- End Death Check ---
   }
 
   // showDamageNumber: Creates floating damage text animation. (No changes needed)
   showDamageNumber(damage: number, scene: Scene) {
+    // ... (keep existing implementation) ...
     const damageText = scene.add.text(
         this.gameObject.x + Phaser.Math.Between(-10, 10), // Random horizontal offset
         this.gameObject.y - this.gameObject.displayHeight - 10, // Above the card
@@ -165,20 +181,21 @@ class BattleCard {
     });
   }
 
-  // die: Marks card as dead, updates visuals, destroys bars. (No changes needed)
+  // die: Marks card as dead, updates visuals. Called by updateHpDisplay when server HP <= 0.
   die(scene: Scene) {
     if (!this.isAlive) return;
-    console.log(`${this.cardInstance.name} (Owner: ${this.ownerSessionId}) died!`);
+    console.log(`${this.cardInstance.name} (Owner: ${this.ownerSessionId}, Instance: ${this.cardInstance.instanceId}) died! (Visual Update)`);
     this.isAlive = false;
-    this.cardInstance.currentHp = 0;
-    this.updateHpDisplay();
-    this.gameObject.setTint(0x888888);
+    // this.cardInstance.currentHp = 0; // HP is already 0 based on server state trigger
+    // this.updateHpDisplay(); // No need to call again, already called by listener
+    this.gameObject.setTint(0x888888); // Grey out
     this.attackBarBg?.destroy(); this.attackBarBg = null;
     this.attackBarFill?.destroy(); this.attackBarFill = null;
   }
 
-  // updateAttackBar: Updates the visual fill of the attack timer bar.
+  // updateAttackBar: Updates the visual fill of the attack timer bar. (No changes needed)
   updateAttackBar() {
+      // ... (keep existing implementation) ...
       if (!this.isAlive || !this.attackBarFill || !this.attackBarFill.active) return; // Check if bar is valid
       const progress = Math.max(0, this.attackTimer) / this.attackCooldown;
       const cardWidth = this.gameObject.width; // Use actual width
@@ -198,7 +215,7 @@ class BattleCard {
   }
 
 
-  // update: Main simulation logic for the card.
+  // update: Main simulation logic for the card (visuals only).
   update(delta: number, targetCards: BattleCard[], scene: Scene) {
     if (!this.isAlive) return;
 
@@ -210,7 +227,10 @@ class BattleCard {
       if (livingTargets.length > 0) {
         const target = Phaser.Utils.Array.GetRandom(livingTargets);
         // console.log(`${this.cardInstance.name} attacks ${target.cardInstance.name}`); // Less verbose log
+
+        // --- Call takeDamage ONLY for visual effect (damage number) ---
         target.takeDamage(this.cardInstance.attack, scene);
+        // --- End Visual Effect Call ---
 
         // --- Draw Attack Line ---
         const attackLine = scene.add.line(
@@ -257,6 +277,9 @@ export class Battle extends Scene {
   // Add properties to store onAdd/onRemove unsubscribe functions
   private playerAddListenerUnsubscribe: (() => void) | null = null;
   private playerRemoveListenerUnsubscribe: (() => void) | null = null;
+
+  // Store listeners for individual card HP changes
+  private cardHpListeners: Map<string, () => void> = new Map(); // Key: instanceId
 
   constructor() {
     super("Battle");
@@ -359,6 +382,10 @@ export class Battle extends Scene {
     const centerX = this.cameras.main.centerX;
     const gameHeight = this.cameras.main.height;
 
+    // --- Clear previous listeners before creating new visuals ---
+    this.cleanupCardHpListeners();
+    // --- End Clear ---
+
     // Player Board (Bottom)
     const playerSlotWidth = 120;
     const playerSlotSpacing = 20;
@@ -372,7 +399,11 @@ export class Battle extends Scene {
         const index = parseInt(slotIndex, 10);
         if (cardSchema && !isNaN(index) && index >= 0 && index < 5) {
             const slotX = startPlayerSlotsX + index * (playerSlotWidth + playerSlotSpacing);
-            myBoardArray[index] = new BattleCard(this, slotX, playerSlotsY, cardSchema, myPlayerId, true);
+            const battleCard = new BattleCard(this, slotX, playerSlotsY, cardSchema, myPlayerId, true);
+            myBoardArray[index] = battleCard;
+            // --- Add HP Listener ---
+            this.addCardHpListener(cardSchema, battleCard);
+            // --- End Add HP Listener ---
         }
     });
     this.playerBoardCards.set(myPlayerId, myBoardArray);
@@ -391,7 +422,11 @@ export class Battle extends Scene {
             const index = parseInt(slotIndex, 10);
             if (cardSchema && !isNaN(index) && index >= 0 && index < 5) {
                 const slotX = startAiSlotsX + index * (aiSlotWidth + aiSlotSpacing);
-                opponentBoardArray[index] = new BattleCard(this, slotX, aiSlotsY, cardSchema, opponentId, false);
+                 const battleCard = new BattleCard(this, slotX, aiSlotsY, cardSchema, opponentId, false);
+                opponentBoardArray[index] = battleCard;
+                // --- Add HP Listener ---
+                this.addCardHpListener(cardSchema, battleCard);
+                // --- End Add HP Listener ---
             }
         });
         this.playerBoardCards.set(opponentId, opponentBoardArray);
@@ -404,12 +439,45 @@ export class Battle extends Scene {
     // ... create visual placeholders for local player's hand ...
   }
 
+  // --- Helper to add HP listener ---
+  addCardHpListener(cardSchema: CardInstanceSchema, battleCard: BattleCard) {
+      if (!colyseusRoom || !cardSchema || !battleCard) return;
+      const $ = getStateCallbacks(colyseusRoom); // Get proxy
+
+      // Remove existing listener for this instanceId if it exists
+      this.cardHpListeners.get(cardSchema.instanceId)?.();
+
+      console.log(`Battle Scene: Adding HP listener for card ${cardSchema.name} (${cardSchema.instanceId})`);
+      const unsub = $(cardSchema).listen("currentHp", (newHp, oldHp) => {
+          if (!this.scene.isActive() || !battleCard.gameObject?.active) {
+              console.log(`Battle Scene: HP listener for ${cardSchema.instanceId} triggered, but scene/object inactive.`);
+              return; // Guard against updates after shutdown or card destruction
+          }
+          console.log(`Battle Scene: HP changed for ${cardSchema.name} (${cardSchema.instanceId}): ${oldHp} -> ${newHp}`);
+          // Update the visual BattleCard's internal currentHp to match server state
+          battleCard.cardInstance.currentHp = newHp;
+          // Update the display (which also checks for death)
+          battleCard.updateHpDisplay();
+      });
+      this.cardHpListeners.set(cardSchema.instanceId, unsub);
+  }
+
+  // --- Helper to clean up all card HP listeners ---
+  cleanupCardHpListeners() {
+      console.log("Battle Scene: Cleaning up card HP listeners.");
+      this.cardHpListeners.forEach(unsub => unsub());
+      this.cardHpListeners.clear();
+  }
+
+
   // --- Colyseus Listeners ---
   setupColyseusListeners() {
     if (!colyseusRoom || !colyseusRoom.state) return;
+    // Get the proxy function for attaching listeners
+    const $ = getStateCallbacks(colyseusRoom);
 
-    // Listen for phase changes to end the battle or handle errors
-    this.phaseListenerUnsubscribe = colyseusRoom.state.listen("currentPhase", (currentPhase) => {
+    // Listen for phase changes to end the battle or handle errors via the proxy
+    this.phaseListenerUnsubscribe = $(colyseusRoom.state).listen("currentPhase", (currentPhase) => {
         if (!this.scene.isActive()) return; // Guard against updates after shutdown
         console.log(`Battle Scene: Phase changed to ${currentPhase}`);
         this.updateDayPhaseText(); // Update navbar
@@ -436,31 +504,109 @@ export class Battle extends Scene {
         }
     });
 
-    // Listen for health/brew changes to update navbar
+    // Listen for health/brew changes to update navbar via the proxy
     colyseusRoom.state.players.forEach((player, sessionId) => {
-        // Store the unsubscribe function for each player's onChange
-        const unsubscribe = player.onChange(() => {
-            // Check if scene is still active before updating UI
-            if (this.scene.isActive()) {
-                this.updateNavbar();
-            }
+        // Store the unsubscribe function for each player's specific listeners
+        const healthUnsub = $(player).listen("health", () => {
+            if (this.scene.isActive()) this.updateNavbar();
         });
-        this.playerStateListeners.set(sessionId, unsubscribe);
+        const brewsUnsub = $(player).listen("brews", () => {
+            if (this.scene.isActive()) this.updateNavbar();
+        });
+
+        // --- Listen for battlefield changes (add/remove) to manage HP listeners ---
+        const battlefieldAddUnsub = $(player.battlefield).onAdd((cardSchema, key) => {
+            if (!this.scene.isActive()) return;
+            console.log(`Battle Scene: Card added to battlefield for ${sessionId} at key ${key}: ${cardSchema.name}`);
+            // Need to find the corresponding BattleCard visual object to add listener
+            // This might require recreating visuals or finding the newly added one
+            // For simplicity, let's recreate board visuals on add/remove for now
+            const myId = colyseusRoom?.sessionId;
+            let oppId: string | undefined;
+            colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== myId) oppId = sid; });
+            if (myId) this.createBoardVisuals(myId, oppId); // Recreate visuals which includes adding listeners
+        });
+        const battlefieldRemoveUnsub = $(player.battlefield).onRemove((cardSchema, key) => {
+             if (!this.scene.isActive()) return;
+             console.log(`Battle Scene: Card removed from battlefield for ${sessionId} at key ${key}: ${cardSchema.name}`);
+             // Remove the specific HP listener for the removed card
+             const unsub = this.cardHpListeners.get(cardSchema.instanceId);
+             if (unsub) {
+                 unsub();
+                 this.cardHpListeners.delete(cardSchema.instanceId);
+                 console.log(`Battle Scene: Removed HP listener for ${cardSchema.instanceId}`);
+             }
+             // Find and destroy the visual object
+             const ownerBoard = this.playerBoardCards.get(sessionId);
+             const visualCard = ownerBoard?.find(bc => bc?.cardInstance?.instanceId === cardSchema.instanceId);
+             if (visualCard) {
+                 visualCard.gameObject?.destroy();
+                 visualCard.hpText?.destroy();
+                 visualCard.attackBarBg?.destroy();
+                 visualCard.attackBarFill?.destroy();
+                 // Remove from the array? Might be easier to just recreate visuals
+             }
+             // Recreate visuals for simplicity?
+             const myId = colyseusRoom?.sessionId;
+             let oppId: string | undefined;
+             colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== myId) oppId = sid; });
+             if (myId) this.createBoardVisuals(myId, oppId); // Recreate visuals
+        });
+        // --- End Battlefield Listener Logic ---
+
+
+        // Combine unsubscribe functions
+        const combinedUnsub = () => {
+            healthUnsub();
+            brewsUnsub();
+            battlefieldAddUnsub(); // Unsubscribe from battlefield add/remove listeners
+            battlefieldRemoveUnsub();
+        };
+        this.playerStateListeners.set(sessionId, combinedUnsub);
     });
 
    // Also handle players joining/leaving during battle? Unlikely but possible.
    // Ensure state and players map exist before attaching listeners
+   // Use proxy for players collection
    if (colyseusRoom.state.players) {
-       this.playerAddListenerUnsubscribe = colyseusRoom.state.players.onAdd((player, sessionId) => {
+       this.playerAddListenerUnsubscribe = $(colyseusRoom.state.players).onAdd((player, sessionId) => {
            if (!this.scene.isActive()) return;
            // If a player joins mid-battle? Error state? Or maybe spectator?
            console.warn(`Player ${sessionId} joined mid-battle?`);
            this.updateNavbar(); // Update just in case
-           // Add listener for the new player
-           const unsubscribe = player.onChange(() => {
+           // Add listeners for the new player via the proxy
+           const healthUnsub = $(player).listen("health", () => {
                if (this.scene.isActive()) this.updateNavbar();
            });
-           this.playerStateListeners.set(sessionId, unsubscribe);
+           const brewsUnsub = $(player).listen("brews", () => {
+               if (this.scene.isActive()) this.updateNavbar();
+           });
+            // --- Listen for battlefield changes (add/remove) for the new player ---
+            const battlefieldAddUnsub = $(player.battlefield).onAdd((cardSchema, key) => {
+                if (!this.scene.isActive()) return;
+                const myId = colyseusRoom?.sessionId;
+                let oppId: string | undefined;
+                colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== myId) oppId = sid; });
+                if (myId) this.createBoardVisuals(myId, oppId);
+            });
+            const battlefieldRemoveUnsub = $(player.battlefield).onRemove((cardSchema, key) => {
+                 if (!this.scene.isActive()) return;
+                 const unsub = this.cardHpListeners.get(cardSchema.instanceId);
+                 if (unsub) { unsub(); this.cardHpListeners.delete(cardSchema.instanceId); }
+                 const myId = colyseusRoom?.sessionId;
+                 let oppId: string | undefined;
+                 colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== myId) oppId = sid; });
+                 if (myId) this.createBoardVisuals(myId, oppId);
+            });
+            // --- End Battlefield Listener Logic ---
+
+           const combinedUnsub = () => {
+               healthUnsub();
+               brewsUnsub();
+               battlefieldAddUnsub();
+               battlefieldRemoveUnsub();
+           };
+           this.playerStateListeners.set(sessionId, combinedUnsub);
            // Recreate board visuals if opponent was missing?
            const myId = colyseusRoom?.sessionId;
            if (myId && sessionId !== myId) {
@@ -468,7 +614,8 @@ export class Battle extends Scene {
            }
        });
 
-       this.playerRemoveListenerUnsubscribe = colyseusRoom.state.players.onRemove((player, sessionId) => {
+       // Use proxy for players collection
+       this.playerRemoveListenerUnsubscribe = $(colyseusRoom.state.players).onRemove((player, sessionId) => {
            if (!this.scene.isActive()) return;
            console.log(`Player ${sessionId} removed mid-battle`);
            // Remove listener
@@ -477,6 +624,15 @@ export class Battle extends Scene {
                unsubscribe(); // Call the stored unsubscribe function
                this.playerStateListeners.delete(sessionId);
            }
+           // --- Clean up HP listeners for the removed player's cards ---
+           player.battlefield.forEach(cardSchema => {
+               const unsubHp = this.cardHpListeners.get(cardSchema.instanceId);
+               if (unsubHp) {
+                   unsubHp();
+                   this.cardHpListeners.delete(cardSchema.instanceId);
+               }
+           });
+           // --- End Cleanup ---
            this.updateNavbar(); // Update display
            // Clear the removed player's board visuals
            const board = this.playerBoardCards.get(sessionId);
@@ -500,31 +656,24 @@ cleanupListeners() {
     this.phaseListenerUnsubscribe?.(); // Call the stored unsubscribe function
     this.phaseListenerUnsubscribe = null;
 
-    // Clear player state listeners
+    // Clear player state listeners (health, brews, battlefield add/remove)
     this.playerStateListeners.forEach((unsubscribe) => {
         unsubscribe(); // Call each player's unsubscribe function
     });
     this.playerStateListeners.clear(); // Clear the map
-  
+
+    // --- Clean up individual card HP listeners ---
+    this.cleanupCardHpListeners();
+    // --- End Cleanup ---
+
     // Remove Colyseus general player add/remove listeners
-    // Note: Using null as the callback effectively removes the listener
-    // Ensure this is the correct way for your Colyseus version or use specific unsubscribe methods if available
     // Call the stored unsubscribe functions instead of assigning null
     this.playerAddListenerUnsubscribe?.();
     this.playerRemoveListenerUnsubscribe?.();
     this.playerAddListenerUnsubscribe = null; // Clear references
     this.playerRemoveListenerUnsubscribe = null;
-    /* // Old method - potentially incorrect for 0.16
-    try {
-        colyseusRoom?.state?.players?.onAdd(null as any); // Cast to any if TS complains
-        colyseusRoom?.state?.players?.onRemove(null as any);
-    } catch (e) {
-        console.warn("Error removing onAdd/onRemove listeners:", e);
-        // Fallback or alternative cleanup if needed
-    }
-    */
   }
-  
+
   // --- UI Update Functions ---
   updateNavbar() {
     // Added checks for text elements existence
@@ -580,25 +729,28 @@ cleanupListeners() {
 
     const activePlayerCards = myBoard.filter(card => card && card.isAlive) as BattleCard[];
     const activeOpponentCards = opponentBoard.filter(card => card && card.isAlive) as BattleCard[];
-  
+
     // --- Check for Client-Side Battle End ---
     // Check if one side has no living cards left, but had cards initially
     const playerBoardHadCards = myBoard.some(c => c !== null);
     const opponentBoardHadCards = opponentBoard.some(c => c !== null);
 
+    // --- REMOVED: Client no longer determines battle end ---
+    /*
     if ((activePlayerCards.length === 0 && playerBoardHadCards) || (activeOpponentCards.length === 0 && opponentBoardHadCards)) {
         console.log("Client detected battle end (board clear). Stopping local simulation and notifying server.");
         this.battleOver = true; // Stop further updates locally
         // --- Send message to server ---
         if (colyseusRoom) {
-            colyseusRoom.send("clientBattleOver");
+            // colyseusRoom.send("clientBattleOver"); // REMOVED
         }
         // --- End Send message ---
         // Server will eventually send BattleEnd phase change to trigger results display
         return; // Stop processing this frame
     }
+    */
     // --- End Client-Side Check ---
-  
+
     // Update Player Cards (Target Opponent Cards)
     activePlayerCards.forEach(card => {
       card.update(delta, activeOpponentCards, this);
@@ -717,7 +869,8 @@ cleanupListeners() {
    // Override shutdown
    shutdown() {
         console.log("Battle scene shutting down explicitly.");
-        this.cleanupListeners(); // Remove Colyseus listeners
+        this.cleanupListeners(); // Remove Colyseus listeners (includes player state, phase, and battlefield add/remove)
+        this.cleanupCardHpListeners(); // Explicitly clean up individual card HP listeners
 
         // Destroy card game objects
         this.playerBoardCards.forEach(board => {

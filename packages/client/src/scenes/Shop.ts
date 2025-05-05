@@ -6,6 +6,8 @@ import { Phase, PlayerState, CardInstanceSchema } from "../../../server/src/sche
 // Reuse client interface if compatible or define locally
 // Assuming CardInstanceSchema has the necessary fields or we adapt
 // import { CardInstance } from "./Battle"; // Reuse client interface if compatible
+// Import getStateCallbacks for 0.16 listener syntax
+import { getStateCallbacks } from "colyseus.js";
 
 // --- Utility Function --- (Keep or import)
 function generateUniqueId(): string {
@@ -405,12 +407,15 @@ export class Shop extends Scene {
     if (!colyseusRoom || !colyseusRoom.sessionId) return;
 
     const myPlayerId = colyseusRoom.sessionId;
+    // Get the proxy function for attaching listeners
+    const $ = getStateCallbacks(colyseusRoom);
 
     // --- Listen to changes in *my* player state (health, brews, isReady) ---
     const player = colyseusRoom.state.players.get(myPlayerId);
     if (player) {
-        // Use listen for specific properties for finer control
-        this.playerStateListenerUnsub = player.onChange(() => {
+        // Use listen for specific properties for finer control via the proxy
+        // Store the returned unsubscribe function
+        this.playerStateListenerUnsub = $(player).onChange(() => { // onChange on the proxied player still works for general changes
             // Add scene active check here for safety, though cleanup should handle it
             if (!this.scene.isActive()) {
                 console.warn("Shop: player.onChange called while scene inactive.");
@@ -422,8 +427,8 @@ export class Shop extends Scene {
         });
 
         // --- Listen specifically to hand changes for *my* player ---
-        // Use onAdd/onRemove for the map itself
-        this.handListenersUnsub.push(player.hand.onAdd((card, key) => {
+        // Use onAdd/onRemove for the map itself via the proxy
+        this.handListenersUnsub.push($(player.hand).onAdd((card, key) => {
             if (!this.scene.isActive()) return; // Guard against scene changes
             console.log("Card added to hand (Shop):", key, card.name);
             this.updateHandDisplay();
@@ -438,7 +443,7 @@ export class Shop extends Scene {
             this.setupDragAndDrop();
             // --- End Refresh ---
         }));
-        this.handListenersUnsub.push(player.hand.onRemove((card, key) => {
+        this.handListenersUnsub.push($(player.hand).onRemove((card, key) => {
             if (!this.scene.isActive()) return; // Guard against scene changes
             console.log("Card removed from hand (Shop):", key);
             this.updateHandDisplay();
@@ -447,7 +452,8 @@ export class Shop extends Scene {
         // player.hand.forEach((card, key) => { ... });
 
         // --- Listen to shop offer changes for *my* player ---
-        this.shopOfferListenersUnsub.push(player.shopOfferIds.onAdd((cardId, index) => {
+        // Use proxy for shopOfferIds collection
+        this.shopOfferListenersUnsub.push($(player.shopOfferIds).onAdd((cardId, index) => {
             if (!this.scene.isActive()) return;
             console.log(`Shop offer added (ID: ${cardId}) at index ${index}`);
             const centerX = this.cameras.main.centerX;
@@ -455,7 +461,7 @@ export class Shop extends Scene {
             const gameWidth = this.cameras.main.width;
             this.createShopCards(centerX, centerY, gameWidth);
         }));
-        this.shopOfferListenersUnsub.push(player.shopOfferIds.onRemove((cardId, index) => {
+        this.shopOfferListenersUnsub.push($(player.shopOfferIds).onRemove((cardId, index) => {
              if (!this.scene.isActive()) return;
              console.log(`Shop offer removed (ID: ${cardId}) at index ${index}`);
              const centerX = this.cameras.main.centerX;
@@ -471,7 +477,8 @@ export class Shop extends Scene {
 
     // --- Listen for phase changes ---
     // Ensure the unsubscribe function returned by state.listen is stored
-    this.phaseListenerUnsub = colyseusRoom.state.listen("currentPhase", (currentPhase, previousPhase) => {
+    // Use proxy for the state object
+    this.phaseListenerUnsub = $(colyseusRoom.state).listen("currentPhase", (currentPhase, previousPhase) => {
         // Add scene active check here for safety
         if (!this.scene.isActive()) {
             console.warn(`Shop: Phase listener triggered (${previousPhase} -> ${currentPhase}) while scene inactive.`);
@@ -499,11 +506,12 @@ export class Shop extends Scene {
     });
 
      // --- Listen for changes in other players' ready status ---
-     colyseusRoom.state.players.onAdd((otherPlayer, sessionId) => {
+     // Use proxy for players collection
+     $(colyseusRoom.state.players).onAdd((otherPlayer, sessionId) => {
         if (sessionId !== myPlayerId) {
             console.log("Other player added (Shop):", sessionId);
-            // Listen to the isReady property of the other player
-            const unsub = otherPlayer.listen("isReady", () => {
+            // Listen to the isReady property of the other player via the proxy
+            const unsub = $(otherPlayer).listen("isReady", () => {
                 if (!this.scene.isActive()) return; // Add guard
                 console.log(`Other player ${sessionId} readiness changed (Shop)`);
                 this.updateWaitingStatus();
@@ -514,7 +522,8 @@ export class Shop extends Scene {
             this.updateWaitingStatus(); // Update immediately on add
         }
      });
-     colyseusRoom.state.players.onRemove((otherPlayer, sessionId) => {
+     // Use proxy for players collection
+     $(colyseusRoom.state.players).onRemove((otherPlayer, sessionId) => {
         if (sessionId !== myPlayerId) {
             console.log("Other player removed (Shop):", sessionId);
             // --- Remove the specific listener for the removed player ---
@@ -533,7 +542,8 @@ export class Shop extends Scene {
      // Initial setup for existing other players
      colyseusRoom.state.players.forEach((otherPlayer, sessionId) => {
         if (sessionId !== myPlayerId) {
-             const unsub = otherPlayer.listen("isReady", () => {
+             // Use proxy for the other player object
+             const unsub = $(otherPlayer).listen("isReady", () => {
                 if (!this.scene.isActive()) return; // Add guard
                 console.log(`Other player ${sessionId} readiness changed (Shop) - initial setup`);
                 this.updateWaitingStatus();

@@ -112,8 +112,8 @@ export class GameRoom extends Room<GameState> {
         // Client UI should update based on state change automatically
     });
 
-    // Update the type hint for the message payload to expect objects
-    this.onMessage("setPreparation", (client, message: { handLayout: { [key: string]: any | null }, battlefieldLayout: { [key: string]: any | null } }) => {
+    // Update the type hint for the message payload to expect instance IDs
+    this.onMessage("setPreparation", (client, message: { handLayout: { [key: string]: string | null }, battlefieldLayout: { [key: string]: string | null } }) => {
         const player = this.state.players.get(client.sessionId);
         if (!player || this.state.currentPhase !== Phase.Preparation) {
             console.warn(`SetPreparation failed: Invalid state (Player: ${!!player}, Phase: ${this.state.currentPhase})`);
@@ -122,34 +122,53 @@ export class GameRoom extends Room<GameState> {
 
         console.log(`Received preparation layout from ${client.sessionId}`);
 
-        // Clear existing layouts and repopulate based on message
+        // --- Server-Side Rearrangement Logic ---
+        // 1. Gather all current card instances owned by the player
+        const currentCards = new Map<string, CardInstanceSchema>();
+        player.hand.forEach(card => currentCards.set(card.instanceId, card));
+        player.battlefield.forEach(card => currentCards.set(card.instanceId, card));
+
+        // 2. Clear the player's current hand and battlefield in the state
         player.hand.clear();
         player.battlefield.clear();
 
-        // Iterate over the handLayout object
-        Object.entries(message.handLayout).forEach(([index, cardInstanceData]) => {
-            if (cardInstanceData) {
-                // Re-create schema instance - assumes client sends full CardInstance data
-                const card = new CardInstanceSchema();
-                Object.assign(card, cardInstanceData); // Copy properties
-                player.hand.set(String(index), card); // Use the string index as the key
+        // 3. Repopulate hand based on the received layout and existing instances
+        Object.entries(message.handLayout).forEach(([index, instanceId]) => {
+            if (instanceId) {
+                const cardInstance = currentCards.get(instanceId);
+                if (cardInstance) {
+                    // Reset HP just in case it was modified client-side (shouldn't happen)
+                    cardInstance.currentHp = cardInstance.health;
+                    player.hand.set(String(index), cardInstance);
+                } else {
+                    console.warn(`SetPreparation Warning: Player ${client.sessionId} tried to place unknown card instance ID ${instanceId} in hand slot ${index}.`);
+                }
             }
         });
 
-        // Iterate over the battlefieldLayout object
-        Object.entries(message.battlefieldLayout).forEach(([index, cardInstanceData]) => {
-            if (cardInstanceData) {
-                const card = new CardInstanceSchema();
-                Object.assign(card, cardInstanceData);
-                player.battlefield.set(String(index), card); // Use the string index as the key
+        // 4. Repopulate battlefield based on the received layout and existing instances
+        Object.entries(message.battlefieldLayout).forEach(([index, instanceId]) => {
+            if (instanceId) {
+                const cardInstance = currentCards.get(instanceId);
+                if (cardInstance) {
+                     // Reset HP before placing on battlefield
+                    cardInstance.currentHp = cardInstance.health;
+                    player.battlefield.set(String(index), cardInstance);
+                } else {
+                    console.warn(`SetPreparation Warning: Player ${client.sessionId} tried to place unknown card instance ID ${instanceId} in battlefield slot ${index}.`);
+                }
             }
         });
+        // --- End Server-Side Rearrangement Logic ---
+
+        console.log(`Player ${client.sessionId} preparation set. Hand size: ${player.hand.size}, Battlefield size: ${player.battlefield.size}`);
 
         player.isReady = true;
         this.checkPhaseTransition();
     });
 
-    // --- Add clientBattleOver handler ---
+    // --- Remove clientBattleOver handler ---
+    /*
     this.onMessage("clientBattleOver", (client) => {
         const player = this.state.players.get(client.sessionId);
         console.log(`Received clientBattleOver message from ${player?.username ?? client.sessionId}`);
@@ -161,6 +180,7 @@ export class GameRoom extends Room<GameState> {
             console.warn(`Received clientBattleOver message during non-Battle phase (${this.state.currentPhase}). Ignoring.`);
         }
     });
+    */
     // --- End clientBattleOver handler ---
 
     // Remove old "move" message handler if present
@@ -393,7 +413,7 @@ export class GameRoom extends Room<GameState> {
     }, 1000); // Update every second
   }
 
-    // Called when battle ends (timer, board clear, or client message)
+    // Called when battle ends (timer, board clear)
     endBattle(timeoutReached: boolean = false) {
         console.log(`--- Entering endBattle function --- Timeout: ${timeoutReached}`); // Log entry
         if (this.state.currentPhase !== Phase.Battle) {
@@ -401,7 +421,11 @@ export class GameRoom extends Room<GameState> {
              return; // Prevent double execution
         }
 
-        console.log(`--- Starting endBattle ---`);
+        // --- Mark Battle as Over Internally ---
+        // This prevents the battle timer interval from calling endBattle again if it fires slightly after.
+        this.state.currentPhase = Phase.BattleEnd; // Tentatively set phase to prevent re-entry
+        console.log(`--- Starting endBattle --- Phase temporarily set to ${this.state.currentPhase}`);
+
         console.log(`Ending Battle Phase. Timeout: ${timeoutReached}`);
         if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Stop the timer
 
@@ -419,34 +443,35 @@ export class GameRoom extends Room<GameState> {
             player2 = this.state.players.get(player2SessionId);
         } else {
             console.error("endBattle: Cannot calculate battle results without exactly 2 players.");
-            this.transitionToPhase(Phase.GameOver); // Or handle appropriately
+            // Transition directly to GameOver if player count is wrong
+            this.transitionToPhase(Phase.GameOver); // Use the proper transition function
             return;
         }
 
         if (!player1 || !player2) {
              console.error("endBattle: Player state missing during battle end calculation.");
-             this.transitionToPhase(Phase.GameOver);
+             this.transitionToPhase(Phase.GameOver); // Use the proper transition function
              return;
         }
 
-        // --- Log Initial Battlefield States ---
-        console.log(`endBattle: Player 1 (${player1.username}) Battlefield State:`);
+        // --- Log Initial Battlefield States (Server Authority) ---
+        console.log(`endBattle: Player 1 (${player1.username}) Battlefield State (Server):`);
         player1.battlefield.forEach((card, key) => {
-            console.log(`  Slot ${key}: ${card.name} (ID: ${card.cardId}, HP: ${card.currentHp}/${card.health})`);
+            console.log(`  Slot ${key}: ${card.name} (ID: ${card.instanceId}, HP: ${card.currentHp}/${card.health})`); // Use instanceId
         });
-        console.log(`endBattle: Player 2 (${player2.username}) Battlefield State:`);
+        console.log(`endBattle: Player 2 (${player2.username}) Battlefield State (Server):`);
         player2.battlefield.forEach((card, key) => {
-            console.log(`  Slot ${key}: ${card.name} (ID: ${card.cardId}, HP: ${card.currentHp}/${card.health})`);
+            console.log(`  Slot ${key}: ${card.name} (ID: ${card.instanceId}, HP: ${card.currentHp}/${card.health})`); // Use instanceId
         });
         // --- End Log ---
 
-        // Determine survivors (based on current server state)
+        // Determine survivors (based on current server state's currentHp)
         const player1Survivors = Array.from(player1.battlefield.values()).filter(card => card && card.currentHp > 0);
         const player2Survivors = Array.from(player2.battlefield.values()).filter(card => card && card.currentHp > 0);
 
         // --- Log Survivor Counts ---
-        console.log(`endBattle: Player 1 Survivors Count: ${player1Survivors.length}`);
-        console.log(`endBattle: Player 2 Survivors Count: ${player2Survivors.length}`);
+        console.log(`endBattle: Player 1 Survivors Count (Server): ${player1Survivors.length}`);
+        console.log(`endBattle: Player 2 Survivors Count (Server): ${player2Survivors.length}`);
         // --- End Log ---
 
         // Determine winner/loser based on survivors
@@ -456,65 +481,55 @@ export class GameRoom extends Room<GameState> {
 
         // --- Determine Winner/Loser/Draw ---
         if (player1Survivors.length > 0 && player2Survivors.length === 0) {
-            // Player 1 wins if they have survivors and Player 2 does not
-            winner = player1;
-            loser = player2;
-            console.log(`endBattle: Winner determined: Player 1 (${winner.username})`);
+            winner = player1; loser = player2;
+            console.log(`endBattle: Winner determined (Server): Player 1 (${winner.username})`);
         } else if (player2Survivors.length > 0 && player1Survivors.length === 0) {
-            // Player 2 wins if they have survivors and Player 1 does not
-            winner = player2;
-            loser = player1;
-            console.log(`endBattle: Winner determined: Player 2 (${winner.username})`);
+            winner = player2; loser = player1;
+            console.log(`endBattle: Winner determined (Server): Player 2 (${winner.username})`);
         } else if (player1Survivors.length === 0 && player2Survivors.length === 0) {
-            // Draw if both players have no survivors
             isDraw = true;
-            console.log(`endBattle: Battle determined as Draw (both boards cleared).`);
-        } else {
-            // Draw if both players have survivors (e.g., timeout)
-            // Note: Could add logic here to determine winner by total HP/attack if desired for timeout draws
+            console.log(`endBattle: Battle determined as Draw (Server - both boards cleared).`);
+        } else { // Both have survivors (timeout or simultaneous clear?)
             isDraw = true;
-            console.log(`endBattle: Battle determined as Draw (both have survivors or timeout).`);
+            console.log(`endBattle: Battle determined as Draw (Server - both have survivors or timeout).`);
         }
         // --- End Winner/Loser/Draw Determination ---
 
 
-        // Calculate face damage based on opponent survivors
+        // Calculate face damage based on opponent survivors' attack stat
         const p1FaceDamage = player2Survivors.reduce((sum, card) => sum + card.attack, 0);
         const p2FaceDamage = player1Survivors.reduce((sum, card) => sum + card.attack, 0);
 
         // --- Log Calculated Damage ---
-        console.log(`endBattle: Calculated Face Damage for Player 1: ${p1FaceDamage} (from ${player2Survivors.length} P2 survivors)`);
-        console.log(`endBattle: Calculated Face Damage for Player 2: ${p2FaceDamage} (from ${player1Survivors.length} P1 survivors)`);
+        console.log(`endBattle: Calculated Face Damage for Player 1 (Server): ${p1FaceDamage} (from ${player2Survivors.length} P2 survivors)`);
+        console.log(`endBattle: Calculated Face Damage for Player 2 (Server): ${p2FaceDamage} (from ${player1Survivors.length} P1 survivors)`);
         // --- End Log ---
 
         // --- Log Health Before Damage ---
-        console.log(`endBattle: Player 1 Health BEFORE damage: ${player1.health}`);
-        console.log(`endBattle: Player 2 Health BEFORE damage: ${player2.health}`);
+        console.log(`endBattle: Player 1 Health BEFORE damage (Server): ${player1.health}`);
+        console.log(`endBattle: Player 2 Health BEFORE damage (Server): ${player2.health}`);
         // --- End Log ---
 
         // Apply face damage ONLY to the loser, or both if it's a draw
         // --- Add Detailed Damage Application Logging ---
         if (loser === player1 || isDraw) {
-            // Apply damage to Player 1 if they lost OR if it's a draw
-            console.log(`endBattle: Applying ${p1FaceDamage} damage to Player 1 (${player1.username}) because ${isDraw ? 'it was a draw' : 'they were the loser'}.`);
+            console.log(`endBattle: Applying ${p1FaceDamage} damage to Player 1 (${player1.username}) because ${isDraw ? 'it was a draw' : 'they were the loser'} (Server).`);
             player1.health = Math.max(0, player1.health - p1FaceDamage);
-            console.log(`endBattle: Player 1 New HP: ${player1.health}`);
+            console.log(`endBattle: Player 1 New HP (Server): ${player1.health}`);
         } else {
-             // Player 1 won, do not apply damage
-             console.log(`endBattle: NOT applying ${p1FaceDamage} damage to Player 1 (${player1.username}) because they won.`);
+             console.log(`endBattle: NOT applying ${p1FaceDamage} damage to Player 1 (${player1.username}) because they won (Server).`);
         }
         if (loser === player2 || isDraw) {
-            // Apply damage to Player 2 if they lost OR if it's a draw
-            console.log(`endBattle: Applying ${p2FaceDamage} damage to Player 2 (${player2.username}) because ${isDraw ? 'it was a draw' : 'they were the loser'}.`);
+            console.log(`endBattle: Applying ${p2FaceDamage} damage to Player 2 (${player2.username}) because ${isDraw ? 'it was a draw' : 'they were the loser'} (Server).`);
             player2.health = Math.max(0, player2.health - p2FaceDamage);
-            console.log(`endBattle: Player 2 New HP: ${player2.health}`);
+            console.log(`endBattle: Player 2 New HP (Server): ${player2.health}`);
         } else {
-             // Player 2 won, do not apply damage
-             console.log(`endBattle: NOT applying ${p2FaceDamage} damage to Player 2 (${player2.username}) because they won.`);
+             console.log(`endBattle: NOT applying ${p2FaceDamage} damage to Player 2 (${player2.username}) because they won (Server).`);
         }
         // --- End Detailed Damage Application Logging ---
 
         // Calculate brews earned based on opponent's dead cards + daily bonus
+        // Count dead cards based on server state BEFORE removing them
         const player1OpponentDeadCards = Array.from(player2.battlefield.values()).filter(card => card && card.currentHp <= 0).length;
         const player2OpponentDeadCards = Array.from(player1.battlefield.values()).filter(card => card && card.currentHp <= 0).length;
 
@@ -522,54 +537,63 @@ export class GameRoom extends Room<GameState> {
         const p2BrewReward = DAILY_BREW_BONUS + (player2OpponentDeadCards * BREW_PER_KILL);
 
         // --- Log Brew Calculation ---
-        console.log(`endBattle: Player 1 Brew Reward Calculation: Daily=${DAILY_BREW_BONUS}, Kills=${player1OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p1BrewReward}`);
-        console.log(`endBattle: Player 2 Brew Reward Calculation: Daily=${DAILY_BREW_BONUS}, Kills=${player2OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p2BrewReward}`);
-        console.log(`endBattle: Player 1 Brews BEFORE reward: ${player1.brews}`);
-        console.log(`endBattle: Player 2 Brews BEFORE reward: ${player2.brews}`);
+        console.log(`endBattle: Player 1 Brew Reward Calculation (Server): Daily=${DAILY_BREW_BONUS}, Kills=${player1OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p1BrewReward}`);
+        console.log(`endBattle: Player 2 Brew Reward Calculation (Server): Daily=${DAILY_BREW_BONUS}, Kills=${player2OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p2BrewReward}`);
+        console.log(`endBattle: Player 1 Brews BEFORE reward (Server): ${player1.brews}`);
+        console.log(`endBattle: Player 2 Brews BEFORE reward (Server): ${player2.brews}`);
         // --- End Log ---
 
         player1.brews += p1BrewReward;
         player2.brews += p2BrewReward;
 
-        console.log(`endBattle: Final Battle Results: P1 HP=${player1.health}, P2 HP=${player2.health}.`);
-        console.log(`endBattle: P1 Brews: +${p1BrewReward} => Total: ${player1.brews}`);
-        console.log(`endBattle: P2 Brews: +${p2BrewReward} => Total: ${player2.brews}`);
+        console.log(`endBattle: Final Battle Results (Server): P1 HP=${player1.health}, P2 HP=${player2.health}.`);
+        console.log(`endBattle: P1 Brews (Server): +${p1BrewReward} => Total: ${player1.brews}`);
+        console.log(`endBattle: P2 Brews (Server): +${p2BrewReward} => Total: ${player2.brews}`);
 
-        // --- Remove Dead Cards from Battlefield State ---
-        console.log("endBattle: Removing dead cards from battlefield state...");
+        // --- Remove Dead Cards from Battlefield State (Server Authority) ---
+        console.log("endBattle: Removing dead cards from server battlefield state...");
+        const p1DeadKeys: string[] = [];
         player1.battlefield.forEach((card, key) => {
             if (card.currentHp <= 0) {
-                console.log(`  Removing P1 card: ${card.name} (Key: ${key})`);
-                player1.battlefield.delete(key);
+                console.log(`  Marking P1 card for removal: ${card.name} (Key: ${key})`);
+                p1DeadKeys.push(key);
             }
         });
+        p1DeadKeys.forEach(key => player1.battlefield.delete(key));
+
+        const p2DeadKeys: string[] = [];
         player2.battlefield.forEach((card, key) => {
             if (card.currentHp <= 0) {
-                console.log(`  Removing P2 card: ${card.name} (Key: ${key})`);
-                player2.battlefield.delete(key);
+                console.log(`  Marking P2 card for removal: ${card.name} (Key: ${key})`);
+                p2DeadKeys.push(key);
             }
         });
-        console.log("endBattle: Finished removing dead cards.");
+        p2DeadKeys.forEach(key => player2.battlefield.delete(key));
+        console.log("endBattle: Finished removing dead cards from server state.");
         // --- End Remove Dead Cards ---
 
-        // Check Game Over conditions
+        // Check Game Over conditions based on updated health
         if (player1.health <= 0 || player2.health <= 0) {
             console.log("endBattle: Game Over condition met (player health <= 0). Determining winner by health.");
             this.determineWinnerByHealth(); // This will transition to GameOver
         } else {
-            // Transition to BattleEnd phase to show results
-            console.log("endBattle: Transitioning to BattleEnd phase.");
-            this.transitionToPhase(Phase.BattleEnd);
+            // Transition formally to BattleEnd phase to show results
+            console.log("endBattle: Transitioning formally to BattleEnd phase.");
+            // We already set state.currentPhase = Phase.BattleEnd at the start of this function
+            // Reset player readiness for the BattleEnd phase (they need to implicitly "ready" by waiting)
+            this.state.players.forEach(p => p.isReady = false); // Reset ready status
 
             // Add a delay before automatically transitioning to the next Shop phase
             if (this.battleEndTimeout) this.battleEndTimeout.clear();
             this.battleEndTimeout = this.clock.setTimeout(() => {
-                if (this.state.currentPhase === Phase.BattleEnd) { // Check if still in BattleEnd
+                // Check if we are *still* in BattleEnd before proceeding
+                if (this.state.currentPhase === Phase.BattleEnd) {
                      console.log("endBattle: BattleEnd timeout reached. Marking players ready and checking phase transition.");
-                     this.state.players.forEach(p => p.isReady = true); // Mark as ready
-                     this.checkPhaseTransition(); // Trigger transition Shop
+                     // Mark players as ready to trigger the transition check
+                     this.state.players.forEach(p => p.isReady = true);
+                     this.checkPhaseTransition(); // This should trigger transition to Shop
                 } else {
-                    console.log("endBattle: BattleEnd timeout reached, but phase is no longer BattleEnd. No transition triggered.");
+                    console.log(`endBattle: BattleEnd timeout reached, but phase is no longer BattleEnd (${this.state.currentPhase}). No transition triggered.`);
                 }
             }, 5000); // 5 second delay to show results
         }

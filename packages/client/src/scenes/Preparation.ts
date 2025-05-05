@@ -5,6 +5,8 @@ import { colyseusRoom } from "../utils/colyseusClient"; // Updated import
 import { Phase, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState"; // Adjust path
 // Reuse client interface if compatible
 import { CardInstance } from "./Battle";
+// Import getStateCallbacks for 0.16 listener syntax
+import { getStateCallbacks } from "colyseus.js";
 
 // --- Utility Function --- (Keep or import)
 // function generateUniqueId(): string { ... }
@@ -132,7 +134,8 @@ export class Preparation extends Scene {
     this.createHandSlots(centerX, gameHeight);
 
     // --- Populate Slots from Server State ---
-    this.updateBoardFromState(); // Initial population
+    // REMOVE this initial call. Listeners will handle population.
+    // this.updateBoardFromState(); // Initial population
 
     // --- Drag and Drop Logic ---
     this.setupDragAndDrop();
@@ -160,6 +163,17 @@ export class Preparation extends Scene {
 
     // Initial UI update based on readiness
     this.updateWaitingStatus(); // Includes button state update
+
+    // --- Remove the direct call to render the board state ---
+    // This call happens before the scene is fully active, causing issues.
+    // console.log("Preparation Create: Calling updateBoardFromState at the end of create().");
+    // this.updateBoardFromState(); // REMOVED
+
+    // --- Schedule the initial updateBoardFromState call ---
+    // This ensures it runs *after* create() completes and the scene is active.
+    console.log("Preparation Create: Scheduling initial updateBoardFromState call with a 1ms delay.");
+    this.time.delayedCall(1, this.updateBoardFromState, [], this);
+    // --- End Schedule ---
   }
 
   // --- UI Creation Helpers ---
@@ -315,40 +329,49 @@ export class Preparation extends Scene {
 setupColyseusListeners() {
   if (!colyseusRoom || !colyseusRoom.sessionId) return;
   const myPlayerId = colyseusRoom.sessionId;
+  // Get the proxy function for attaching listeners
+  const $ = getStateCallbacks(colyseusRoom);
 
   // Listen to general player state changes (health, brews, isReady)
   const player = colyseusRoom.state.players.get(myPlayerId);
   if (player) {
       // Use onChange for the whole player object or listen for specific props
       // Store the returned unsubscribe function
-      this.playerStateListenerUnsub = player.onChange(() => {
+      // Use proxy for the player object
+      this.playerStateListenerUnsub = $(player).onChange(() => {
           if (!this.scene.isActive()) return; // Guard against updates after shutdown
           this.updateNavbar();
           this.updateWaitingStatus();
       });
 
-      // Listen to hand changes
-      this.handAddUnsub = player.hand.onAdd((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      this.handRemoveUnsub = player.hand.onRemove((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      // Assuming onChange on MapSchema items also returns an unsubscribe function
-      // Note: Colyseus 0.15 might require iterating and adding onChange to each item.
-      // If direct onChange on the map doesn't work as expected, this needs adjustment.
-      // For now, assume it works like this or is handled by onAdd/onRemove triggering updateBoardFromState.
-      // this.handChangeUnsub = player.hand.onChange((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      // Listen to hand changes via the proxy
+      this.handAddUnsub = $(player.hand).onAdd((card, key) => {
+          // --- Add Log ---
+          console.log(`Preparation Scene: player.hand.onAdd triggered for key: ${key}, card: ${card?.name}. Scene active: ${this.scene.isActive()}`);
+          // --- End Log ---
+          if (this.scene.isActive()) {
+              // --- Add Log ---
+              console.log(`Preparation Scene: Calling updateBoardFromState from hand.onAdd listener.`);
+              // --- End Log ---
+              this.updateBoardFromState();
+          }
+      });
+      this.handRemoveUnsub = $(player.hand).onRemove((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      // Note: onChange on individual items within the map might require attaching listeners inside onAdd
+      // For now, updateBoardFromState on Add/Remove covers visual updates.
 
-
-      // Listen to battlefield changes
-      this.battlefieldAddUnsub = player.battlefield.onAdd((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      this.battlefieldRemoveUnsub = player.battlefield.onRemove((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
-      // this.battlefieldChangeUnsub = player.battlefield.onChange((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      // Listen to battlefield changes via the proxy
+      this.battlefieldAddUnsub = $(player.battlefield).onAdd((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      this.battlefieldRemoveUnsub = $(player.battlefield).onRemove((card, key) => { if (this.scene.isActive()) this.updateBoardFromState(); });
+      // Note: onChange on individual items within the map might require attaching listeners inside onAdd
 
   } else {
       console.error("Preparation Scene: My player state not found on init.");
   }
 
-  // Listen for phase changes
+  // Listen for phase changes via the proxy
   // Store the returned unsubscribe function
-  this.phaseListenerUnsub = colyseusRoom.state.listen("currentPhase", (currentPhase) => {
+  this.phaseListenerUnsub = $(colyseusRoom.state).listen("currentPhase", (currentPhase) => {
       if (!this.scene.isActive()) return;
       console.log(`Preparation Scene: Phase changed to ${currentPhase}`);
       this.updateDayPhaseText();
@@ -369,13 +392,13 @@ setupColyseusListeners() {
       this.updateWaitingStatus();
   });
 
-   // Listen for changes in other players' ready status & join/leave
+   // Listen for changes in other players' ready status & join/leave via the proxy
    // Store the returned unsubscribe functions
-   this.otherPlayerAddUnsub = colyseusRoom.state.players.onAdd((addedPlayer, sessionId) => {
+   this.otherPlayerAddUnsub = $(colyseusRoom.state.players).onAdd((addedPlayer, sessionId) => {
        if (this.scene.isActive()) {
            if (sessionId !== myPlayerId) {
-               // Listen for changes on the added player
-               const unsub = addedPlayer.onChange(() => {
+               // Listen for changes on the added player via the proxy
+               const unsub = $(addedPlayer).listen("isReady", () => { // Listen specifically to isReady
                    if (this.scene.isActive()) this.updateWaitingStatus();
                });
                this.otherPlayerChangeListeners.set(sessionId, unsub);
@@ -383,7 +406,7 @@ setupColyseusListeners() {
            this.updateWaitingStatus();
        }
    });
-   this.otherPlayerRemoveUnsub = colyseusRoom.state.players.onRemove((removedPlayer, sessionId) => {
+   this.otherPlayerRemoveUnsub = $(colyseusRoom.state.players).onRemove((removedPlayer, sessionId) => {
        if (this.scene.isActive()) {
            // Remove the specific listener for the removed player
            const unsub = this.otherPlayerChangeListeners.get(sessionId);
@@ -395,7 +418,8 @@ setupColyseusListeners() {
    // Add listeners for existing other players
    colyseusRoom.state.players.forEach((existingPlayer, sessionId) => {
         if (sessionId !== myPlayerId) {
-            const unsub = existingPlayer.onChange(() => {
+            // Use proxy for existing player
+            const unsub = $(existingPlayer).listen("isReady", () => { // Listen specifically to isReady
                 if (this.scene.isActive()) this.updateWaitingStatus();
             });
             this.otherPlayerChangeListeners.set(sessionId, unsub);
@@ -465,7 +489,7 @@ updateBoardFromState() {
   // --- Add Log ---
   console.log("Preparation updateBoardFromState: Function called.");
   // --- End Log ---
-  if (!colyseusRoom || !colyseusRoom.sessionId ) {
+  if (!colyseusRoom || !colyseusRoom.sessionId || !this.scene.isActive()) { // Added scene active check here
       console.log("Preparation updateBoardFromState: Exiting early - Room/Session/Scene inactive."); // Log exit reason
       console.log("Colyseus Room:", colyseusRoom);
       console.log("Session ID:", colyseusRoom?.sessionId);
@@ -640,29 +664,30 @@ confirmPreparation() {
   if (!colyseusRoom) return;
   console.log("Confirming preparation layout...");
 
-  // Construct layout data from current VISUAL state
-  // Server needs CardInstanceSchema-like data or just instanceIds if it can look them up
-  const handLayout: { [key: string]: CardInstanceSchema | null } = {};
+  // Construct layout data from current VISUAL state using INSTANCE IDs
+  const handLayout: { [key: string]: string | null } = {}; // Map slot index to instanceId or null
   for (let i = 0; i < 5; i++) {
       const key = String(i);
       const cardObject = this.handCardObjects.get(key);
-      // Ensure we get the actual CardInstanceSchema stored in data
-      handLayout[key] = cardObject ? (cardObject.getData('cardInstance') as CardInstanceSchema) : null;
+      // Get the instanceId from the CardInstanceSchema stored in the visual object's data
+      handLayout[key] = cardObject ? (cardObject.getData('cardInstance') as CardInstanceSchema).instanceId : null;
   }
 
-  const battlefieldLayout: { [key: string]: CardInstanceSchema | null } = {};
+  const battlefieldLayout: { [key: string]: string | null } = {}; // Map slot index to instanceId or null
   for (let i = 0; i < 5; i++) {
       const key = String(i);
       const cardObject = this.battlefieldCardObjects.get(key);
-      // Ensure we get the actual CardInstanceSchema stored in data
-      battlefieldLayout[key] = cardObject ? (cardObject.getData('cardInstance') as CardInstanceSchema) : null;
+      // Get the instanceId from the CardInstanceSchema stored in the visual object's data
+      battlefieldLayout[key] = cardObject ? (cardObject.getData('cardInstance') as CardInstanceSchema).instanceId : null;
   }
 
-  // Send layout to server and mark as ready
+  console.log("Sending preparation layout to server:", { handLayout, battlefieldLayout });
+
+  // Send layout (with instance IDs) to server and mark as ready
   colyseusRoom.send("setPreparation", { handLayout: handLayout, battlefieldLayout: battlefieldLayout });
   // Note: Server sets isReady=true upon receiving this message.
   // Client UI update (waiting text, disabled button) will happen via playerStateListener.
-  this.updateWaitingStatus(); // Immediately show waiting state
+  this.updateWaitingStatus(); // Immediately show waiting state visually
 }
 
 
