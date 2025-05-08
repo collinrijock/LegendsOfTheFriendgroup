@@ -3,6 +3,9 @@ import { colyseusRoom } from "../utils/colyseusClient";
 import { Phase, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState";
 import { getStateCallbacks } from "colyseus.js";
 
+const CARD_WIDTH = 120; // Was 100, updated for Full Card Sprite
+const CARD_HEIGHT = 168; // Was 140, updated for Full Card Sprite
+
 interface CardData {
   id: string;
   name: string;
@@ -16,7 +19,7 @@ interface CardData {
 
 export class Shop extends Scene {
   private continueButton!: Phaser.GameObjects.Text;
-  private shopCardObjects: Phaser.GameObjects.Text[] = [];
+  private shopCardObjects: Phaser.GameObjects.Container[] = [];
   private waitingText!: Phaser.GameObjects.Text;
 
   // For shop offers UI
@@ -162,8 +165,7 @@ export class Shop extends Scene {
 
     if (!shopOfferIds || shopOfferIds.length === 0) {
         console.log("Shop: No shop offers from server.");
-        // Still create an empty background for consistency if needed, or hide container
-        if (this.shopOffersBackground) this.shopOffersBackground.setVisible(false);
+        if (this.shopOffersBackground && this.shopOffersBackground.active) this.shopOffersBackground.setVisible(false);
         return;
     }
 
@@ -173,18 +175,18 @@ export class Shop extends Scene {
         return;
     }
 
-    const shopCardWidth = 100;
-    const shopCardHeight = 140;
     const shopCardSpacing = 20;
-    const numOffers = shopOfferIds.length > 0 ? shopOfferIds.length : 4; // Assume 4 if empty for layout
+    const numOffers = shopOfferIds.length > 0 ? shopOfferIds.length : 4;
     const shopY = centerY - 150;
-    const totalShopWidth = numOffers * shopCardWidth + (numOffers - 1) * shopCardSpacing;
-    const startShopX = centerX - totalShopWidth / 2 + shopCardWidth / 2;
+    const totalShopWidth = numOffers * CARD_WIDTH + (numOffers - 1) * shopCardSpacing;
+    const startShopX = centerX - totalShopWidth / 2 + CARD_WIDTH / 2;
 
-    // Add a background for the shop offers area
-    const bgWidth = totalShopWidth + shopCardSpacing * 2; // Add padding
-    const bgHeight = shopCardHeight + shopCardSpacing * 2;
-    this.shopOffersBackground = this.add.rectangle(centerX, shopY, bgWidth, bgHeight, 0x000033, 0.6); // Dark blue, semi-transparent
+    const bgWidth = totalShopWidth + shopCardSpacing * 2;
+    const bgHeight = CARD_HEIGHT + shopCardSpacing * 2;
+    if (this.shopOffersBackground && this.shopOffersBackground.active) {
+        this.shopOffersBackground.destroy();
+    }
+    this.shopOffersBackground = this.add.rectangle(centerX, shopY, bgWidth, bgHeight, 0x000033, 0.6);
     this.shopOffersContainer.add(this.shopOffersBackground);
 
     shopOfferIds.forEach((cardId, index) => {
@@ -194,28 +196,58 @@ export class Shop extends Scene {
             return;
         }
 
-        const cardX = startShopX + index * (shopCardWidth + shopCardSpacing);
-        const cardText = this.add.text(
-            cardX, shopY,
-            `${cardData.name}\nCost: ${cardData.brewCost}\nAtk: ${cardData.attack}\nHP: ${cardData.health}\nSpd: ${cardData.speed}`,
-            {
-                fontFamily: "Arial",
-                fontSize: 14,
-                color: "#ffffff",
-                backgroundColor: "#333366",
-                padding: { x: 5, y: 3 },
-                align: "center",
-                fixedWidth: shopCardWidth,
-                fixedHeight: shopCardHeight,
-                wordWrap: { width: shopCardWidth - 10 }
-            }
-        ).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        const cardX = startShopX + index * (CARD_WIDTH + shopCardSpacing);
+        const cardContainer = this.add.container(cardX, shopY);
 
-        cardText.setData("cardId", cardData.id);
-        cardText.setData("cardData", cardData);
-        this.input.setDraggable(cardText);
-        this.shopCardObjects.push(cardText); // Keep track for enabling/disabling drag
-        this.shopOffersContainer.add(cardText); // Add to container
+        const cardImage = this.add.image(0, 0, "cardFullTier1")
+            .setOrigin(0.5)
+            .setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
+        cardContainer.add(cardImage);
+
+        // Name: Middle center
+        const nameText = this.add.text(0, 0, cardData.name, {
+            fontFamily: "Arial", fontSize: 14, color: "#ffffff", stroke: "#000000", strokeThickness: 2, align: "center", wordWrap: { width: CARD_WIDTH - 20 }
+        }).setOrigin(0.5, 0.5);
+        cardContainer.add(nameText);
+
+        // Attack: Under name, to the left
+        const attackText = this.add.text(-CARD_WIDTH / 2 + 15, CARD_HEIGHT * 0.25, `${cardData.attack}`, {
+            fontFamily: "Arial", fontSize: 16, color: "#ffffff", stroke: "#000000", strokeThickness: 3
+        }).setOrigin(0, 0.5);
+        cardContainer.add(attackText);
+
+        // HP: Middle right (currentHp/maxHealth format, for shop cards currentHp is maxHealth)
+        const healthText = this.add.text(CARD_WIDTH / 2 - 15, 0, `${cardData.health}/${cardData.health}`, {
+            fontFamily: "Arial", fontSize: 16, color: "#00ff00", stroke: "#000000", strokeThickness: 3
+        }).setOrigin(1, 0.5);
+        cardContainer.add(healthText);
+        
+        // Speed: Middle bottom
+        const speedText = this.add.text(0, CARD_HEIGHT / 2 - 20, `${cardData.speed}`, {
+            fontFamily: "Arial", fontSize: 16, color: "#ffffff", stroke: "#000000", strokeThickness: 3
+        }).setOrigin(0.5, 1);
+        cardContainer.add(speedText);
+
+        // Brew Cost: Top-right corner (remains)
+        const costText = this.add.text(CARD_WIDTH / 2 - 8, -CARD_HEIGHT / 2 + 8, `${cardData.brewCost}B`, {
+            fontFamily: "Arial", fontSize: 14, color: "#ffff00", stroke: "#000000", strokeThickness: 3, align: "right"
+        }).setOrigin(1, 0);
+        cardContainer.add(costText);
+        
+        cardContainer.setSize(CARD_WIDTH, CARD_HEIGHT);
+        // const descriptionText = this.add.text(0, CARD_HEIGHT / 2 - 25, cardData.description, {
+        //     fontFamily: "Arial", fontSize: 9, color: "#dddddd", wordWrap: { width: CARD_WIDTH - 10 }, align: 'center'
+        // }).setOrigin(0.5, 0);
+        // cardContainer.add(descriptionText);
+
+        cardContainer.setSize(CARD_WIDTH, CARD_HEIGHT); // Important for hit area
+        cardContainer.setInteractive({ useHandCursor: true });
+        cardContainer.setData("cardId", cardData.id);
+        cardContainer.setData("cardData", cardData); // Store full card data if needed
+        this.input.setDraggable(cardContainer);
+        
+        this.shopCardObjects.push(cardContainer);
+        this.shopOffersContainer.add(cardContainer);
     });
   }
 
@@ -225,24 +257,24 @@ export class Shop extends Scene {
     this.input.off('dragend');
 
     this.input.on('dragstart', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject) => {
-        if (!(gameObject instanceof Phaser.GameObjects.Text) || !this.shopCardObjects.includes(gameObject)) return;
+        if (!(gameObject instanceof Phaser.GameObjects.Container) || !this.shopCardObjects.includes(gameObject)) return;
         if (!gameObject.input?.enabled) return;
 
-        this.children.bringToTop(gameObject);
+        this.children.bringToTop(gameObject); // Bring container to top
         gameObject.setAlpha(0.7);
         gameObject.setData('startX', gameObject.x);
         gameObject.setData('startY', gameObject.y);
     });
 
     this.input.on('drag', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject, dragX: number, dragY: number) => {
-        if (!(gameObject instanceof Phaser.GameObjects.Text) || !this.shopCardObjects.includes(gameObject)) return;
+        if (!(gameObject instanceof Phaser.GameObjects.Container) || !this.shopCardObjects.includes(gameObject)) return;
         if (!gameObject.input?.enabled) return;
         gameObject.x = dragX;
         gameObject.y = dragY;
     });
 
     this.input.on('dragend', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject) => {
-        if (!colyseusRoom || !(gameObject instanceof Phaser.GameObjects.Text) || !this.shopCardObjects.includes(gameObject)) return;
+        if (!colyseusRoom || !(gameObject instanceof Phaser.GameObjects.Container) || !this.shopCardObjects.includes(gameObject)) return;
         
         gameObject.setAlpha(1.0);
         const droppedX = gameObject.x;

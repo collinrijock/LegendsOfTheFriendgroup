@@ -13,18 +13,8 @@ export class Battle extends Scene {
   private resultText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text; // For "Battle Ended", "Waiting for results..."
 
-  // Navbar elements
-  private playerHealthText!: Phaser.GameObjects.Text;
-  private opponentHealthText!: Phaser.GameObjects.Text; // Renamed from aiHealthText
-  private playerBrewsText!: Phaser.GameObjects.Text;
-  private dayPhaseText!: Phaser.GameObjects.Text;
-
   // Colyseus listeners
   private phaseListenerUnsubscribe: (() => void) | null = null; // Store unsubscribe function
-  private playerStateListeners: Map<string, () => void> = new Map(); // Track listeners per player
-  // Add properties to store onAdd/onRemove unsubscribe functions
-  private playerAddListenerUnsubscribe: (() => void) | null = null;
-  private playerRemoveListenerUnsubscribe: (() => void) | null = null;
 
   constructor() {
     super("Battle");
@@ -47,45 +37,9 @@ export class Battle extends Scene {
     }
 
     const centerX = this.cameras.main.centerX;
-    const centerY = this.cameras.main.centerY; // Added for result text positioning
+    const centerY = this.cameras.main.centerY;
     const gameHeight = this.cameras.main.height;
     const gameWidth = this.cameras.main.width;
-
-    // Get initial state from Colyseus
-    const myPlayerId = colyseusRoom.sessionId;
-    const myPlayerState = colyseusRoom.state.players.get(myPlayerId);
-    let opponentState: PlayerState | undefined;
-    colyseusRoom.state.players.forEach((player, sessionId) => {
-        if (sessionId !== myPlayerId) {
-            opponentState = player;
-        }
-    });
-
-    const currentDay = colyseusRoom.state.currentDay;
-    const playerHealth = myPlayerState?.health ?? 50;
-    const opponentHealth = opponentState?.health ?? 50;
-    const playerBrews = myPlayerState?.brews ?? 0;
-
-    // --- Navbar ---
-    const navbarY = 25;
-    const navbarHeight = 50;
-    this.add.rectangle(centerX, navbarY, gameWidth, navbarHeight, 0x000000, 0.6);
-    // Add styles matching previous implementation
-    const navTextStyle = { fontFamily: "Arial", fontSize: 18, color: "#ffffff", align: "left" };
-    this.playerHealthText = this.add.text(50, navbarY, `You: ${playerHealth} HP`, { ...navTextStyle, color: "#00ff00" }).setOrigin(0, 0.5);
-    this.opponentHealthText = this.add.text(250, navbarY, `Opponent: ${opponentHealth} HP`, { ...navTextStyle, color: "#ff0000" }).setOrigin(0, 0.5);
-    this.dayPhaseText = this.add.text(centerX, navbarY, `Day ${currentDay} - Battle Phase`, { ...navTextStyle, fontSize: 24, align: "center" }).setOrigin(0.5);
-    this.playerBrewsText = this.add.text(gameWidth - 50, navbarY, `Brews: ${playerBrews}`, { ...navTextStyle, fontSize: 20, color: "#ffff00", align: "right" }).setOrigin(1, 0.5);
-
-    // --- Title ---
-    this.add.text(centerX, 80, "Battle Phase!", {
-        fontFamily: "Arial Black",
-        fontSize: 48,
-        color: "#ff8c00", // Orange color for battle
-        stroke: "#000000",
-        strokeThickness: 8,
-        align: "center",
-      }).setOrigin(0.5);
 
     // --- Result Text & Status Text (initially hidden) ---
     this.resultText = this.add.text(centerX, centerY, "", {
@@ -103,13 +57,8 @@ export class Battle extends Scene {
 
     // --- Colyseus Listeners ---
     this.setupColyseusListeners();
-
-    // Initial UI update
-    this.updateNavbar();
-    this.updateDayPhaseText(); // Ensure phase text is correct initially
   }
 
-  // --- Colyseus Listeners ---
   setupColyseusListeners() {
     if (!colyseusRoom || !colyseusRoom.state) return;
     // Get the proxy function for attaching listeners
@@ -119,7 +68,6 @@ export class Battle extends Scene {
     this.phaseListenerUnsubscribe = $(colyseusRoom.state).listen("currentPhase", (currentPhase) => {
         if (!this.scene.isActive()) return; // Guard against updates after shutdown
         console.log(`Battle Scene: Phase changed to ${currentPhase}`);
-        this.updateDayPhaseText(); // Update navbar
 
         if (currentPhase === Phase.BattleEnd) {
             this.handleBattleEnd(); // Trigger results display
@@ -142,112 +90,18 @@ export class Battle extends Scene {
             }
         }
     });
+  }
 
-    // Listen for health/brew changes to update navbar via the proxy
-    colyseusRoom.state.players.forEach((player, sessionId) => {
-        // Store the unsubscribe function for each player's specific listeners
-        const healthUnsub = $(player).listen("health", () => {
-            if (this.scene.isActive()) this.updateNavbar();
-        });
-        const brewsUnsub = $(player).listen("brews", () => {
-            if (this.scene.isActive()) this.updateNavbar();
-        });
-
-        const combinedUnsub = () => {
-            healthUnsub();
-            brewsUnsub();
-        };
-        this.playerStateListeners.set(sessionId, combinedUnsub);
-    });
-
-   if (colyseusRoom.state.players) {
-       this.playerAddListenerUnsubscribe = $(colyseusRoom.state.players).onAdd((player, sessionId) => {
-           if (!this.scene.isActive()) return;
-           console.warn(`Player ${sessionId} joined mid-battle?`);
-           this.updateNavbar();
-           
-           const healthUnsub = $(player).listen("health", () => {
-               if (this.scene.isActive()) this.updateNavbar();
-           });
-           const brewsUnsub = $(player).listen("brews", () => {
-               if (this.scene.isActive()) this.updateNavbar();
-           });
-
-           const combinedUnsub = () => {
-               healthUnsub();
-               brewsUnsub();
-           };
-           this.playerStateListeners.set(sessionId, combinedUnsub);
-       });
-
-       this.playerRemoveListenerUnsubscribe = $(colyseusRoom.state.players).onRemove((player, sessionId) => {
-           if (!this.scene.isActive()) return;
-           console.log(`Player ${sessionId} removed mid-battle`);
-           
-           const unsubscribe = this.playerStateListeners.get(sessionId);
-           if (unsubscribe) {
-               unsubscribe();
-               this.playerStateListeners.delete(sessionId);
-           }
-           
-           this.updateNavbar();
-       });
-   } else {
-       console.error("Battle Scene: colyseusRoom.state.players is not available when attaching onAdd/onRemove listeners.");
-   }
-}
-
-cleanupListeners() {
+  cleanupListeners() {
     console.log("Battle Scene: Cleaning up listeners.");
     this.phaseListenerUnsubscribe?.();
     this.phaseListenerUnsubscribe = null;
-
-    this.playerStateListeners.forEach((unsubscribe) => {
-        unsubscribe();
-    });
-    this.playerStateListeners.clear();
-
-    this.playerAddListenerUnsubscribe?.();
-    this.playerRemoveListenerUnsubscribe?.();
-    this.playerAddListenerUnsubscribe = null;
-    this.playerRemoveListenerUnsubscribe = null;
-}
-
-  // --- UI Update Functions ---
-  updateNavbar() {
-    if (!colyseusRoom || !colyseusRoom.state || !colyseusRoom.sessionId || !this.playerHealthText?.active || !this.opponentHealthText?.active || !this.playerBrewsText?.active) {
-        return;
-    }
-
-    const myPlayerId = colyseusRoom.sessionId;
-    const myPlayerState = colyseusRoom.state.players.get(myPlayerId);
-    let opponentState: PlayerState | undefined;
-    colyseusRoom.state.players.forEach((player, sessionId) => {
-        if (sessionId !== myPlayerId) opponentState = player;
-    });
-
-    this.playerHealthText.setText(`You: ${myPlayerState?.health ?? 'N/A'} HP`);
-    this.opponentHealthText.setText(`Opponent: ${opponentState?.health ?? 'N/A'} HP`);
-    this.playerBrewsText.setText(`Brews: ${myPlayerState?.brews ?? 'N/A'}`);
   }
-
-   updateDayPhaseText() {
-        if (!colyseusRoom || !colyseusRoom.state || !this.dayPhaseText?.active) {
-            return;
-        }
-        const day = colyseusRoom.state.currentDay;
-        const phase = colyseusRoom.state.currentPhase;
-        const phaseText = phase === Phase.BattleEnd ? "Battle Ended" : phase;
-        this.dayPhaseText.setText(`Day ${day} - ${phaseText}`);
-   }
 
   handleBattleEnd() {
     if (this.battleOver || !this.scene.isActive()) return;
     this.battleOver = true;
     console.log("Battle ended (server signal received). Displaying results.");
-
-    this.updateNavbar();
-    this.updateDayPhaseText();
 
     const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId);
     let opponentState: PlayerState | undefined;
@@ -283,9 +137,6 @@ cleanupListeners() {
      if (this.battleOver || !this.scene.isActive()) return;
      this.battleOver = true;
      console.log("Game Over signal received.");
-
-     this.updateNavbar();
-     this.updateDayPhaseText();
 
      const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId);
      let opponentState: PlayerState | undefined;
@@ -327,10 +178,6 @@ cleanupListeners() {
      });
      this.handCardDisplayObjects.clear();
 
-     this.playerHealthText?.destroy();
-     this.opponentHealthText?.destroy();
-     this.playerBrewsText?.destroy();
-     this.dayPhaseText?.destroy();
      this.resultText?.destroy();
      this.statusText?.destroy();
   }

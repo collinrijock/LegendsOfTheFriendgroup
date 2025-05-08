@@ -45,27 +45,14 @@ export class Preloader extends Scene {
   preload() {
     //  Load the assets for the game - Replace with your own assets
     this.load.setPath("/.proxy/assets");
-
-    // Load the alphabet images
-    const alphabetArray = "abcd".split(""); // efghijklmnopqrstuvwxyz
-
-    alphabetArray.forEach((letter) => {
-      this.load.image(letter, `${letter}.png`);
-    });
-
-    this.load.image("smile", "smile.png");
-    this.load.image("alien", "alien.png");
     this.load.image("logo", "logo.png");
-    this.load.image("nought_1", "nought.png");
-    this.load.image("nought_2", "nought.png");
-    this.load.image("nought_3", "nought.png");
-    this.load.image("cross_1", "cross.png");
-    this.load.image("cross_2", "cross.png");
-    this.load.image("cross_3", "cross.png");
-    this.load.image("grid", "grid.png");
 
     // Load card data
     this.load.json("cardData", "data/cards.json");
+
+    // Load card sprites
+    this.load.image("cardFullTier1", "CardFullTier1.png");
+    this.load.image("cardMinionTier1", "CardMinionTier1.png");
   }
 
   create() {
