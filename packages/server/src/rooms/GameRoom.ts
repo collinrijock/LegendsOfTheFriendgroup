@@ -168,6 +168,126 @@ export class GameRoom extends Room<GameState> {
         this.checkPhaseTransition();
     });
 
+    this.onMessage("moveCardInHand", (client, message: { instanceId: string, fromSlotKey: string, toSlotKey: string }) => {
+        const player = this.state.players.get(client.sessionId);
+
+        if (!player) {
+            console.warn(`moveCardInHand: Player not found for session ID: ${client.sessionId}`);
+            return;
+        }
+
+        if (this.state.currentPhase !== Phase.Shop) {
+            console.warn(`moveCardInHand: Incorrect phase. Player ${player.username} tried to move card outside Shop phase. Current phase: ${this.state.currentPhase}`);
+            return;
+        }
+
+        const { instanceId, fromSlotKey, toSlotKey } = message;
+
+        if (fromSlotKey === toSlotKey) {
+            console.log(`moveCardInHand: fromSlotKey and toSlotKey are the same (${fromSlotKey}). No action needed for player ${player.username}.`);
+            return;
+        }
+
+        const cardToMove = player.hand.get(fromSlotKey);
+
+        if (!cardToMove || cardToMove.instanceId !== instanceId) {
+            console.warn(`moveCardInHand: Card with instanceId ${instanceId} not found at fromSlotKey ${fromSlotKey} for player ${player.username}. Card found: ${cardToMove?.name}`);
+            // Attempt to find the card by instanceId anywhere in hand as a fallback diagnostic
+            let foundElsewhere = false;
+            player.hand.forEach((card, key) => {
+                if (card.instanceId === instanceId) {
+                    console.warn(`moveCardInHand: Diagnostic - Card ${instanceId} was found at slot ${key} instead of ${fromSlotKey}.`);
+                    foundElsewhere = true;
+                }
+            });
+            if (!foundElsewhere) console.warn(`moveCardInHand: Diagnostic - Card ${instanceId} not found anywhere in hand.`);
+            return;
+        }
+
+        if (player.hand.has(toSlotKey)) {
+            const occupantCard = player.hand.get(toSlotKey);
+            console.warn(`moveCardInHand: Target toSlotKey ${toSlotKey} is already occupied by card ${occupantCard?.name} (${occupantCard?.instanceId}) for player ${player.username}. Move aborted.`);
+            // Client-side logic should ideally prevent this, but server validates.
+            return;
+        }
+
+        // Perform the move
+        player.hand.delete(fromSlotKey);
+        player.hand.set(toSlotKey, cardToMove);
+
+        console.log(`Player ${player.username} moved card ${cardToMove.name} (${instanceId}) from hand slot ${fromSlotKey} to ${toSlotKey}.`);
+    });
+
+    this.onMessage("updatePrepLayout", (client, message: {
+        instanceId: string;
+        newArea: 'hand' | 'battlefield';
+        newSlotKey: string;
+    }) => {
+        const player = this.state.players.get(client.sessionId);
+        if (!player || this.state.currentPhase !== Phase.Preparation) {
+            console.warn(`updatePrepLayout: Invalid state. Player: ${!!player}, Phase: ${this.state.currentPhase}, From: ${client.sessionId}`);
+            return;
+        }
+
+        console.log(`Player ${client.sessionId} wants to move card ${message.instanceId} to ${message.newArea}[${message.newSlotKey}]`);
+
+        let cardToMove: CardInstanceSchema | undefined;
+        let foundInArea: 'hand' | 'battlefield' | undefined;
+        let foundAtKey: string | undefined;
+
+        // Find the card in player's hand
+        player.hand.forEach((card, key) => {
+            if (card.instanceId === message.instanceId) {
+                cardToMove = card;
+                foundInArea = 'hand';
+                foundAtKey = key;
+            }
+        });
+
+        // If not in hand, find in player's battlefield
+        if (!cardToMove) {
+            player.battlefield.forEach((card, key) => {
+                if (card.instanceId === message.instanceId) {
+                    cardToMove = card;
+                    foundInArea = 'battlefield';
+                    foundAtKey = key;
+                }
+            });
+        }
+
+        if (!cardToMove || !foundInArea || foundAtKey === undefined) {
+            console.warn(`updatePrepLayout: Card instance ${message.instanceId} not found for player ${client.sessionId}.`);
+            return;
+        }
+
+        // If the card is already in the target destination, do nothing.
+        if (foundInArea === message.newArea && foundAtKey === message.newSlotKey) {
+            console.log(`updatePrepLayout: Card ${message.instanceId} is already at ${message.newArea}[${message.newSlotKey}]. No change.`);
+            return;
+        }
+
+        // Remove from its current location
+        if (foundInArea === 'hand') {
+            player.hand.delete(foundAtKey);
+        } else {
+            player.battlefield.delete(foundAtKey);
+        }
+
+        // Place in new location
+        const targetMap = message.newArea === 'hand' ? player.hand : player.battlefield;
+
+        // If the target slot is occupied by another card, client should have prevented this.
+        // For server robustness, we'll log a warning and overwrite.
+        // The card previously in targetMap.get(message.newSlotKey) will be removed from schema.
+        if (targetMap.has(message.newSlotKey)) {
+            const occupant = targetMap.get(message.newSlotKey);
+            console.warn(`updatePrepLayout: Target slot ${message.newArea}[${message.newSlotKey}] for card ${cardToMove.instanceId} is occupied by ${occupant?.instanceId}. Overwriting.`);
+        }
+
+        targetMap.set(message.newSlotKey, cardToMove);
+        console.log(`Card ${cardToMove.instanceId} moved from ${foundInArea}[${foundAtKey}] to ${message.newArea}[${message.newSlotKey}] for player ${client.sessionId}`);
+    });
+
     // --- Remove clientBattleOver handler ---
     /*
     this.onMessage("clientBattleOver", (client) => {
@@ -439,39 +559,63 @@ export class GameRoom extends Room<GameState> {
                     });
                 });
   
-                // Process collected attacks
-                attacksThisTick.forEach(attack => {
-                    // attack.targetCard is the CardInstanceSchema object from the state.
-                    // attack.attackerCard is the CardInstanceSchema object from the state.
-  
-                    // Ensure the attacker and target are still valid and alive.
-                    const attackerPlayer = this.state.players.get(attack.attackerPlayerId);
-                    const targetPlayer = this.state.players.get(attack.targetPlayerId);
-  
-                    if (attackerPlayer && targetPlayer) {
-                        // Verify the attacker is still on their board and alive
-                        let currentAttackerOnBoard: CardInstanceSchema | undefined;
-                        attackerPlayer.battlefield.forEach(card => {
-                            if (card.instanceId === attack.attackerCard.instanceId && card.currentHp > 0) {
-                                currentAttackerOnBoard = card;
-                            }
-                        });
-  
-                        // Verify the target is still on their board and alive
-                        let currentTargetOnBoard: CardInstanceSchema | undefined;
-                        targetPlayer.battlefield.forEach(card => {
-                            if (card.instanceId === attack.targetCard.instanceId && card.currentHp > 0) {
-                                currentTargetOnBoard = card;
-                            }
-                        });
-  
-                        if (currentAttackerOnBoard && currentTargetOnBoard) {
-                            const oldHp = currentTargetOnBoard.currentHp;
-                            currentTargetOnBoard.currentHp = Math.max(0, currentTargetOnBoard.currentHp - attack.damage);
-                            console.log(`[SERVER BATTLE] ${currentAttackerOnBoard.name} (P: ${attackerPlayer.username}) attacks ${currentTargetOnBoard.name} (P: ${targetPlayer.username}) for ${attack.damage} damage. HP: ${oldHp} -> ${currentTargetOnBoard.currentHp}`);
-                        }
-                    }
-                });
+        // Process collected attacks
+attacksThisTick.forEach(attack => {
+    // attack.targetCard is the CardInstanceSchema object from the state.
+    // attack.attackerCard is the CardInstanceSchema object from the state.
+
+    // Ensure the attacker and target are still valid and alive.
+    const attackerPlayer = this.state.players.get(attack.attackerPlayerId);
+    const targetPlayer = this.state.players.get(attack.targetPlayerId);
+
+    if (attackerPlayer && targetPlayer) {
+        // Verify the attacker is still on their board and alive
+        let currentAttackerOnBoard: CardInstanceSchema | undefined;
+        attackerPlayer.battlefield.forEach(card => {
+            if (card.instanceId === attack.attackerCard.instanceId && card.currentHp > 0) {
+                currentAttackerOnBoard = card;
+            }
+        });
+
+        // Verify the target is still on their board and alive
+        let currentTargetOnBoard: CardInstanceSchema | undefined;
+        let foundTargetCardDataForLog: { id: string, hp: number, name: string } | null = null;
+
+        targetPlayer.battlefield.forEach(card => {
+            if (card.instanceId === attack.targetCard.instanceId) {
+                foundTargetCardDataForLog = { id: card.instanceId, hp: card.currentHp, name: card.name };
+                if (card.currentHp > 0) {
+                    currentTargetOnBoard = card;
+                }
+            }
+        });
+
+        if (!currentAttackerOnBoard) {
+            console.log(`[SERVER BATTLE DEBUG] Attacker ${attack.attackerCard.name} (ID: ${attack.attackerCard.instanceId}, Player: ${attackerPlayer.username}) not found on board or not alive for processing attack.`);
+        }
+        if (!foundTargetCardDataForLog) {
+            console.log(`[SERVER BATTLE DEBUG] Target card (ID: ${attack.targetCard.instanceId}) not found on ${targetPlayer.username}'s battlefield when processing attack from ${attack.attackerCard.name}.`);
+        } else if (!currentTargetOnBoard) {
+            console.log(`[SERVER BATTLE DEBUG] Target ${foundTargetCardDataForLog} Attack by ${currentAttackerOnBoard?.name || attack.attackerCard.name} aborted.`);
+        }
+
+        if (currentAttackerOnBoard && currentTargetOnBoard) {
+            const oldHp = currentTargetOnBoard.currentHp;
+            console.log(`[SERVER BATTLE DEBUG] Applying damage: Target ${currentTargetOnBoard.name} (Player: ${targetPlayer.username}) HP before: ${oldHp}, Damage from ${currentAttackerOnBoard.name} (Player: ${attackerPlayer.username}): ${attack.damage}`);
+            currentTargetOnBoard.currentHp = Math.max(0, currentTargetOnBoard.currentHp - attack.damage);
+            console.log(`[SERVER BATTLE] ${currentAttackerOnBoard.name} (P: ${attackerPlayer.username}) attacks ${currentTargetOnBoard.name} (P: ${targetPlayer.username}) for ${attack.damage} damage. HP: ${oldHp} -> ${currentTargetOnBoard.currentHp}`);
+
+            // Broadcast the attack event to all clients
+            this.broadcast("battleAttackEvent", {
+                attackerInstanceId: currentAttackerOnBoard.instanceId,
+                targetInstanceId: currentTargetOnBoard.instanceId,
+                damageDealt: attack.damage,
+                attackerPlayerId: attack.attackerPlayerId,
+                targetPlayerId: attack.targetPlayerId
+            });
+        }
+    }
+});
             }
             // --- End Server-Side Card Attack Simulation ---
   

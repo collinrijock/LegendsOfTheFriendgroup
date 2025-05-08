@@ -15,6 +15,7 @@ import { Lobby } from "./scenes/Lobby";
 import { Shop } from "./scenes/Shop";
 import { Preparation } from "./scenes/Preparation";
 import { Battle } from "./scenes/Battle";
+import { BoardView } from "./scenes/BoardView"; // Import BoardView
 
 // --- Global Colyseus Room Variable (Now imported from colyseusClient.ts) ---
 // export let colyseusRoom: Room | null = null; // Moved
@@ -38,6 +39,6 @@ import { Battle } from "./scenes/Battle";
     backgroundColor: "#000000",
     roundPixels: false,
     pixelArt: false,
-    scene: [Boot, Preloader, MainMenu, Lobby, Shop, Preparation, Battle, Game, Background],
+    scene: [Boot, Preloader, MainMenu, Lobby, Shop, Preparation, Battle, BoardView, Game, Background], // Added BoardView
   });
 })();
