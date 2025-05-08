@@ -3,21 +3,22 @@ import { Scene } from "phaser";
 import { colyseusRoom } from "../utils/colyseusClient"; // Updated import
 import { getUserName } from "../utils/discordSDK";
 // Import Phase enum for type safety (adjust path if needed)
-import { Phase } from "../../../server/src/schemas/GameState"; // Adjust path as necessary
+import { Phase, PlayerState } from "../../../server/src/schemas/GameState"; // Adjust path as necessary
 // Import getStateCallbacks for 0.16 listener syntax
 import { getStateCallbacks } from "colyseus.js";
 
 export class Lobby extends Scene {
   private playerTextObjects: Map<string, Phaser.GameObjects.Text> = new Map(); // Map sessionId to Text object
   private statusText!: Phaser.GameObjects.Text;
-  private readyButton!: Phaser.GameObjects.Text; // Added
-  private waitingText!: Phaser.GameObjects.Text; // Added
+  private readyButton!: Phaser.GameObjects.Text;
+  private waitingText!: Phaser.GameObjects.Text;
 
   // Listener tracking
   private phaseListenerUnsub: (() => void) | null = null;
   private playerAddListenerUnsub: (() => void) | null = null;
   private playerRemoveListenerUnsub: (() => void) | null = null;
-  private playerStateListeners: Map<string, () => void> = new Map(); // Track individual player listeners
+  private playerStateListeners: Map<string, () => void> = new Map(); // Track individual player 'isReady' listeners
+  private listenersAttached: boolean = false; // Flag to ensure main listeners are attached once
 
   constructor() {
     super("Lobby");
@@ -25,20 +26,23 @@ export class Lobby extends Scene {
 
   create() {
     this.scene.launch("background");
+    this.listenersAttached = false; // Reset flag on scene creation
 
     // Check if connected
-    if (!colyseusRoom) {
-      console.error("Not connected to Colyseus room!");
-      // Handle error - maybe return to MainMenu
+    if (!colyseusRoom || !colyseusRoom.sessionId) { // Added sessionId check
+      console.error("Lobby Scene: Not connected to Colyseus room or no session ID!");
       this.add
         .text(
           this.cameras.main.centerX,
           this.cameras.main.centerY,
           "Error: Not connected to server.\nPlease return to Main Menu.",
-          { color: "#ff0000", fontSize: "24px", align: "center" }
+          { color: "#ff0000", fontSize: "24px", align: "center", backgroundColor: '#000000' }
         )
         .setOrigin(0.5);
-      this.input.once("pointerdown", () => this.scene.start("MainMenu"));
+      this.input.once("pointerdown", () => {
+          try { colyseusRoom?.leave(); } catch(e) {}
+          this.scene.start("MainMenu");
+      });
       return;
     }
 
@@ -68,8 +72,8 @@ export class Lobby extends Scene {
     this.statusText = this.add
       .text(
         this.cameras.main.centerX,
-        this.cameras.main.height - 100,
-        "Waiting for players...",
+        this.cameras.main.height - 100, // Adjusted Y
+        "Connecting to lobby...", // Initial text
         {
           fontFamily: "Arial",
           fontSize: 24,
@@ -79,23 +83,25 @@ export class Lobby extends Scene {
       )
       .setOrigin(0.5);
 
-    // Ready Button (Initially hidden/disabled)
+    // Ready Button
     this.readyButton = this.add.text(
         this.cameras.main.centerX,
-        this.cameras.main.height - 150, // Position above status text
+        this.cameras.main.height - 150,
         "Ready Up",
         {
             fontFamily: "Arial Black",
             fontSize: 40,
             color: "#888888", // Start disabled
+            backgroundColor: "#333333",
+            padding: { x: 20, y: 10 },
             stroke: "#000000",
             strokeThickness: 6,
             align: "center",
         }
     )
     .setOrigin(0.5)
-    .setVisible(false) // Start hidden
-    .disableInteractive(); // Start disabled
+    .setVisible(false) // Start hidden, shown by updateLobbyUI
+    .disableInteractive(); // Start disabled, managed by updateLobbyUI
 
     // Waiting Text (Initially hidden)
     this.waitingText = this.add.text(
@@ -107,14 +113,11 @@ export class Lobby extends Scene {
     .setOrigin(0.5)
     .setVisible(false);
 
-    // Add listener for the ready button
     this.readyButton.on('pointerdown', () => {
         if (colyseusRoom && this.readyButton.input?.enabled) {
             console.log("Lobby: Sending playerReady message.");
             colyseusRoom.send("playerReady");
-            // Disable button immediately and show waiting text
-            this.readyButton.disableInteractive().setColor("#888888").setText("Waiting...");
-            this.waitingText.setText("Waiting for opponent...").setVisible(true);
+            // UI update (button text/state) will be handled by the server state change listener
         }
     });
     this.readyButton.on('pointerover', () => {
@@ -122,177 +125,190 @@ export class Lobby extends Scene {
     });
     this.readyButton.on('pointerout', () => {
         if (this.readyButton.input?.enabled) this.readyButton.setColor('#00ff00');
-        else this.readyButton.setColor('#888888'); // Keep grey if disabled
+        else this.readyButton.setColor('#888888');
     });
 
+    this.setupColyseusListeners();
+    // Initial UI update is now handled by attachMainListenersAndUI via setupColyseusListeners
+  }
 
-    // --- Colyseus State Handling ---
-    console.log(`Lobby: create() - Checking colyseusRoom status. Is connected: ${!!colyseusRoom}, Room ID: ${colyseusRoom?.roomId}`);
+  private attachMainListenersAndUI() {
+    if (this.listenersAttached) {
+        console.log("Lobby: Main listeners and UI setup already performed, skipping.");
+        return;
+    }
+    if (!this.scene.isActive()) {
+        console.warn("Lobby: attachMainListenersAndUI called but scene is not active. Aborting.");
+        return;
+    }
+    if (!colyseusRoom || !colyseusRoom.state) {
+        console.warn("Lobby: attachMainListenersAndUI called but Colyseus room or state is not ready. Aborting.");
+        return;
+    }
 
-    // Wait for the initial state to be received before setting up player listeners
+    console.log("Lobby: Attaching main Colyseus listeners and performing initial UI update.");
+    this.attachMainListeners(); // This method sets up specific listeners like phase, player add/remove
+    this.updateLobbyUI();     // Perform the initial UI render based on current state
+    this.listenersAttached = true;
+  }
+
+  setupColyseusListeners() {
+    if (!colyseusRoom) {
+        console.error("Lobby: setupColyseusListeners called but colyseusRoom is null.");
+        return;
+    }
+    console.log("Lobby: Setting up Colyseus general listeners.");
+
+    // If state is already available, schedule the main listener attachment and UI update.
+    // Using a small delay ensures Phaser's scene context is fully ready.
+    if (colyseusRoom.state && !this.listenersAttached) {
+        console.log("Lobby: State already available on setup. Scheduling attachMainListenersAndUI.");
+        this.time.delayedCall(1, this.attachMainListenersAndUI, [], this);
+    }
+
+    // Always set up onStateChange.once for the definitive first state synchronization.
+    // This handles cases where state might not be immediately available or if a full state sync occurs.
     colyseusRoom.onStateChange.once((state) => {
-      console.log("Lobby: Initial state received inside onStateChange.once. Setting up listeners.");
-      if (!this.scene.isActive()) {
-          console.log("Lobby: Scene inactive, aborting listener setup.");
-          return; // Guard against scene being destroyed before state arrives
-      }
-      console.log("Lobby: Initial state players count:", state.players?.size ?? 'N/A'); // Log initial count
+        console.log("Lobby: Initial state received via onStateChange.once.");
+        if (!this.scene.isActive()) {
+            console.log("Lobby: Scene became inactive before onStateChange.once processing could complete.");
+            return;
+        }
+        // Call the consolidated method to attach listeners and update UI
+        this.attachMainListenersAndUI();
+    });
 
-      // Get the proxy function for attaching listeners
-      // Ensure colyseusRoom is valid before getting proxy
-      if (!colyseusRoom) {
-          console.error("Lobby: colyseusRoom is null inside onStateChange.once. Aborting listener setup.");
-          this.statusText.setText("Error: Room connection lost.");
-          return;
-      }
-      const $ = getStateCallbacks(colyseusRoom);
+    // Note: If state was already processed by the direct check + delayedCall,
+    // attachMainListenersAndUI will bail out due to `this.listenersAttached` being true,
+    // preventing duplicate setup from the onStateChange.once callback.
+  }
 
-    // --- REMOVED Robustness Check ---
-    // The proxy ($) handles the case where state.players might not be ready immediately.
-    // if (!state || !state.players || typeof state.players.onAdd !== 'function' || typeof state.players.onRemove !== 'function') { ... } // REMOVED
+  attachMainListeners() {
+    if (!colyseusRoom || !colyseusRoom.state) {
+        console.error("Lobby: attachMainListeners - colyseusRoom or state is null.");
+        return;
+    }
+    const $ = getStateCallbacks(colyseusRoom);
 
-      console.log("Lobby: Attaching listeners using proxy...");
-
-      // Listen for players joining/leaving using the proxy on colyseusRoom.state.players
-      // Store unsubscribe functions
-      try {
-          console.log("Lobby: Attaching players.onAdd listener via proxy...");
-          // Use proxy directly on the room's state reference
-          this.playerAddListenerUnsub = $(colyseusRoom.state.players).onAdd((player, sessionId) => {
-            if (!this.scene.isActive()) return; // Guard
-            console.log(`Lobby: players.onAdd fired for sessionId: ${sessionId}, username: ${player?.username}`);
-            // Add listener for changes within this specific player (especially isReady)
-            // Use proxy for the player object
-            if (player && typeof $(player).listen === 'function') {
-                const unsub = $(player).listen("isReady", (currentValue, previousValue) => {
-                    console.log(`Lobby: isReady changed for player ${sessionId}: ${previousValue} -> ${currentValue}`);
-                    if (this.scene.isActive()) this.updateLobbyUI();
-                });
-                // Remove previous listener if it exists before adding new one
-                this.playerStateListeners.get(sessionId)?.();
-                this.playerStateListeners.set(sessionId, unsub);
-                console.log(`Lobby: Attached/Replaced isReady listener for new player ${sessionId}`);
-            } else {
-                console.warn(`Lobby: Player object for ${sessionId} is invalid or missing listen method.`);
-            }
-            this.updateLobbyUI(); // Update UI when player joins
-        });
-        console.log("Lobby: players.onAdd listener attached via proxy.");
-      } catch (e) {
-          console.error("Lobby: Error attaching players.onAdd listener via proxy:", e);
-      }
-
-      try {
-          console.log("Lobby: Attaching players.onRemove listener via proxy...");
-          // Use proxy directly on the room's state reference
-          this.playerRemoveListenerUnsub = $(colyseusRoom.state.players).onRemove((player, sessionId) => {
-            if (!this.scene.isActive()) return; // Guard
-            console.log("Player left lobby:", player?.username || sessionId);
-            // Remove listener associated with this player
-            const unsub = this.playerStateListeners.get(sessionId);
-            if (unsub) {
-                unsub(); // Call unsubscribe function
-                this.playerStateListeners.delete(sessionId);
-                console.log(`Lobby: Removed isReady listener for player ${sessionId}`);
-            } else {
-                console.warn(`Lobby: Could not find listener to remove for player ${sessionId}`);
-            }
-            this.removePlayerText(sessionId); // Remove visual text
-            this.updateLobbyUI(); // Update UI when player leaves
-          });
-          console.log("Lobby: players.onRemove listener attached via proxy.");
-      } catch (e) {
-           console.error("Lobby: Error attaching players.onRemove listener via proxy:", e);
-      }
-
-      // Add listeners for existing players (in case state arrives with players already)
-      try {
-          console.log("Lobby: Attaching listeners to EXISTING players (if any)...");
-          // Use colyseusRoom.state here as well for consistency with proxy usage
-          colyseusRoom.state.players.forEach((player, sessionId) => {
-              console.log(`Lobby: Setting up listener for existing player ${sessionId}`);
-              if (player && typeof $(player).listen === 'function') {
-                  const unsub = $(player).listen("isReady", (currentValue, previousValue) => {
-                      console.log(`Lobby: isReady changed for existing player ${sessionId}: ${previousValue} -> ${currentValue}`);
-                      if (this.scene.isActive()) this.updateLobbyUI();
-                  });
-                  // Remove previous listener if it exists before adding new one
-                  this.playerStateListeners.get(sessionId)?.();
-                  this.playerStateListeners.set(sessionId, unsub);
-                  console.log(`Lobby: Attached/Replaced isReady listener for existing player ${sessionId}`);
-              } else {
-                  console.warn(`Lobby: Existing player object for ${sessionId} is invalid or missing listen method.`);
-              }
-          });
-          console.log("Lobby: Finished attaching listeners to existing players.");
-      } catch (e) {
-          console.error("Lobby: Error iterating or attaching listen for existing players:", e);
-      }
-
-
-      // Listen for phase changes from the server using state.listen() via the proxy
-      // Use proxy on the room's state reference
-      if (colyseusRoom.state && typeof $(colyseusRoom.state).listen === 'function') {
-          try {
-              console.log("Lobby: Attaching state.listen('currentPhase') listener via proxy...");
-              this.phaseListenerUnsub = $(colyseusRoom.state).listen("currentPhase", (currentPhase, previousPhase) => {
-                if (!this.scene.isActive()) return; // Guard
-                console.log(`Phase changed from ${previousPhase} to: ${currentPhase}`);
-                if (currentPhase === Phase.Shop) {
-                  this.statusText.setText("Starting Game!");
-                  this.time.delayedCall(500, () => {
-                    if (this.scene.isActive()) {
-                        this.scene.stop();
-                        this.scene.start("Shop");
-                    }
-                  });
-                } else if (currentPhase === Phase.Lobby) {
-                  this.updateLobbyUI();
-                }
-              });
-              console.log("Lobby: state.listen('currentPhase') listener attached via proxy.");
-          } catch (e) {
-              console.error("Lobby: Error attaching state.listen('currentPhase') listener via proxy:", e);
+    // Listen for phase changes
+    if (this.phaseListenerUnsub) this.phaseListenerUnsub(); // Clean up previous if any
+    this.phaseListenerUnsub = $(colyseusRoom.state).listen("currentPhase", (currentPhase, previousPhase) => {
+      if (!this.scene.isActive()) return;
+      console.log(`Lobby: Phase changed from ${previousPhase} to: ${currentPhase}`);
+      if (currentPhase === Phase.Shop) {
+        this.statusText.setText("Starting Game!");
+        this.time.delayedCall(500, () => {
+          if (this.scene.isActive()) {
+              this.scene.stop(); // Stop Lobby scene
+              this.scene.start("Shop");
           }
-      } else {
-          console.error("Lobby: colyseusRoom.state is unexpectedly null or invalid when attaching phase listener.");
+        });
+      } else if (currentPhase === Phase.Lobby) {
+        this.updateLobbyUI(); // Refresh UI if somehow back to Lobby
+      } else if (currentPhase === Phase.GameOver) {
+        // Handle game over if it occurs while in lobby (e.g. other player leaves from another phase)
+        this.statusText.setText("Game Over. Returning to Main Menu.");
+        this.time.delayedCall(1500, () => {
+            if (this.scene.isActive()) {
+                try { colyseusRoom?.leave(); } catch(e) {}
+                this.scene.stop();
+                this.scene.start("MainMenu");
+            }
+        });
       }
+    });
 
-      // Initial UI setup based on the state received
-      console.log("Lobby: Performing initial updateLobbyUI call.");
+    // Listen for players joining/leaving
+    if (this.playerAddListenerUnsub) this.playerAddListenerUnsub();
+    this.playerAddListenerUnsub = $(colyseusRoom.state.players).onAdd((player, sessionId) => {
+      if (!this.scene.isActive()) return;
+      console.log(`Lobby: Player joined: ${player.username} (${sessionId})`);
+      this.addPlayerStateListener(player, sessionId);
       this.updateLobbyUI();
+    });
+
+    if (this.playerRemoveListenerUnsub) this.playerRemoveListenerUnsub();
+    this.playerRemoveListenerUnsub = $(colyseusRoom.state.players).onRemove((player, sessionId) => {
+      if (!this.scene.isActive()) return;
+      console.log(`Lobby: Player left: ${player.username} (${sessionId})`);
+      this.removePlayerStateListener(sessionId);
+      this.updateLobbyUI();
+    });
+
+    // Add listeners for existing players
+    colyseusRoom.state.players.forEach((player, sessionId) => {
+        this.addPlayerStateListener(player, sessionId);
     });
   }
 
-  // --- UI Update Logic ---
+  addPlayerStateListener(player: PlayerState, sessionId: string) {
+    if (!colyseusRoom) return;
+    const $ = getStateCallbacks(colyseusRoom);
+
+    // Remove existing listener for this player before adding a new one
+    this.playerStateListeners.get(sessionId)?.();
+
+    console.log(`Lobby: Adding 'isReady' listener for player ${sessionId}`);
+    const unsub = $(player).listen("isReady", (currentValue, previousValue) => {
+        console.log(`Lobby: isReady changed for player ${sessionId}: ${previousValue} -> ${currentValue}`);
+        if (this.scene.isActive()) this.updateLobbyUI();
+    });
+    this.playerStateListeners.set(sessionId, unsub);
+  }
+
+  removePlayerStateListener(sessionId: string) {
+    const unsub = this.playerStateListeners.get(sessionId);
+    if (unsub) {
+        console.log(`Lobby: Removing 'isReady' listener for player ${sessionId}`);
+        unsub();
+        this.playerStateListeners.delete(sessionId);
+    }
+  }
+
   updateLobbyUI() {
-    if (!colyseusRoom || !colyseusRoom.state || !this.scene.isActive()) {
-        console.warn("Lobby: updateLobbyUI called but room/state/scene is invalid or inactive.");
+    if (!this.scene.isActive()) {
+        console.warn("Lobby: updateLobbyUI called but scene is NOT ACTIVE. Aborting UI update.");
         return;
     }
+    if (!colyseusRoom) {
+        console.warn("Lobby: updateLobbyUI called but colyseusRoom is NULL. Aborting UI update.");
+        if (this.statusText && this.statusText.active) { // Check if statusText is valid
+            this.statusText.setText("Error: Connection lost.");
+        }
+        return;
+    }
+    if (!colyseusRoom.state) {
+        console.warn("Lobby: updateLobbyUI called but colyseusRoom.state is NULL. Aborting UI update.");
+        if (this.statusText && this.statusText.active) { // Check if statusText is valid
+            this.statusText.setText("Error: Game state unavailable.");
+        }
+        return;
+    }
+
+    // console.log("Lobby: updateLobbyUI proceeding with updates."); // Optional: for debugging successful entry
 
     const players = colyseusRoom.state.players;
     const mySessionId = colyseusRoom.sessionId;
     const playerCount = players.size;
-    const startY = 250; // Starting Y position for player list
-    const spacingY = 40; // Vertical spacing between player names
+    const startY = 250;
+    const spacingY = 40;
 
-    console.log(`Lobby: updateLobbyUI called. Current player count in state: ${playerCount}`); // Log count
-
-    // Clear existing player text first
+    // Clear existing player text objects
     this.playerTextObjects.forEach(textObj => textObj.destroy());
     this.playerTextObjects.clear();
 
-    // Display current players and their ready status
     let playerIndex = 0;
-    let allReady = playerCount > 0; // Assume ready if players exist, check below
-    let amReady = false;
+    let allPlayersReady = playerCount > 0; // Assume ready if players exist, check below
+    let localPlayerIsReady = false;
+    const localPlayer = players.get(mySessionId);
+    if (localPlayer) {
+        localPlayerIsReady = localPlayer.isReady;
+    }
 
     players.forEach((player, sessionId) => {
-        console.log(`Lobby: updateLobbyUI processing player: ${sessionId}, username: ${player.username}, isReady: ${player.isReady}`); // Log each player
         const isMe = sessionId === mySessionId;
-        const readyText = player.isReady ? " [Ready]" : "";
-        const displayName = `${player.username || 'Joining...'}${isMe ? ' (You)' : ''}${readyText}`;
+        const readyMarker = player.isReady ? " [Ready]" : " [Not Ready]";
+        const displayName = `${player.username || 'Joining...'}${isMe ? ' (You)' : ''}${readyMarker}`;
         const playerText = this.add.text(
             this.cameras.main.centerX,
             startY + playerIndex * spacingY,
@@ -303,54 +319,39 @@ export class Lobby extends Scene {
         playerIndex++;
 
         if (!player.isReady) {
-            allReady = false;
-        }
-        if (isMe && player.isReady) {
-            amReady = true;
+            allPlayersReady = false;
         }
     });
-    console.log(`Lobby: updateLobbyUI finished processing ${playerIndex} players.`); // Log end of loop
 
-    // Update Status Text and Ready Button
+    // Update Status Text, Ready Button, and Waiting Text
     if (playerCount < 2) {
         this.statusText.setText("Waiting for opponent...");
         this.readyButton.setVisible(false).disableInteractive();
         this.waitingText.setVisible(false);
-    } else {
-        // We have 2 players
-        this.statusText.setText("Lobby full. Ready up!");
-        if (amReady) {
-            // I am ready
-            this.readyButton.setVisible(true).disableInteractive().setColor("#888888").setText("Waiting...");
-            this.waitingText.setText(allReady ? "Starting game..." : "Waiting for opponent...").setVisible(true);
-        } else {
-            // I am not ready
-            this.readyButton.setVisible(true).setInteractive({ useHandCursor: true }).setColor("#00ff00").setText("Ready Up");
+    } else { // playerCount is 2 (maxClients)
+        this.readyButton.setVisible(true); // Always show button if 2 players
+        if (localPlayerIsReady) {
+            this.statusText.setText("Waiting for opponent to ready up...");
+            this.readyButton.setText("Waiting...").setColor("#888888").disableInteractive();
+            this.waitingText.setText(allPlayersReady ? "Starting game..." : "Waiting for opponent...").setVisible(true);
+        } else { // Local player is not ready
+            this.statusText.setText("Lobby full. Ready up!");
+            this.readyButton.setText("Ready Up").setColor("#00ff00").setInteractive({ useHandCursor: true });
+            this.waitingText.setVisible(false);
+        }
+
+        if (allPlayersReady) { // This implies playerCount is 2 and both are ready
+            this.statusText.setText("Starting game...");
+            this.readyButton.setVisible(false); // Hide button as game starts (server handles phase transition)
             this.waitingText.setVisible(false);
         }
     }
-
-    // If all players are ready (server should handle phase transition)
-    if (playerCount === 2 && allReady) {
-        this.statusText.setText("Starting game...");
-        this.readyButton.setVisible(false); // Hide button as game starts
-        this.waitingText.setVisible(false);
-        // Phase transition is handled by the 'currentPhase' listener
-    }
   }
 
-  removePlayerText(sessionId: string) {
-    const textObj = this.playerTextObjects.get(sessionId);
-    if (textObj) {
-      textObj.destroy();
-      this.playerTextObjects.delete(sessionId);
-    }
-  }
-
-  // --- Cleanup ---
   shutdown() {
     console.log("Lobby scene shutting down.");
-    // Remove listeners
+    this.listenersAttached = false; // Reset flag for potential scene restart
+    // Remove Colyseus listeners
     this.phaseListenerUnsub?.();
     this.playerAddListenerUnsub?.();
     this.playerRemoveListenerUnsub?.();
@@ -369,9 +370,11 @@ export class Lobby extends Scene {
     this.readyButton?.destroy();
     this.waitingText?.destroy();
 
-    // Remove Phaser listeners
+    // Remove Phaser listeners from button
     this.readyButton?.off('pointerdown');
     this.readyButton?.off('pointerover');
     this.readyButton?.off('pointerout');
+
+    // super.shutdown(); // If extending a base class with shutdown logic
   }
 }

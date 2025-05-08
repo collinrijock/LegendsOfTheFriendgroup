@@ -31,6 +31,7 @@ export class GameRoom extends Room<GameState> {
   maxClients = 2; // Set max clients for 1v1
   battleEndTimeout: Delayed | null = null; // For delayed transition after battle ends
   battleTimerInterval: Delayed | null = null; // For server-side battle timer countdown
+  private cardAttackReadiness: Map<string, number> = new Map(); // instanceId -> msToNextAttack
 
   onCreate(options: any): void | Promise<any> {
     console.log("GameRoom created!");
@@ -202,24 +203,17 @@ export class GameRoom extends Room<GameState> {
 
     newPlayer.health = 50;
     newPlayer.brews = 10; // Starting brews
-    newPlayer.isReady = false;
-    // Initialize empty hand/battlefield maps - MapSchema starts empty, no need to set undefined
-    // for (let i = 0; i < 5; i++) {
-    //     // newPlayer.hand.set(String(i), undefined); // Incorrect: MapSchema doesn't store undefined values this way
-    //     // newPlayer.battlefield.set(String(i), undefined); // Incorrect
-    // }
+    newPlayer.isReady = false; // Ensure player starts as not ready
 
     this.state.players.set(client.sessionId, newPlayer);
     console.log(`Player ${newPlayer.username} (${client.sessionId}) added to state.`);
     console.log(`Current player count: ${this.state.players.size}`);
 
-
     // Check if the lobby is full, but DON'T transition automatically
     if (this.state.players.size === this.maxClients && this.state.currentPhase === Phase.Lobby) {
         console.log("Lobby is full. Waiting for players to ready up.");
         // The transition to Shop now happens in checkPhaseTransition when all players are ready
-        // this.state.currentDay = 1; // Moved to checkPhaseTransition
-        // this.transitionToPhase(Phase.Shop); // REMOVED automatic transition
+        // DO NOT transition phase or set day here.
     }
   }
 
@@ -247,28 +241,38 @@ export class GameRoom extends Room<GameState> {
   // --- Phase Transition Logic ---
 
   checkPhaseTransition() {
-    if (this.state.players.size < this.maxClients && this.state.currentPhase !== Phase.Lobby) {
-        console.log("Waiting for more players before transitioning.");
-        return; // Don't transition if not enough players (unless in Lobby)
+    // First, check if we have enough players for phases other than Lobby or GameOver
+    if (this.state.currentPhase !== Phase.Lobby && this.state.currentPhase !== Phase.GameOver && this.state.players.size < this.maxClients) {
+        console.log(`Waiting for ${this.maxClients} players before transitioning from ${this.state.currentPhase}. Current: ${this.state.players.size}`);
+        // If a player left, and we are below maxClients, we might need to reset readiness of remaining player(s)
+        // so they don't get stuck in a "ready" state waiting for a non-existent player.
+        // However, this might interfere if one player is legitimately waiting for another to ready up.
+        // For now, let's assume player.isReady is handled correctly by onLeave or other logic.
+        return;
     }
 
     let allReady = true;
-    this.state.players.forEach(player => {
-        if (!player.isReady) {
-            allReady = false;
-        }
-    });
+    if (this.state.players.size === 0 && this.state.currentPhase !== Phase.GameOver) { // No players, can't be all ready unless game over
+        allReady = false;
+    } else {
+        this.state.players.forEach(player => {
+            if (!player.isReady) {
+                allReady = false;
+            }
+        });
+    }
+
 
     if (allReady) {
         console.log(`All ${this.state.players.size} players ready. Transitioning from ${this.state.currentPhase}`);
         switch (this.state.currentPhase) {
-            case Phase.Lobby: // Added case for Lobby
+            case Phase.Lobby:
                 if (this.state.players.size === this.maxClients) { // Ensure lobby is full before starting
                     this.state.currentDay = 1; // Set day 1 when starting from lobby
                     this.transitionToPhase(Phase.Shop);
                 } else {
-                    console.log("Cannot start from Lobby: Not enough players.");
-                    // Reset ready status if needed? Or just wait.
+                    console.log(`Cannot start from Lobby: Not enough players (${this.state.players.size}/${this.maxClients}). Resetting ready status.`);
+                    // Reset ready status so players have to click again if someone leaves and rejoins.
                     this.state.players.forEach(p => p.isReady = false);
                 }
                 break;
@@ -279,14 +283,24 @@ export class GameRoom extends Room<GameState> {
                 this.transitionToPhase(Phase.Battle);
                 break;
             case Phase.BattleEnd:
-                this.state.currentDay++;
-                if (this.state.currentDay > 10) { // Win condition check
-                    this.determineWinnerByHealth();
+                // Increment day only if not transitioning to GameOver
+                if (this.state.currentDay <= 10) { // Assuming 10 is max days, check before increment
+                     this.state.currentDay++;
+                }
+
+                if (this.state.currentDay > 10) { // Win condition check (e.g., max days reached)
+                    this.determineWinnerByHealth(); // This will transition to GameOver
                 } else {
-                    this.transitionToPhase(Phase.Shop);
+                    // Check for player health <= 0 again, as determineWinnerByHealth might not have been called if day limit not reached
+                    let gameOver = false;
+                    this.state.players.forEach(p => { if (p.health <= 0) gameOver = true; });
+                    if (gameOver) {
+                        this.determineWinnerByHealth();
+                    } else {
+                        this.transitionToPhase(Phase.Shop);
+                    }
                 }
                 break;
-            // Lobby -> Shop is handled in onJoin
             // Battle -> BattleEnd is handled by battle logic/timer
             // GameOver is terminal
         }
@@ -295,7 +309,7 @@ export class GameRoom extends Room<GameState> {
         // Optionally count ready players:
         let readyCount = 0;
         this.state.players.forEach(p => { if(p.isReady) readyCount++; });
-        console.log(`${readyCount} / ${this.state.players.size} players ready.`);
+        console.log(`${readyCount} / ${this.state.players.size} players ready for phase ${this.state.currentPhase}.`);
     }
   }
 
@@ -312,7 +326,8 @@ export class GameRoom extends Room<GameState> {
     console.log(`--- End State Log ---`);
     // --- End Logging ---
 
-    console.log(`Transitioning phase: ${this.state.currentPhase} -> ${newPhase}`);
+    const oldPhase = this.state.currentPhase;
+    console.log(`Transitioning phase: ${oldPhase} -> ${newPhase}`);
     this.state.currentPhase = newPhase;
 
     // Reset ready status for all players for the new phase
@@ -331,11 +346,13 @@ export class GameRoom extends Room<GameState> {
         console.log(`  IsReady: ${player.isReady}`); // Also log ready status
     });
     console.log(`--- End Post-Transition State Log ---`);
-    // --- End Logging ---
 
 
     // Phase-specific start actions
     if (newPhase === Phase.Shop) {
+        // currentDay is incremented in checkPhaseTransition for BattleEnd -> Shop
+        // currentDay is set to 1 in checkPhaseTransition for Lobby -> Shop
+        // So, no need to set currentDay here explicitly unless it's a direct transition not covered by checkPhaseTransition
         this.generateShopOffers(); // Generate new offers for each player
     }
     if (newPhase === Phase.Battle) {
@@ -359,47 +376,133 @@ export class GameRoom extends Room<GameState> {
     // Clear previous interval if any
     if (this.battleTimerInterval) this.battleTimerInterval.clear();
 
+    // --- Initialize card attack readiness ---
+    this.cardAttackReadiness.clear();
+    this.state.players.forEach(player => {
+        player.battlefield.forEach(card => {
+            if (card.currentHp > 0) {
+                // Ensure speed is positive to avoid infinite loops or zero division if speed is 0
+                const speedInMs = (card.speed > 0 ? card.speed : 1.5) * 1000; // Default to 1.5s if speed is 0 or less
+                this.cardAttackReadiness.set(card.instanceId, speedInMs);
+            }
+        });
+    });
+    // --- End Initialize ---
+
     // Start server-side timer countdown
     this.battleTimerInterval = this.clock.setInterval(() => {
         if (this.state.currentPhase === Phase.Battle) {
-
-            // --- Check for Battle End by Board Clear ---
-            let player1Cleared = true;
-            let player2Cleared = true;
+            const delta = 1000; // Interval duration in ms
+  
+            // --- Server-Side Card Attack Simulation ---
+            const attacksThisTick: Array<{
+                attackerPlayerId: string,
+                attackerCard: CardInstanceSchema,
+                targetPlayerId: string,
+                targetCard: CardInstanceSchema,
+                damage: number
+            }> = [];
+  
             const playerIds = Array.from(this.state.players.keys());
+            if (playerIds.length === 2) {
+                this.state.players.forEach((currentPlayer, currentPlayerId) => {
+                    const opponentId = playerIds.find(id => id !== currentPlayerId);
+                    if (!opponentId) return;
+                    const opponentPlayer = this.state.players.get(opponentId);
+                    if (!opponentPlayer) return;
+  
+                    const livingOpponentCards = Array.from(opponentPlayer.battlefield.values()).filter(c => c.currentHp > 0);
+  
+                    currentPlayer.battlefield.forEach(attackerCard => {
+                        if (attackerCard.currentHp <= 0) return; // Skip dead attackers
+  
+                        let timeToNext = this.cardAttackReadiness.get(attackerCard.instanceId) || ( (attackerCard.speed > 0 ? attackerCard.speed : 1.5) * 1000);
+                        timeToNext -= delta;
+  
+                        if (timeToNext <= 0) {
+                            if (livingOpponentCards.length > 0) {
+                                const targetCard = livingOpponentCards[Math.floor(Math.random() * livingOpponentCards.length)];
+                                attacksThisTick.push({
+                                    attackerPlayerId: currentPlayerId,
+                                    attackerCard: attackerCard,
+                                    targetPlayerId: opponentId,
+                                    targetCard: targetCard,
+                                    damage: attackerCard.attack
+                                });
+                            }
+                            // Reset timer regardless of whether a target was found
+                            const speedInMs = (attackerCard.speed > 0 ? attackerCard.speed : 1.5) * 1000;
+                            this.cardAttackReadiness.set(attackerCard.instanceId, speedInMs);
+                        } else {
+                            this.cardAttackReadiness.set(attackerCard.instanceId, timeToNext);
+                        }
+                    });
+                });
+  
+                // Process collected attacks
+                attacksThisTick.forEach(attack => {
+                    // attack.targetCard is the CardInstanceSchema object from the state.
+                    // attack.attackerCard is the CardInstanceSchema object from the state.
+  
+                    // Ensure the attacker and target are still valid and alive.
+                    const attackerPlayer = this.state.players.get(attack.attackerPlayerId);
+                    const targetPlayer = this.state.players.get(attack.targetPlayerId);
+  
+                    if (attackerPlayer && targetPlayer) {
+                        // Verify the attacker is still on their board and alive
+                        let currentAttackerOnBoard: CardInstanceSchema | undefined;
+                        attackerPlayer.battlefield.forEach(card => {
+                            if (card.instanceId === attack.attackerCard.instanceId && card.currentHp > 0) {
+                                currentAttackerOnBoard = card;
+                            }
+                        });
+  
+                        // Verify the target is still on their board and alive
+                        let currentTargetOnBoard: CardInstanceSchema | undefined;
+                        targetPlayer.battlefield.forEach(card => {
+                            if (card.instanceId === attack.targetCard.instanceId && card.currentHp > 0) {
+                                currentTargetOnBoard = card;
+                            }
+                        });
+  
+                        if (currentAttackerOnBoard && currentTargetOnBoard) {
+                            const oldHp = currentTargetOnBoard.currentHp;
+                            currentTargetOnBoard.currentHp = Math.max(0, currentTargetOnBoard.currentHp - attack.damage);
+                            console.log(`[SERVER BATTLE] ${currentAttackerOnBoard.name} (P: ${attackerPlayer.username}) attacks ${currentTargetOnBoard.name} (P: ${targetPlayer.username}) for ${attack.damage} damage. HP: ${oldHp} -> ${currentTargetOnBoard.currentHp}`);
+                        }
+                    }
+                });
+            }
+            // --- End Server-Side Card Attack Simulation ---
+  
+  
+            // --- Check for Battle End by Board Clear ---
+            // let player1Cleared = true; // Old logic
+            // let player2Cleared = true; // Old logic
+            // const playerIds = Array.from(this.state.players.keys()); // Already defined above
             if (playerIds.length === 2) {
                 const player1 = this.state.players.get(playerIds[0]);
                 const player2 = this.state.players.get(playerIds[1]);
-
-                if (player1 && player1.battlefield.size > 0) { // Only check if board has cards
-                    player1.battlefield.forEach(card => {
-                        if (card.currentHp > 0) player1Cleared = false;
-                    });
-                } else {
-                    player1Cleared = false; // Cannot be cleared if empty initially? Or treat as cleared? Decide logic. Assume not cleared if empty.
-                }
-
-                if (player2 && player2.battlefield.size > 0) { // Only check if board has cards
-                    player2.battlefield.forEach(card => {
-                        if (card.currentHp > 0) player2Cleared = false;
-                    });
-                 } else {
-                    player2Cleared = false; // Assume not cleared if empty.
-                 }
-
-                // If one side is cleared AND the board wasn't empty to begin with (or both boards were non-empty initially)
-                const wasPlayer1BoardPopulated = player1 && player1.battlefield.size > 0;
-                const wasPlayer2BoardPopulated = player2 && player2.battlefield.size > 0;
-
-                if ((player1Cleared && wasPlayer1BoardPopulated) || (player2Cleared && wasPlayer2BoardPopulated)) {
-                    console.log(`Battle timer loop: Board clear detected. Player 1 Cleared: ${player1Cleared}, Player 2 Cleared: ${player2Cleared}. Calling endBattle.`); // Log before call
-                    this.endBattle(false); // End battle, not due to timeout
-                    return; // Stop further processing for this interval tick
+  
+                if (player1 && player2) {
+                    const player1HasLivingCards = Array.from(player1.battlefield.values()).some(c => c.currentHp > 0);
+                    const player2HasLivingCards = Array.from(player2.battlefield.values()).some(c => c.currentHp > 0);
+  
+                    const player1BoardWasPopulated = player1.battlefield.size > 0;
+                    const player2BoardWasPopulated = player2.battlefield.size > 0;
+  
+                    // End condition:
+                    // A player's board was populated AND they now have no living cards.
+                    if ((player1BoardWasPopulated && !player1HasLivingCards) || (player2BoardWasPopulated && !player2HasLivingCards)) {
+                        console.log(`Battle timer loop: Board clear condition met. P1 HasLiving: ${player1HasLivingCards} (WasPopulated: ${player1BoardWasPopulated}), P2 HasLiving: ${player2HasLivingCards} (WasPopulated: ${player2BoardWasPopulated}). Calling endBattle.`);
+                        this.endBattle(false); // End battle, not due to timeout
+                        return; // Stop further processing for this interval tick
+                    }
                 }
             }
             // --- End Board Clear Check ---
-
-
+  
+  
             this.state.battleTimer--;
             // console.log(`Battle timer: ${this.state.battleTimer}`); // Optional: Log countdown
             if (this.state.battleTimer <= 0) {
@@ -412,7 +515,7 @@ export class GameRoom extends Room<GameState> {
         }
     }, 1000); // Update every second
   }
-
+  
     // Called when battle ends (timer, board clear)
     endBattle(timeoutReached: boolean = false) {
         console.log(`--- Entering endBattle function --- Timeout: ${timeoutReached}`); // Log entry
@@ -420,25 +523,29 @@ export class GameRoom extends Room<GameState> {
              console.log(`--- endBattle exiting early: Current phase is ${this.state.currentPhase}, not Battle. ---`); // Log exit reason
              return; // Prevent double execution
         }
-
+    
+        // Clear attack readiness map
+        this.cardAttackReadiness.clear();
+    
         // --- Mark Battle as Over Internally ---
         // This prevents the battle timer interval from calling endBattle again if it fires slightly after.
+        const previousPhaseForBattleEnd = this.state.currentPhase; // Store current phase before changing
         this.state.currentPhase = Phase.BattleEnd; // Tentatively set phase to prevent re-entry
-        console.log(`--- Starting endBattle --- Phase temporarily set to ${this.state.currentPhase}`);
-
+        console.log(`--- Starting endBattle --- Phase changed from ${previousPhaseForBattleEnd} to ${this.state.currentPhase}`);
+  
         console.log(`Ending Battle Phase. Timeout: ${timeoutReached}`);
         if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Stop the timer
-
+  
         // --- Calculate Results (Server-Side) ---
         let player1SessionId = "";
         let player2SessionId = "";
         let player1: PlayerState | undefined;
         let player2: PlayerState | undefined;
-
-        const playerIds = Array.from(this.state.players.keys());
-        if (playerIds.length === 2) {
-            player1SessionId = playerIds[0];
-            player2SessionId = playerIds[1];
+  
+        const playerIdsList = Array.from(this.state.players.keys()); // Renamed to avoid conflict
+        if (playerIdsList.length === 2) {
+            player1SessionId = playerIdsList[0];
+            player2SessionId = playerIdsList[1];
             player1 = this.state.players.get(player1SessionId);
             player2 = this.state.players.get(player2SessionId);
         } else {
@@ -447,13 +554,13 @@ export class GameRoom extends Room<GameState> {
             this.transitionToPhase(Phase.GameOver); // Use the proper transition function
             return;
         }
-
+  
         if (!player1 || !player2) {
              console.error("endBattle: Player state missing during battle end calculation.");
              this.transitionToPhase(Phase.GameOver); // Use the proper transition function
              return;
         }
-
+  
         // --- Log Initial Battlefield States (Server Authority) ---
         console.log(`endBattle: Player 1 (${player1.username}) Battlefield State (Server):`);
         player1.battlefield.forEach((card, key) => {
@@ -464,16 +571,18 @@ export class GameRoom extends Room<GameState> {
             console.log(`  Slot ${key}: ${card.name} (ID: ${card.instanceId}, HP: ${card.currentHp}/${card.health})`); // Use instanceId
         });
         // --- End Log ---
-
+  
         // Determine survivors (based on current server state's currentHp)
         const player1Survivors = Array.from(player1.battlefield.values()).filter(card => card && card.currentHp > 0);
         const player2Survivors = Array.from(player2.battlefield.values()).filter(card => card && card.currentHp > 0);
-
+  
         // --- Log Survivor Counts ---
         console.log(`endBattle: Player 1 Survivors Count (Server): ${player1Survivors.length}`);
+        player1Survivors.forEach(s => console.log(`  P1 Survivor: ${s.name} HP: ${s.currentHp}`));
         console.log(`endBattle: Player 2 Survivors Count (Server): ${player2Survivors.length}`);
+        player2Survivors.forEach(s => console.log(`  P2 Survivor: ${s.name} HP: ${s.currentHp}`));
         // --- End Log ---
-
+  
         // Determine winner/loser based on survivors
         let winner: PlayerState | null = null;
         let loser: PlayerState | null = null;

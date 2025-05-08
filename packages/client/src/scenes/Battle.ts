@@ -259,6 +259,7 @@ class BattleCard {
 export class Battle extends Scene {
   // Store BattleCard instances keyed by owner session ID, then slot index
   private playerBoardCards: Map<string, (BattleCard | null)[]> = new Map();
+  private visualCardsByInstanceId: Map<string, BattleCard> = new Map(); // Added for direct lookup
   private handCardDisplayObjects: Map<string, (Phaser.GameObjects.Text | null)[]> = new Map(); // Display opponent hand? Maybe just placeholders.
 
   private battleOver: boolean = false;
@@ -384,6 +385,7 @@ export class Battle extends Scene {
 
     // --- Clear previous listeners before creating new visuals ---
     this.cleanupCardHpListeners();
+    this.visualCardsByInstanceId.clear(); // Clear the new map
     // --- End Clear ---
 
     // Player Board (Bottom)
@@ -401,6 +403,7 @@ export class Battle extends Scene {
             const slotX = startPlayerSlotsX + index * (playerSlotWidth + playerSlotSpacing);
             const battleCard = new BattleCard(this, slotX, playerSlotsY, cardSchema, myPlayerId, true);
             myBoardArray[index] = battleCard;
+            this.visualCardsByInstanceId.set(cardSchema.instanceId, battleCard); // Add to map
             // --- Add HP Listener ---
             this.addCardHpListener(cardSchema, battleCard);
             // --- End Add HP Listener ---
@@ -424,6 +427,7 @@ export class Battle extends Scene {
                 const slotX = startAiSlotsX + index * (aiSlotWidth + aiSlotSpacing);
                  const battleCard = new BattleCard(this, slotX, aiSlotsY, cardSchema, opponentId, false);
                 opponentBoardArray[index] = battleCard;
+                this.visualCardsByInstanceId.set(cardSchema.instanceId, battleCard); // Add to map
                 // --- Add HP Listener ---
                 this.addCardHpListener(cardSchema, battleCard);
                 // --- End Add HP Listener ---
@@ -443,21 +447,33 @@ export class Battle extends Scene {
   addCardHpListener(cardSchema: CardInstanceSchema, battleCard: BattleCard) {
       if (!colyseusRoom || !cardSchema || !battleCard) return;
       const $ = getStateCallbacks(colyseusRoom); // Get proxy
-
+  
       // Remove existing listener for this instanceId if it exists
       this.cardHpListeners.get(cardSchema.instanceId)?.();
-
-      console.log(`Battle Scene: Adding HP listener for card ${cardSchema.name} (${cardSchema.instanceId})`);
+  
+      // console.log(`Battle Scene: Adding HP listener for card ${cardSchema.name} (${cardSchema.instanceId})`); // Keep log minimal
       const unsub = $(cardSchema).listen("currentHp", (newHp, oldHp) => {
-          if (!this.scene.isActive() || !battleCard.gameObject?.active) {
-              console.log(`Battle Scene: HP listener for ${cardSchema.instanceId} triggered, but scene/object inactive.`);
-              return; // Guard against updates after shutdown or card destruction
+          if (!this.scene.isActive()) {
+              // console.log(`Battle Scene: HP listener for ${cardSchema.instanceId} triggered, but scene inactive.`);
+              return;
           }
-          console.log(`Battle Scene: HP changed for ${cardSchema.name} (${cardSchema.instanceId}): ${oldHp} -> ${newHp}`);
+          
+          console.log(`[CLIENT BATTLE] HP Update Received for ${cardSchema.name} (Instance: ${cardSchema.instanceId}): ${oldHp} -> ${newHp}. Scene Active: ${this.scene.isActive()}`);
+
+          const currentVisualCard = this.visualCardsByInstanceId.get(cardSchema.instanceId);
+
+          if (!currentVisualCard || !currentVisualCard.gameObject?.active) {
+              // console.log(`Battle Scene: HP listener for ${cardSchema.instanceId} triggered, but its current visual object is inactive or not found in visualCardsByInstanceId.`);
+              console.warn(`[CLIENT BATTLE] Visual card for instanceId ${cardSchema.instanceId} (${cardSchema.name}) not found or inactive during HP update.`);
+              return;
+          }
+          
+          // console.log(`Battle Scene: HP changed for ${currentVisualCard.cardInstance.name} (${cardSchema.instanceId}): ${oldHp} -> ${newHp}`);
           // Update the visual BattleCard's internal currentHp to match server state
-          battleCard.cardInstance.currentHp = newHp;
+          currentVisualCard.cardInstance.currentHp = newHp;
           // Update the display (which also checks for death)
-          battleCard.updateHpDisplay();
+          console.log(`[CLIENT BATTLE] Calling updateHpDisplay for ${currentVisualCard.cardInstance.name} with new HP: ${newHp}`);
+          currentVisualCard.updateHpDisplay();
       });
       this.cardHpListeners.set(cardSchema.instanceId, unsub);
   }
@@ -516,41 +532,95 @@ export class Battle extends Scene {
 
         // --- Listen for battlefield changes (add/remove) to manage HP listeners ---
         const battlefieldAddUnsub = $(player.battlefield).onAdd((cardSchema, key) => {
-            if (!this.scene.isActive()) return;
+            if (!this.scene.isActive() || !colyseusRoom || !colyseusRoom.state || !colyseusRoom.sessionId) return;
             console.log(`Battle Scene: Card added to battlefield for ${sessionId} at key ${key}: ${cardSchema.name}`);
-            // Need to find the corresponding BattleCard visual object to add listener
-            // This might require recreating visuals or finding the newly added one
-            // For simplicity, let's recreate board visuals on add/remove for now
-            const myId = colyseusRoom?.sessionId;
-            let oppId: string | undefined;
-            colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== myId) oppId = sid; });
-            if (myId) this.createBoardVisuals(myId, oppId); // Recreate visuals which includes adding listeners
+
+            const myId = colyseusRoom.sessionId;
+            const isLocalPlayer = sessionId === myId;
+            const slotIndex = parseInt(key, 10);
+
+            if (isNaN(slotIndex) || slotIndex < 0 || slotIndex >= 5) {
+                console.warn(`Battle Scene: Invalid slotIndex ${key} for card addition.`);
+                return;
+            }
+
+            // Determine position for the new card
+            const centerX = this.cameras.main.centerX;
+            const gameHeight = this.cameras.main.height;
+            const slotWidth = 120;
+            const slotSpacing = 20;
+            const totalSlotsWidth = 5 * slotWidth + 4 * slotSpacing;
+            const startSlotsX = centerX - totalSlotsWidth / 2 + slotWidth / 2;
+            const slotX = startSlotsX + slotIndex * (slotWidth + slotSpacing);
+            const slotY = isLocalPlayer ? gameHeight - 250 : 200; // Player at bottom, Opponent at top
+
+            // Check if a visual card already exists in this slot for this player
+            const playerBoard = this.playerBoardCards.get(sessionId);
+            if (playerBoard && playerBoard[slotIndex]) {
+                console.warn(`Battle Scene: Visual card already exists in slot ${slotIndex} for player ${sessionId}. Cleaning up old one.`);
+                const oldCard = playerBoard[slotIndex];
+                if (oldCard) {
+                    this.cardHpListeners.get(oldCard.cardInstance.instanceId)?.();
+                    this.cardHpListeners.delete(oldCard.cardInstance.instanceId);
+                    this.visualCardsByInstanceId.delete(oldCard.cardInstance.instanceId); // Remove from map
+                    oldCard.gameObject?.destroy();
+                    oldCard.hpText?.destroy();
+                    oldCard.attackBarBg?.destroy();
+                    oldCard.attackBarFill?.destroy();
+                }
+            }
+            
+            const newBattleCard = new BattleCard(this, slotX, slotY, cardSchema, sessionId, isLocalPlayer);
+            this.visualCardsByInstanceId.set(cardSchema.instanceId, newBattleCard); // Add to map
+            
+            if (!playerBoard) {
+                const newBoardArray: (BattleCard | null)[] = Array(5).fill(null);
+                newBoardArray[slotIndex] = newBattleCard;
+                this.playerBoardCards.set(sessionId, newBoardArray);
+            } else {
+                playerBoard[slotIndex] = newBattleCard;
+            }
+            
+            this.addCardHpListener(cardSchema, newBattleCard);
+            console.log(`Battle Scene: Added new BattleCard ${cardSchema.name} to slot ${slotIndex} for player ${sessionId}`);
         });
         const battlefieldRemoveUnsub = $(player.battlefield).onRemove((cardSchema, key) => {
-             if (!this.scene.isActive()) return;
+             if (!this.scene.isActive() || !colyseusRoom || !colyseusRoom.state) return;
              console.log(`Battle Scene: Card removed from battlefield for ${sessionId} at key ${key}: ${cardSchema.name}`);
+             
+             const instanceIdToRemove = cardSchema.instanceId;
+
              // Remove the specific HP listener for the removed card
-             const unsub = this.cardHpListeners.get(cardSchema.instanceId);
-             if (unsub) {
-                 unsub();
-                 this.cardHpListeners.delete(cardSchema.instanceId);
-                 console.log(`Battle Scene: Removed HP listener for ${cardSchema.instanceId}`);
+             const unsubHp = this.cardHpListeners.get(instanceIdToRemove);
+             if (unsubHp) {
+                 unsubHp();
+                 this.cardHpListeners.delete(instanceIdToRemove);
+                 this.visualCardsByInstanceId.delete(instanceIdToRemove); // Remove from map
+                 console.log(`Battle Scene: Removed HP listener for ${instanceIdToRemove}`);
              }
+
              // Find and destroy the visual object
              const ownerBoard = this.playerBoardCards.get(sessionId);
-             const visualCard = ownerBoard?.find(bc => bc?.cardInstance?.instanceId === cardSchema.instanceId);
-             if (visualCard) {
-                 visualCard.gameObject?.destroy();
-                 visualCard.hpText?.destroy();
-                 visualCard.attackBarBg?.destroy();
-                 visualCard.attackBarFill?.destroy();
-                 // Remove from the array? Might be easier to just recreate visuals
+             if (ownerBoard) {
+                const slotIndex = parseInt(key, 10);
+                if (!isNaN(slotIndex) && slotIndex >= 0 && slotIndex < 5) {
+                    const visualCard = ownerBoard[slotIndex];
+                    if (visualCard && visualCard.cardInstance.instanceId === instanceIdToRemove) {
+                        console.log(`Battle Scene: Destroying visual for card ${visualCard.cardInstance.name} in slot ${slotIndex} for player ${sessionId}`);
+                        visualCard.gameObject?.destroy();
+                        visualCard.hpText?.destroy();
+                        visualCard.attackBarBg?.destroy();
+                        visualCard.attackBarFill?.destroy();
+                        ownerBoard[slotIndex] = null; // Clear the slot in the visual array
+                    } else {
+                        console.warn(`Battle Scene: Could not find matching visual card in slot ${slotIndex} for instanceId ${instanceIdToRemove} to remove.`);
+                    }
+                } else {
+                     console.warn(`Battle Scene: Invalid key ${key} for card removal from visual board.`);
+                }
+             } else {
+                console.warn(`Battle Scene: Could not find board for player ${sessionId} to remove card visual.`);
              }
-             // Recreate visuals for simplicity?
-             const myId = colyseusRoom?.sessionId;
-             let oppId: string | undefined;
-             colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== myId) oppId = sid; });
-             if (myId) this.createBoardVisuals(myId, oppId); // Recreate visuals
         });
         // --- End Battlefield Listener Logic ---
 
@@ -583,20 +653,73 @@ export class Battle extends Scene {
            });
             // --- Listen for battlefield changes (add/remove) for the new player ---
             const battlefieldAddUnsub = $(player.battlefield).onAdd((cardSchema, key) => {
-                if (!this.scene.isActive()) return;
-                const myId = colyseusRoom?.sessionId;
-                let oppId: string | undefined;
-                colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== myId) oppId = sid; });
-                if (myId) this.createBoardVisuals(myId, oppId);
+                if (!this.scene.isActive() || !colyseusRoom || !colyseusRoom.state || !colyseusRoom.sessionId) return;
+                console.log(`Battle Scene: Card added to battlefield for NEWLY ADDED player ${sessionId} at key ${key}: ${cardSchema.name}`);
+                const myId = colyseusRoom.sessionId;
+                const isLocalPlayer = sessionId === myId; // Should be false if this is an opponent joining
+                const slotIndex = parseInt(key, 10);
+
+                if (isNaN(slotIndex) || slotIndex < 0 || slotIndex >= 5) {
+                    console.warn(`Battle Scene: Invalid slotIndex ${key} for card addition (new player).`);
+                    return;
+                }
+
+                const centerX = this.cameras.main.centerX;
+                const gameHeight = this.cameras.main.height;
+                const slotWidth = 120;
+                const slotSpacing = 20;
+                const totalSlotsWidth = 5 * slotWidth + 4 * slotSpacing;
+                const startSlotsX = centerX - totalSlotsWidth / 2 + slotWidth / 2;
+                const slotX = startSlotsX + slotIndex * (slotWidth + slotSpacing);
+                const slotY = isLocalPlayer ? gameHeight - 250 : 200;
+
+                const playerBoard = this.playerBoardCards.get(sessionId);
+                 if (playerBoard && playerBoard[slotIndex]) {
+                    console.warn(`Battle Scene: Visual card already exists in slot ${slotIndex} for new player ${sessionId}. Cleaning up old one.`);
+                    const oldCard = playerBoard[slotIndex];
+                    if (oldCard) {
+                        this.cardHpListeners.get(oldCard.cardInstance.instanceId)?.();
+                        this.cardHpListeners.delete(oldCard.cardInstance.instanceId);
+                        oldCard.gameObject?.destroy();
+                        oldCard.hpText?.destroy();
+                        oldCard.attackBarBg?.destroy();
+                        oldCard.attackBarFill?.destroy();
+                    }
+                }
+
+                const newBattleCard = new BattleCard(this, slotX, slotY, cardSchema, sessionId, isLocalPlayer);
+                
+                if (!playerBoard) {
+                    const newBoardArray: (BattleCard | null)[] = Array(5).fill(null);
+                    newBoardArray[slotIndex] = newBattleCard;
+                    this.playerBoardCards.set(sessionId, newBoardArray);
+                } else {
+                    playerBoard[slotIndex] = newBattleCard;
+                }
+                this.addCardHpListener(cardSchema, newBattleCard);
             });
             const battlefieldRemoveUnsub = $(player.battlefield).onRemove((cardSchema, key) => {
-                 if (!this.scene.isActive()) return;
-                 const unsub = this.cardHpListeners.get(cardSchema.instanceId);
-                 if (unsub) { unsub(); this.cardHpListeners.delete(cardSchema.instanceId); }
-                 const myId = colyseusRoom?.sessionId;
-                 let oppId: string | undefined;
-                 colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== myId) oppId = sid; });
-                 if (myId) this.createBoardVisuals(myId, oppId);
+                 if (!this.scene.isActive() || !colyseusRoom || !colyseusRoom.state) return;
+                 console.log(`Battle Scene: Card removed from battlefield for NEWLY ADDED player ${sessionId} at key ${key}: ${cardSchema.name}`);
+                 const instanceIdToRemove = cardSchema.instanceId;
+
+                 const unsubHp = this.cardHpListeners.get(instanceIdToRemove);
+                 if (unsubHp) { unsubHp(); this.cardHpListeners.delete(instanceIdToRemove); }
+
+                 const ownerBoard = this.playerBoardCards.get(sessionId);
+                 if (ownerBoard) {
+                    const slotIndex = parseInt(key, 10);
+                    if (!isNaN(slotIndex) && slotIndex >= 0 && slotIndex < 5) {
+                        const visualCard = ownerBoard[slotIndex];
+                        if (visualCard && visualCard.cardInstance.instanceId === instanceIdToRemove) {
+                            visualCard.gameObject?.destroy();
+                            visualCard.hpText?.destroy();
+                            visualCard.attackBarBg?.destroy();
+                            visualCard.attackBarFill?.destroy();
+                            ownerBoard[slotIndex] = null;
+                        }
+                    }
+                 }
             });
             // --- End Battlefield Listener Logic ---
 
@@ -608,9 +731,19 @@ export class Battle extends Scene {
            };
            this.playerStateListeners.set(sessionId, combinedUnsub);
            // Recreate board visuals if opponent was missing?
-           const myId = colyseusRoom?.sessionId;
-           if (myId && sessionId !== myId) {
-               this.createBoardVisuals(myId, sessionId);
+           // This is now handled by the onAdd for player.battlefield if cards are added.
+           // If an opponent joins and their board is empty, createBoardVisuals might still be needed
+           // if we want to show empty slots for them.
+           // For now, individual card additions will populate their board.
+           const myCurrentId = colyseusRoom?.sessionId;
+           if (myCurrentId && sessionId !== myCurrentId) {
+               // If this is the opponent, ensure their board array exists
+               if (!this.playerBoardCards.has(sessionId)) {
+                   this.playerBoardCards.set(sessionId, Array(5).fill(null));
+               }
+               // Potentially call createBoardVisuals if a full refresh is desired upon new opponent.
+               // However, the granular listeners should handle cards appearing.
+               // this.createBoardVisuals(myCurrentId, sessionId); // Consider if this is better
            }
        });
 
@@ -883,9 +1016,10 @@ cleanupListeners() {
                 }
             });
         });
-        this.playerBoardCards.clear();
+     this.playerBoardCards.clear();
+     this.visualCardsByInstanceId.clear(); // Clear the new map
 
-        // Destroy hand display objects (if any were created)
+     // Destroy hand display objects (if any were created)
         this.handCardDisplayObjects.forEach(hand => {
             hand?.forEach(displayObj => displayObj?.destroy());
         });
