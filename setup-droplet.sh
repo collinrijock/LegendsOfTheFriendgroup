@@ -8,7 +8,7 @@ sudo apt update && sudo apt upgrade -y
 
 # Install requirements
 echo "Installing Docker and other required packages..."
-sudo apt install -y docker.io docker-compose git curl netstat-net-tools
+sudo apt install -y docker.io docker-compose git curl net-tools
 
 # Enable and start Docker
 echo "Enabling Docker service..."

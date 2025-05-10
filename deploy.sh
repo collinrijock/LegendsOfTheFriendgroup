@@ -9,13 +9,32 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# Check if ports 8080 and 4001 are available
-if netstat -tuln | grep -q ":8080 "; then
-    echo "Warning: Port 8080 is already in use. This may cause conflicts with the client."
+# Check if netstat is available
+if command -v netstat &> /dev/null; then
+    # Check if ports 8080 and 4001 are available
+    if netstat -tuln | grep -q ":8080 "; then
+        echo "Warning: Port 8080 is already in use. This may cause conflicts with the client."
+    fi
+
+    if netstat -tuln | grep -q ":4001 "; then
+        echo "Warning: Port 4001 is already in use. This may cause conflicts with the server."
+    fi
+else
+    echo "Note: netstat command not found. Skipping port availability checks."
+    echo "If you need port checking, install net-tools with: sudo apt install net-tools"
 fi
 
-if netstat -tuln | grep -q ":4001 "; then
-    echo "Warning: Port 4001 is already in use. This may cause conflicts with the server."
+# Check if required directories exist
+if [ ! -d "packages/client" ]; then
+    echo "Error: packages/client directory not found!"
+    echo "Please ensure you have the correct directory structure."
+    exit 1
+fi
+
+if [ ! -d "packages/server" ]; then
+    echo "Error: packages/server directory not found!"
+    echo "Please ensure you have the correct directory structure."
+    exit 1
 fi
 
 echo "Stopping any existing containers..."
