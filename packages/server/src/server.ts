@@ -12,7 +12,7 @@ dotenv.config({ path: "../../.env" });
 
 const app: Application = express();
 const router = express.Router();
-const port: number = Number(process.env.PORT) || 3001;
+const port: number = Number(process.env.PORT) || 4001;
 
 const server = new Server({
   transport: new WebSocketTransport({

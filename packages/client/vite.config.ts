@@ -26,7 +26,7 @@ export default ({ mode }) => {
           rewrite: (path) => path.replace(/^\/.proxy\/assets/, ""),
         },
         "/.proxy/api": {
-          target: "http://localhost:3001",
+          target: "http://localhost:4001",
           changeOrigin: true,
           secure: false,
           ws: true,

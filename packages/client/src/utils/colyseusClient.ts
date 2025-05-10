@@ -52,7 +52,7 @@ export async function loadAllCardData(): Promise<boolean> {
 export async function connectColyseus(accessToken: string, username: string) {
   const url =
     location.host.includes("localhost") // Check if running locally
-      ? `ws://localhost:3001`
+      ? `ws://localhost:4001` // Changed from 3001
       : `wss://${location.host}/.proxy/api`; // Adjust proxy path if needed
 
   colyseusClient = new Client(url);
