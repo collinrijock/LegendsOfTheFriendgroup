@@ -61,6 +61,7 @@ export class PlayerState extends Schema {
     @type("string") username: string = "Player"; // Discord username
     @type("number") health: number = 50;
     @type("number") brews: number = 10; // Starting brews
+    @type("number") shopRefreshCost: number = 2; // Cost to refresh shop, doubles each use
     @type({ map: CardInstanceSchema }) hand = new MapSchema<CardInstanceSchema>(); // Keyed by slot index "0"-"4"
     @type({ map: CardInstanceSchema }) battlefield = new MapSchema<CardInstanceSchema>(); // Keyed by slot index "0"-"4"
     @type("boolean") isReady: boolean = false; // Ready for next phase transition

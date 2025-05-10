@@ -6,6 +6,48 @@ import { Client, Room } from "colyseus.js";
 export let colyseusRoom: Room | null = null;
 export let colyseusClient: Client | null = null;
 
+// --- Global Card Data Cache ---
+export interface CardData {
+  id: string;
+  name: string;
+  attack: number;
+  speed: number;
+  health: number;
+  brewCost: number;
+  description: string;
+  isLegend: boolean;
+}
+export let globalCardDataCache: Map<string, CardData> = new Map();
+
+// Function to request and load all card data
+export async function loadAllCardData(): Promise<boolean> {
+  if (!colyseusRoom) return false;
+  
+  return new Promise((resolve) => {
+    // Set a timeout to prevent indefinite waiting
+    const timeout = setTimeout(() => {
+      console.error("loadAllCardData: Timeout while waiting for card data");
+      resolve(false);
+    }, 5000);
+
+    colyseusRoom.send("getAllCards");
+    
+    // Set up one-time listener for the response
+    colyseusRoom.onMessage("allCards", (cardData: CardData[]) => {
+      clearTimeout(timeout);
+      console.log(`Received ${cardData.length} cards from server`);
+      
+      // Populate the global cache
+      globalCardDataCache.clear();
+      cardData.forEach(card => {
+        globalCardDataCache.set(card.id, card);
+      });
+      
+      resolve(true);
+    });
+  });
+}
+
 // Function to connect to Colyseus
 export async function connectColyseus(accessToken: string, username: string) {
   const url =
@@ -26,6 +68,11 @@ export async function connectColyseus(accessToken: string, username: string) {
     console.log("Successfully joined room:", colyseusRoom.roomId);
     console.log("Session ID:", colyseusRoom.sessionId);
     console.log("Initial room state:", colyseusRoom.state.toJSON()); // Log initial state
+
+    // Load all card data after connecting
+    console.log("Loading all card data...");
+    await loadAllCardData();
+    console.log("Card data loaded, cache size:", globalCardDataCache.size);
 
     // Listen for state changes (optional global listener)
     colyseusRoom.onStateChange((state) => {

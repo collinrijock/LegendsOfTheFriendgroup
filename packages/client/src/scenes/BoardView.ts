@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { colyseusRoom } from "../utils/colyseusClient";
+import { colyseusRoom, globalCardDataCache, CardData } from "../utils/colyseusClient";
 import {
   GameState,
   PlayerState,
@@ -44,6 +44,12 @@ export class BoardView extends Scene {
   > = new Map();
 
   private currentPhase: Phase = Phase.Lobby; // Add currentPhase property
+  
+  // Add sell zone properties
+  private sellZone!: Phaser.GameObjects.Container;
+  private sellZoneRect!: Phaser.GameObjects.Rectangle;
+  private sellZoneText!: Phaser.GameObjects.Text;
+  private brewGainText!: Phaser.GameObjects.Text;
 
   // Navbar elements
   private playerHealthText!: Phaser.GameObjects.Text;
@@ -54,7 +60,6 @@ export class BoardView extends Scene {
 
   // Listeners
   private listeners: Array<() => void> = [];
-  private cardDataCache: CardUIData[] | null = null;
 
   constructor() {
     super("BoardView");
@@ -142,9 +147,8 @@ export class BoardView extends Scene {
 
   create() {
     console.log("BoardView creating...");
-    this.cardDataCache = this.cache.json.get("cardData");
-
     this.createNavbar();
+    this.createSellZone(); // Add this line to create the sell zone
     this.setupColyseusListeners();
     // Ensure this scene is rendered below other UI scenes like Shop, Prep, Battle
     // this.scene.sendToBack(); // REMOVE THIS LINE
@@ -312,7 +316,14 @@ export class BoardView extends Scene {
         // Added oldPhase
         this.currentPhase = newPhase as Phase; // Update currentPhase
         this.updateNavbarText();
-
+  
+        // Show/hide sell zone based on phase
+        if (newPhase === Phase.Shop || newPhase === Phase.Preparation) {
+          this.sellZone.setVisible(true);
+        } else {
+          this.sellZone.setVisible(false);
+        }
+  
         const processCardVisualsPostBattle = (
           cardContainer: Phaser.GameObjects.Container,
           cardSchema: CardInstanceSchema | undefined,
@@ -335,7 +346,16 @@ export class BoardView extends Scene {
                 if (cooldownBarBg && cooldownBarFill) {
                   cooldownBarBg.setVisible(true);
                   cooldownBarFill.setVisible(true);
-                  cooldownBarFill.setSize(cooldownBarBaseWidth, 6); // Reset width using base width
+
+                  // Get the cooldown bar width from the card's data or use a fallback
+                  const storedWidth = cardContainer.getData(
+                    "cooldownBarBaseWidth"
+                  );
+                  const cooldownBarBaseWidth =
+                    typeof storedWidth === "number"
+                      ? storedWidth
+                      : MINION_CARD_WIDTH - 10;
+                  cooldownBarFill.setSize(cooldownBarBaseWidth, 6); // Use the retrieved width value
 
                   const maxCooldown =
                     (cardSchema.speed > 0 ? cardSchema.speed : 1.5) * 1000;
@@ -513,7 +533,7 @@ export class BoardView extends Scene {
               targetCardArea === "battlefield" &&
               targetCardSlotKey
             ) {
-              const targetPlayer = colyseusRoom.state.players.get(
+              const targetPlayer = colyseusRoom!.state.players.get(
                 message.targetPlayerId
               );
               const cardSchema =
@@ -620,6 +640,25 @@ export class BoardView extends Scene {
       $(player).listen("username", () => this.updateNavbarText())
     );
 
+    // Add onChange listener for the hand map to catch all changes
+    const handChangeUnsub = $(player.hand).onChange(() => {
+      // Update all hand cards based on current state
+      player.hand.forEach((cardSchema, slotKey) => {
+        this.updateCardVisual(sessionId, "hand", slotKey, cardSchema);
+      });
+    });
+    playerListeners.push(handChangeUnsub);
+
+    // Add onChange listener for the battlefield map to catch all changes
+    const battlefieldChangeUnsub = $(player.battlefield).onChange(() => {
+      // Update all battlefield cards based on current state
+      player.battlefield.forEach((cardSchema, slotKey) => {
+        this.updateCardVisual(sessionId, "battlefield", slotKey, cardSchema);
+      });
+    });
+    playerListeners.push(battlefieldChangeUnsub);
+
+    // Keep existing onAdd/onRemove listeners
     playerListeners.push(
       $(player.hand).onAdd((cardSchema, slotKey) =>
         this.updateCardVisual(sessionId, "hand", slotKey, cardSchema)
@@ -741,7 +780,14 @@ export class BoardView extends Scene {
     slotKey: string,
     cardSchema: CardInstanceSchema
   ) {
-    if (!this.scene.isActive()) return;
+    if (!this.scene.isActive()) {
+      // Don't update visuals if scene isn't active
+      return;
+    }
+    if (!colyseusRoom || !colyseusRoom.state) {
+      // Don't update visuals if Colyseus room or state isn't available
+      return;
+    }
     this.removeCardVisual(sessionId, area, slotKey); // Remove old one if exists
 
     const playerVisuals = this.playerVisuals.get(sessionId);
@@ -866,9 +912,6 @@ export class BoardView extends Scene {
       return container;
     }
 
-    const cardBaseData = this.cardDataCache?.find(
-      (c) => c.id === cardSchema.cardId
-    );
 
     const cardTextureKey =
       area === "hand" ? "cardFullTier1" : "cardMinionTier1";
@@ -880,13 +923,13 @@ export class BoardView extends Scene {
     if (area === "hand") {
       // Full Card Sprite (Hand)
       const nameText = this.add
-        .text(0, 0, cardSchema.name, {
-          // Middle center
+        .text(0, -20, cardSchema.name, {
+          // Middle center, moved up
           fontFamily: "Arial",
-          fontSize: 14, // Slightly larger for bigger card
+          fontSize: 16,
           color: "#ffffff",
           stroke: "#000000",
-          strokeThickness: 2,
+          strokeThickness: 4,
           align: "center",
           wordWrap: { width: displayCardWidth - 20 },
         })
@@ -894,34 +937,27 @@ export class BoardView extends Scene {
       container.add(nameText);
 
       const attackText = this.add
-        .text(
-          -displayCardWidth / 2 + 15,
-          displayCardHeight * 0.25,
-          `${cardSchema.attack}`,
-          {
-            // Under name, to the left
-            fontFamily: "Arial",
-            fontSize: 16, // Larger for value only
-            color: "#ffffff",
-            stroke: "#000000",
-            strokeThickness: 3,
-          }
-        )
+        .text(-MINION_CARD_WIDTH / 2 + 32, MINION_CARD_HEIGHT * 0.03, `${cardSchema.attack}`, {
+          fontFamily: "Arial",
+          fontSize: 16,
+          color: "#ffffff",
+          stroke: "#000000",
+          strokeThickness: 4,
+        })
         .setOrigin(0, 0.5);
       container.add(attackText);
 
       const hpText = this.add
         .text(
-          displayCardWidth / 2 - 15,
-          0,
-          `${cardSchema.currentHp}/${cardSchema.health}`,
+          MINION_CARD_WIDTH / 2 - 18,
+          6,
+          `${cardSchema.currentHp}  ${cardSchema.health}`,
           {
-            // Middle right
             fontFamily: "Arial",
-            fontSize: 16, // Larger for value only
+            fontSize: 16,
             color: "#00ff00",
             stroke: "#000000",
-            strokeThickness: 3,
+            strokeThickness: 4,
           }
         )
         .setOrigin(1, 0.5);
@@ -929,10 +965,10 @@ export class BoardView extends Scene {
       container.setData("hpTextObject", hpText);
 
       const speedText = this.add
-        .text(0, displayCardHeight / 2 - 20, `${cardSchema.speed}`, {
+        .text(0, displayCardHeight / 2 - 50, `${cardSchema.speed}`, {
           // Middle bottom
           fontFamily: "Arial",
-          fontSize: 16, // Larger for value only
+          fontSize: 16,
           color: "#ffffff",
           stroke: "#000000",
           strokeThickness: 3,
@@ -940,31 +976,31 @@ export class BoardView extends Scene {
         .setOrigin(0.5, 1);
       container.add(speedText);
     } else {
-      // Minion Card Sprite (Battlefield)
+
       const attackText = this.add
-        .text(-displayCardWidth / 2 + 10, 0, `${cardSchema.attack}`, {
+        .text(-displayCardWidth / 2 + 32, 32, `${cardSchema.attack}`, {
           // Middle-left
           fontFamily: "Arial",
-          fontSize: 14, // Value only
+          fontSize: 16, // Value only
           color: "#ffffff",
           stroke: "#000000",
-          strokeThickness: 3,
+          strokeThickness: 4,
         })
         .setOrigin(0, 0.5);
       container.add(attackText);
 
       const hpText = this.add
         .text(
-          displayCardWidth / 2 - 5,
-          displayCardHeight / 2 - 5,
+          displayCardWidth / 2 - 10,
+          displayCardHeight / 2 - 28,
           `${cardSchema.currentHp}/${cardSchema.health}`,
           {
             // Bottom-right
             fontFamily: "Arial",
-            fontSize: 12,
+            fontSize: 16,
             color: "#00ff00",
             stroke: "#000000",
-            strokeThickness: 2,
+            strokeThickness: 4,
           }
         )
         .setOrigin(1, 1);
@@ -1125,6 +1161,40 @@ export class BoardView extends Scene {
       ) as string;
       const ownerSessionId = cardContainer.getData("ownerSessionId") as string;
 
+      // Check if card is dropped on sell zone
+      if ((this.currentPhase === Phase.Shop || this.currentPhase === Phase.Preparation) &&
+          this.sellZone.visible &&
+          this.isDroppedOnSellZone(cardContainer)) {
+        
+        // Get card information from the server state to calculate value
+        const myPlayer = colyseusRoom?.state.players.get(colyseusRoom?.sessionId);
+        let cardSchema: CardInstanceSchema | undefined;
+        
+        // Find the card schema based on area and slotKey
+        if (originalArea === "hand" && myPlayer?.hand.has(originalSlotKey)) {
+          cardSchema = myPlayer.hand.get(originalSlotKey);
+        } else if (originalArea === "battlefield" && myPlayer?.battlefield.has(originalSlotKey)) {
+          cardSchema = myPlayer.battlefield.get(originalSlotKey);
+        }
+        
+        if (cardSchema && cardSchema.instanceId === instanceId) {
+          // Calculate sell value (half the brew cost, minimum 1)
+          const sellValue = Math.max(1, Math.floor(cardSchema.brewCost / 2));
+          
+          // Send sell request to server
+          colyseusRoom?.send("sellCard", {
+            instanceId: instanceId,
+            area: originalArea,
+            slotKey: originalSlotKey
+          });
+          
+          // Show brew gain animation
+          this.showBrewGain(sellValue);
+          
+          return; // Exit the handler after selling
+        }
+      }
+
       let dropped = false;
       let newAreaForServer: "hand" | "battlefield" | undefined;
       let newSlotKeyForServer: string | undefined;
@@ -1162,8 +1232,12 @@ export class BoardView extends Scene {
                 // Valid drop in hand
                 cardContainer.x = slotPos.x;
                 cardContainer.y = slotPos.y;
+                
+                // Change area attribute
+                const areaChanged = originalArea !== "hand";
                 cardContainer.setData("area", "hand");
                 cardContainer.setData("slotKey", targetSlotKey);
+                
                 this.updateVisualMaps(
                   ownerSessionId,
                   originalArea,
@@ -1172,6 +1246,19 @@ export class BoardView extends Scene {
                   targetSlotKey,
                   cardContainer
                 );
+                
+                // If area has changed, recreate the card visual to update appearance
+                if (areaChanged) {
+                  // Get the card data from the server state
+                  const myPlayer = colyseusRoom?.state.players.get(ownerSessionId);
+                  const cardSchema = myPlayer?.hand.get(targetSlotKey) || myPlayer?.battlefield.get(originalSlotKey);
+                  
+                  if (cardSchema && cardSchema.instanceId === instanceId) {
+                    // Recreate the card with the correct appearance for its new area
+                    this.updateCardVisual(ownerSessionId, "hand", targetSlotKey, cardSchema);
+                  }
+                }
+                
                 dropped = true;
                 newAreaForServer = "hand";
                 newSlotKeyForServer = targetSlotKey;
@@ -1224,8 +1311,12 @@ export class BoardView extends Scene {
                 // Valid drop on battlefield
                 cardContainer.x = slotPos.x;
                 cardContainer.y = slotPos.y;
+                
+                // Change area attribute
+                const areaChanged = originalArea !== "battlefield";
                 cardContainer.setData("area", "battlefield");
                 cardContainer.setData("slotKey", targetSlotKey);
+                
                 this.updateVisualMaps(
                   ownerSessionId,
                   originalArea,
@@ -1234,6 +1325,19 @@ export class BoardView extends Scene {
                   targetSlotKey,
                   cardContainer
                 );
+                
+                // If area has changed, recreate the card visual to update appearance
+                if (areaChanged) {
+                  // Get the card data from the server state
+                  const myPlayer = colyseusRoom?.state.players.get(ownerSessionId);
+                  const cardSchema = myPlayer?.battlefield.get(targetSlotKey) || myPlayer?.hand.get(originalSlotKey);
+                  
+                  if (cardSchema && cardSchema.instanceId === instanceId) {
+                    // Recreate the card with the correct appearance for its new area
+                    this.updateCardVisual(ownerSessionId, "battlefield", targetSlotKey, cardSchema);
+                  }
+                }
+                
                 dropped = true;
                 newAreaForServer = "battlefield";
                 newSlotKeyForServer = targetSlotKey;
@@ -1347,6 +1451,57 @@ export class BoardView extends Scene {
     return occupantCard.getData("instanceId") === draggedInstanceId;
   }
 
+  private isDroppedOnSellZone(cardContainer: Phaser.GameObjects.Container): boolean {
+    if (!this.sellZone.visible) return false;
+    
+    // Create a slightly larger hit area than the visual rectangle to make selling easier
+    const sellZoneBounds = new Phaser.Geom.Rectangle(
+      this.sellZone.x - this.sellZoneRect.width / 2 - 20,
+      this.sellZone.y - this.sellZoneRect.height / 2 - 20,
+      this.sellZoneRect.width + 40,
+      this.sellZoneRect.height + 40
+    );
+    
+    return sellZoneBounds.contains(cardContainer.x, cardContainer.y);
+}
+
+  private showBrewGain(amount: number) {
+    this.brewGainText.setText(`+${amount} 🍺`);
+    this.brewGainText.setAlpha(1);
+    this.brewGainText.y = this.sellZone.y;
+    this.brewGainText.x = this.sellZone.x - 20;
+    
+    // Scale up and down for attention
+    this.tweens.add({
+      targets: this.brewGainText,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      duration: 100,
+      yoyo: true,
+      ease: 'Cubic.easeOut',
+      onComplete: () => {
+        // Then float up and fade out
+        this.tweens.add({
+          targets: this.brewGainText,
+          y: this.brewGainText.y - 80,
+          alpha: 0,
+          duration: 1500,
+          ease: 'Power2'
+        });
+      }
+    });
+    
+    // Flash the sell zone briefly
+    this.tweens.add({
+      targets: this.sellZoneRect,
+      fillAlpha: 0.7,
+      duration: 200,
+      yoyo: true,
+      repeat: 1,
+      ease: 'Cubic.easeOut'
+    });
+}
+
   private updateVisualMaps(
     sessionId: string,
     originalArea: "hand" | "battlefield",
@@ -1422,6 +1577,73 @@ export class BoardView extends Scene {
     return layoutData;
   }
 
+  private createSellZone() {
+    // Create sell zone container at the right side of the screen
+    this.sellZone = this.add.container(this.cameras.main.width - 80, this.cameras.main.height / 2);
+    this.sellZone.setDepth(1000); // High depth to be on top
+    
+    // Create red rectangle for the zone
+    this.sellZoneRect = this.add.rectangle(0, 0, 120, 160, 0xff0000, 0.3);
+    this.sellZoneRect.setStrokeStyle(2, 0xff0000, 1);
+    this.sellZone.add(this.sellZoneRect);
+    
+    // Add "SELL" text
+    this.sellZoneText = this.add.text(0, 0, "SELL", {
+      fontFamily: "Arial Black",
+      fontSize: 24,
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 4,
+      align: "center"
+    }).setOrigin(0.5);
+    this.sellZone.add(this.sellZoneText);
+    
+    // Create the brew gain text (initially invisible)
+    this.brewGainText = this.add.text(this.cameras.main.width * 0.95, 60, "", {
+      fontFamily: "Arial Black",
+      fontSize: 24,
+      color: "#ffff00",
+      stroke: "#000000",
+      strokeThickness: 4,
+      align: "center"
+    }).setOrigin(1, 0.5).setAlpha(0).setDepth(1001);
+    
+    // Add "Drag cards here" helper text
+    const helperText = this.add.text(0, 50, "Drag cards here\nto sell", {
+      fontFamily: "Arial",
+      fontSize: 14,
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 2,
+      align: "center"
+    }).setOrigin(0.5);
+    this.sellZone.add(helperText);
+    
+    // Add visual feedback when dragging cards
+    this.input.on('dragenter', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject, dropZone: Phaser.GameObjects.GameObject) => {
+      if (gameObject instanceof Phaser.GameObjects.Container &&
+          this.sellZone.visible &&
+          this.isDroppedOnSellZone(gameObject as Phaser.GameObjects.Container)) {
+        this.sellZoneRect.setFillStyle(0xff0000, 0.5);
+        this.sellZoneRect.setStrokeStyle(3, 0xff5555, 1);
+      }
+    });
+    
+    this.input.on('dragleave', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject, dropZone: Phaser.GameObjects.GameObject) => {
+      this.sellZoneRect.setFillStyle(0xff0000, 0.3);
+      this.sellZoneRect.setStrokeStyle(2, 0xff0000, 1);
+    });
+    
+    // Reset the sell zone appearance on any drop
+    this.input.on('drop', () => {
+      this.sellZoneRect.setFillStyle(0xff0000, 0.3);
+      this.sellZoneRect.setStrokeStyle(2, 0xff0000, 1);
+    });
+    
+    // Initially hide the sell zone
+    this.sellZone.setVisible(false);
+}
+
   private updateNavbarText() {
     if (
       !colyseusRoom ||
@@ -1454,9 +1676,17 @@ export class BoardView extends Scene {
     this.dayPhaseText.setText(`Day ${day} - ${phase}`);
   }
 
-  shutdown() {
-    console.log("BoardView shutting down...");
-    this.listeners.forEach((unsub) => unsub());
+  private cleanupListeners() {
+    console.log("BoardView: Cleaning up listeners.");
+    this.listeners.forEach((unsub) => {
+      if (typeof unsub === "function") {
+        try {
+          unsub();
+        } catch (e) {
+          console.warn("BoardView: Error cleaning up listener:", e);
+        }
+      }
+    });
     this.listeners = [];
     this.playerVisuals.forEach((areas) => {
       areas.hand.forEach((container) => container.destroy());
@@ -1469,5 +1699,19 @@ export class BoardView extends Scene {
     this.playerBrewsText?.destroy();
     this.dayPhaseText?.destroy();
     this.opponentUsernameText?.destroy();
+    
+    // Clean up sell zone elements
+    this.sellZone?.destroy();
+    this.brewGainText?.destroy();
+    
+    // Clean up input listeners
+    this.input.off('dragenter');
+    this.input.off('dragleave');
+    this.input.off('drop');
+}
+
+  shutdown() {
+    console.log("BoardView shutting down...");
+    this.cleanupListeners();
   }
 }

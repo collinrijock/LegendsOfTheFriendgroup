@@ -47,8 +47,8 @@ export class Preloader extends Scene {
     this.load.setPath("/.proxy/assets");
     this.load.image("logo", "logo.png");
 
-    // Load card data
-    this.load.json("cardData", "data/cards.json");
+    // Remove loading of card data as it's now on the server
+    // this.load.json("cardData", "data/cards.json");
 
     // Load card sprites
     this.load.image("cardFullTier1", "CardFullTier1.png");
