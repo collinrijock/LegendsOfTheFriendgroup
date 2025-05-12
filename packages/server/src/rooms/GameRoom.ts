@@ -15,7 +15,6 @@ const cardDatabasePath = path.join(__dirname, '../../src/data/cards.json');
 const cardDatabase = JSON.parse(fs.readFileSync(cardDatabasePath, 'utf8'));
 
 // --- Constants for Rewards ---
-const BREW_PER_KILL = 1;
 // --- End Constants ---
 
 // Helper function for unique IDs (consider a more robust library like uuid)
@@ -1177,27 +1176,25 @@ export class GameRoom extends Room<GameState> {
     }
     // --- End Detailed Damage Application Logging ---
 
-    // Calculate brews earned based on opponent's dead cards + daily bonus
+    // Calculate brews earned based on *own* dead cards
     // Count dead cards based on server state BEFORE removing them
-    const player1OpponentDeadCards = Array.from(
-      player2.battlefield.values()
-    ).filter((card) => card && card.currentHp <= 0).length;
-    const player2OpponentDeadCards = Array.from(
+    const player1OwnDeadCards = Array.from(
       player1.battlefield.values()
     ).filter((card) => card && card.currentHp <= 0).length;
+    const player2OwnDeadCards = Array.from(
+      player2.battlefield.values()
+    ).filter((card) => card && card.currentHp <= 0).length;
 
-    // Calculate reward: (3 * currentDay) + (kills * BREW_PER_KILL)
-    const p1BrewReward =
-      (3 * this.state.currentDay) + player1OpponentDeadCards * BREW_PER_KILL;
-    const p2BrewReward =
-      (3 * this.state.currentDay) + player2OpponentDeadCards * BREW_PER_KILL;
+    // Calculate reward: (own dead cards * 2)
+    const p1BrewReward = player1OwnDeadCards * 2;
+    const p2BrewReward = player2OwnDeadCards * 2;
 
     // --- Log Brew Calculation ---
     console.log(
-      `endBattle: Player 1 Brew Reward Calculation (Server): (3 * Day ${this.state.currentDay}) + Kills=${player1OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p1BrewReward}`
+      `endBattle: Player 1 Brew Reward Calculation (Server): OwnDeadCards=${player1OwnDeadCards} * 2 = Total: ${p1BrewReward}`
     );
     console.log(
-      `endBattle: Player 2 Brew Reward Calculation (Server): (3 * Day ${this.state.currentDay}) + Kills=${player2OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p2BrewReward}`
+      `endBattle: Player 2 Brew Reward Calculation (Server): OwnDeadCards=${player2OwnDeadCards} * 2 = Total: ${p2BrewReward}`
     );
     console.log(
       `endBattle: Player 1 Brews BEFORE reward (Server): ${player1.brews}`
