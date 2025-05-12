@@ -1185,16 +1185,17 @@ export class GameRoom extends Room<GameState> {
       player2.battlefield.values()
     ).filter((card) => card && card.currentHp <= 0).length;
 
-    // Calculate reward: (own dead cards * 2)
-    const p1BrewReward = player1OwnDeadCards * 2;
-    const p2BrewReward = player2OwnDeadCards * 2;
+    // Calculate reward: (3 * currentDay) + (own dead cards * 2)
+    const dailyBonus = 3 * this.state.currentDay;
+    const p1BrewReward = dailyBonus + (player1OwnDeadCards * 2);
+    const p2BrewReward = dailyBonus + (player2OwnDeadCards * 2);
 
     // --- Log Brew Calculation ---
     console.log(
-      `endBattle: Player 1 Brew Reward Calculation (Server): OwnDeadCards=${player1OwnDeadCards} * 2 = Total: ${p1BrewReward}`
+      `endBattle: Player 1 Brew Reward Calculation (Server): DailyBonus(${dailyBonus}) + OwnDeadCards(${player1OwnDeadCards} * 2) = Total: ${p1BrewReward}`
     );
     console.log(
-      `endBattle: Player 2 Brew Reward Calculation (Server): OwnDeadCards=${player2OwnDeadCards} * 2 = Total: ${p2BrewReward}`
+      `endBattle: Player 2 Brew Reward Calculation (Server): DailyBonus(${dailyBonus}) + OwnDeadCards(${player2OwnDeadCards} * 2) = Total: ${p2BrewReward}`
     );
     console.log(
       `endBattle: Player 1 Brews BEFORE reward (Server): ${player1.brews}`
