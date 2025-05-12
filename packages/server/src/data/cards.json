@@ -1,18 +1,8 @@
 [
   {
-    "id": "test_card_01",
-    "name": "Test Card",
-    "attack": 5,
-    "speed": 4,
-    "health": 10,
-    "brewCost": 5,
-    "description": "A basic test card.",
-    "isLegend": false
-  },
-  {
-    "id": "test_card_02",
+    "id": "quick_jab_01",
     "name": "Quick Jab",
-    "attack": 3,
+    "attack": 2,
     "speed": 2,
     "health": 8,
     "brewCost": 4,
@@ -20,43 +10,133 @@
     "isLegend": false
   },
   {
-    "id": "test_card_03",
+    "id": "tanky_boi_01",
     "name": "Tanky Boi",
-    "attack": 2,
-    "speed": 6,
-    "health": 20,
-    "brewCost": 6,
+    "attack": 3,
+    "speed": 7,
+    "health": 25,
+    "brewCost": 5,
     "description": "Takes a beating.",
     "isLegend": false
   },
   {
-    "id": "test_card_04",
+    "id": "glass_cannon_01",
     "name": "Glass Cannon",
-    "attack": 10,
+    "attack": 14,
     "speed": 5,
-    "health": 5,
-    "brewCost": 7,
+    "health": 4,
+    "brewCost": 6,
     "description": "Hits hard, dies fast.",
     "isLegend": false
   },
   {
-    "id": "test_card_05",
+    "id": "balanced_bud_01",
     "name": "Balanced Bud",
     "attack": 6,
-    "speed": 4,
+    "speed": 5,
     "health": 12,
     "brewCost": 6,
     "description": "Good all-around.",
     "isLegend": false
   },
   {
-    "id": "test_card_06",
+    "id": "speedy_scout_01",
     "name": "Speedy Scout",
+    "attack": 3,
+    "speed": 3,
+    "health": 10,
+    "brewCost": 6,
+    "description": "Attacks quickly.",
+    "isLegend": false
+  },
+  {
+    "id": "bruiser_01",
+    "name": "Tough Bruiser",
+    "attack": 8,
+    "speed": 6,
+    "health": 18,
+    "brewCost": 7,
+    "description": "Tough and hits reasonably hard.",
+    "isLegend": false
+  },
+  {
+    "id": "sniper_01",
+    "name": "Sniper",
+    "attack": 24,
+    "speed": 12,
+    "health": 12,
+    "brewCost": 8,
+    "description": "Slow wind-up, big impact.",
+    "isLegend": false
+  },
+  {
+    "id": "swarm_ling_01",
+    "name": "Swarmling",
+    "attack": 1,
+    "speed": 2,
+    "health": 6,
+    "brewCost": 1,
+    "description": "Cheap and fast, but weak.",
+    "isLegend": false
+  },
+  {
+    "id": "guardian_01",
+    "name": "Guardian",
     "attack": 4,
-    "speed": 1.5,
-    "health": 7,
-    "brewCost": 5,
-    "description": "Attacks very quickly.",
+    "speed": 7,
+    "health": 32,
+    "brewCost": 9,
+    "description": "A defensive wall.",
+    "isLegend": false
+  },
+  {
+    "id": "berserker_01",
+    "name": "Berserker",
+    "attack": 8,
+    "speed": 3,
+    "health": 16,
+    "brewCost": 12,
+    "description": "Expensive but very powerful.",
+    "isLegend": false
+  },
+  {
+    "id": "circulito_01",
+    "name": "Circulito",
+    "attack": 2,
+    "speed": 3,
+    "health": 6,
+    "brewCost": 3,
+    "description": "Meow.",
+    "isLegend": false
+  },
+  {
+    "id": "minigunner_01",
+    "name": "Minigunner",
+    "attack": 2,
+    "speed": 2,
+    "health": 18,
+    "brewCost": 12,
+    "description": "Pew pew pew.",
+    "isLegend": false
+  },
+  {
+    "id": "humonculated_chungorian_01",
+    "name": "Humonculated Chungorian",
+    "attack": 16,
+    "speed": 8,
+    "health": 32,
+    "brewCost": 15,
+    "description": "Strong and chunky",
+    "isLegend": false
+  },
+  {
+    "id": "fu-hsi_01",
+    "name": "Fu-hsi",
+    "attack": 1,
+    "speed": 2.5,
+    "health": 8,
+    "brewCost": 2,
+    "description": "Cheap and well rounded.",
     "isLegend": false
   }
 ]
