@@ -80,7 +80,7 @@ export class BoardView extends Scene {
     ) as Phaser.GameObjects.Image; // Changed from backgroundRectangle
 
     if (hpText && hpText.active) {
-      hpText.setText(`HP: ${currentHp}/${maxHealth}`);
+      hpText.setText(`${currentHp}/${maxHealth}`);
       const hpPercent = maxHealth > 0 ? currentHp / maxHealth : 0;
       if (currentHp <= 0) {
         hpText.setColor("#ff0000"); // Red for dead

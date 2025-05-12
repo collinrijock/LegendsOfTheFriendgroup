@@ -711,7 +711,7 @@ export class GameRoom extends Room<GameState> {
     // Reset shopRefreshCost when leaving Shop phase
     if (oldPhase === Phase.Shop && newPhase !== Phase.Shop) {
       this.state.players.forEach((player) => {
-        player.shopRefreshCost = 2; // Reset to initial value
+        player.shopRefreshCost = 1; // Reset to initial value
         console.log(
           `Reset shop refresh cost for ${player.username} to ${player.shopRefreshCost}`
         );
@@ -1332,7 +1332,7 @@ export class GameRoom extends Room<GameState> {
       this.generatePlayerShopOffers(player);
 
       // Reset shop refresh cost to initial value
-      player.shopRefreshCost = 2;
+      player.shopRefreshCost = 1;
       console.log(
         `Reset shop refresh cost for ${player.username} to ${player.shopRefreshCost}`
       );
