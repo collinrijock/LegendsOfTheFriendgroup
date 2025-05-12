@@ -15,7 +15,6 @@ const cardDatabasePath = path.join(__dirname, '../../src/data/cards.json');
 const cardDatabase = JSON.parse(fs.readFileSync(cardDatabasePath, 'utf8'));
 
 // --- Constants for Rewards ---
-const DAILY_BREW_BONUS = 5;
 const BREW_PER_KILL = 1;
 // --- End Constants ---
 
@@ -1187,17 +1186,18 @@ export class GameRoom extends Room<GameState> {
       player1.battlefield.values()
     ).filter((card) => card && card.currentHp <= 0).length;
 
+    // Calculate reward: (3 * currentDay) + (kills * BREW_PER_KILL)
     const p1BrewReward =
-      DAILY_BREW_BONUS + player1OpponentDeadCards * BREW_PER_KILL;
+      (3 * this.state.currentDay) + player1OpponentDeadCards * BREW_PER_KILL;
     const p2BrewReward =
-      DAILY_BREW_BONUS + player2OpponentDeadCards * BREW_PER_KILL;
+      (3 * this.state.currentDay) + player2OpponentDeadCards * BREW_PER_KILL;
 
     // --- Log Brew Calculation ---
     console.log(
-      `endBattle: Player 1 Brew Reward Calculation (Server): Daily=${DAILY_BREW_BONUS}, Kills=${player1OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p1BrewReward}`
+      `endBattle: Player 1 Brew Reward Calculation (Server): (3 * Day ${this.state.currentDay}) + Kills=${player1OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p1BrewReward}`
     );
     console.log(
-      `endBattle: Player 2 Brew Reward Calculation (Server): Daily=${DAILY_BREW_BONUS}, Kills=${player2OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p2BrewReward}`
+      `endBattle: Player 2 Brew Reward Calculation (Server): (3 * Day ${this.state.currentDay}) + Kills=${player2OpponentDeadCards} * ${BREW_PER_KILL} = Total: ${p2BrewReward}`
     );
     console.log(
       `endBattle: Player 1 Brews BEFORE reward (Server): ${player1.brews}`
