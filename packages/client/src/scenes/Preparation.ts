@@ -76,12 +76,6 @@ export class Preparation extends Scene {
     const gameHeight = this.cameras.main.height;
     const gameWidth = this.cameras.main.width;
 
-    // Get initial state from Colyseus
-    // const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId); // Not needed for navbar here
-    // const currentDay = colyseusRoom.state.currentDay; // Not needed for navbar here
-    // const playerHealth = myPlayerState?.health ?? 50; // Not needed for navbar here
-    // const playerBrews = myPlayerState?.brews ?? 0; // Not needed for navbar here
-
     // --- Log Hand State ---
     const myPlayerStateForLog = colyseusRoom.state.players.get(
       colyseusRoom.sessionId

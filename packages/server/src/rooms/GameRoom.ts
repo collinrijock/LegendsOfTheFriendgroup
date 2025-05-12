@@ -542,7 +542,7 @@ export class GameRoom extends Room<GameState> {
       `Assigned username for ${client.sessionId}: ${newPlayer.username}`
     );
 
-    newPlayer.health = 50;
+    newPlayer.health = 100;
     newPlayer.brews = 10; // Starting brews
     newPlayer.isReady = false; // Ensure player starts as not ready
 
