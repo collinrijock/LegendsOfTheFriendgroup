@@ -1154,6 +1154,39 @@ export class BoardView extends Scene {
         if (cardContainer.getData("isDragging")) {
           cardContainer.x = dragX;
           cardContainer.y = dragY;
+
+          // Sell preview logic
+          if ((this.currentPhase === Phase.Shop || this.currentPhase === Phase.Preparation) && this.sellZone.visible) {
+            if (this.isDroppedOnSellZone(cardContainer)) {
+              const instanceId = cardContainer.getData("instanceId") as string;
+              const originalArea = cardContainer.getData("originalAreaOnDragStart") as "hand" | "battlefield";
+              const originalSlotKey = cardContainer.getData("originalSlotKeyOnDragStart") as string;
+              const ownerId = cardContainer.getData("ownerSessionId") as string;
+              
+              const player = colyseusRoom?.state.players.get(ownerId);
+              let cardSchema: CardInstanceSchema | undefined;
+
+              if (player) {
+                if (originalArea === "hand") {
+                  cardSchema = player.hand.get(originalSlotKey);
+                } else {
+                  cardSchema = player.battlefield.get(originalSlotKey);
+                }
+              }
+
+              if (cardSchema && cardSchema.instanceId === instanceId) {
+                const sellValue = Math.max(1, Math.floor(cardSchema.brewCost / 2));
+                this.brewGainText.setText(`Sell: +${sellValue} 🍺`);
+                this.brewGainText.setAlpha(1);
+              } else {
+                this.brewGainText.setAlpha(0); // Hide if card data can't be found
+              }
+            } else {
+              this.brewGainText.setAlpha(0); // Hide if not over sell zone
+            }
+          } else {
+            this.brewGainText.setAlpha(0); // Hide if wrong phase or sell zone not visible
+          }
         }
       }
     );
@@ -1163,6 +1196,7 @@ export class BoardView extends Scene {
 
       cardContainer.setAlpha(1.0);
       cardContainer.setData("isDragging", false);
+      this.brewGainText.setAlpha(0); // Hide preview text on drag end
 
       const instanceId = cardContainer.getData("instanceId") as string;
       // Use the area and slotKey stored at the beginning of the drag for updating visual maps
@@ -1479,10 +1513,13 @@ export class BoardView extends Scene {
 }
 
   private showBrewGain(amount: number) {
-    this.brewGainText.setText(`+${amount} 🍺`);
-    this.brewGainText.setAlpha(1);
-    this.brewGainText.y = this.sellZone.y;
-    this.brewGainText.x = this.sellZone.x - 20;
+    this.brewGainText.setText(`+${amount} 🍺`); // Set final confirmed amount
+    this.brewGainText.setAlpha(1); // Make it visible for animation
+    // Position it relative to the sellZone container's origin (which is the center of the sell zone)
+    // If brewGainText is already part of sellZone container, its x,y are relative.
+    // Let's ensure it's positioned where the preview was, e.g., above the "SELL" text.
+    this.brewGainText.y = -50; // Reset y position if it was moved by another animation
+    this.brewGainText.x = 0;   // Reset x position
     
     // Scale up and down for attention
     this.tweens.add({
@@ -1611,15 +1648,16 @@ export class BoardView extends Scene {
     }).setOrigin(0.5);
     this.sellZone.add(this.sellZoneText);
     
-    // Create the brew gain text (initially invisible)
-    this.brewGainText = this.add.text(this.cameras.main.width * 0.95, 60, "", {
+    // Create the brew gain text (initially invisible, positioned above SELL text)
+    this.brewGainText = this.add.text(0, -50, "", { // Positioned above sellZoneText
       fontFamily: "Arial Black",
-      fontSize: 24,
+      fontSize: 20, // Slightly smaller for preview
       color: "#ffff00",
       stroke: "#000000",
-      strokeThickness: 4,
+      strokeThickness: 3,
       align: "center"
-    }).setOrigin(1, 0.5).setAlpha(0).setDepth(1001);
+    }).setOrigin(0.5).setAlpha(0); // Start invisible
+    this.sellZone.add(this.brewGainText); // Add to sellZone container
     
     // Add "Drag cards here" helper text
     const helperText = this.add.text(0, 50, "Drag cards here\nto sell", {

@@ -34,22 +34,40 @@ export class GameRoom extends Room<GameState> {
   private cardAttackReadiness: Map<string, number> = new Map(); // instanceId -> msToNextAttack
   private generatePlayerShopOffers(player: PlayerState) {
     player.shopOfferIds.clear(); // Clear previous offers
-    const availableCards = [
-      ...cardDatabase.filter((card: { isLegend: any }) => !card.isLegend),
-    ]; // Create a copy to modify, exclude legends
+    let availableCards = [
+      ...cardDatabase.filter((card: { isLegend: boolean; brewCost: number }) => !card.isLegend), // Ensure type for brewCost
+    ];
+
+    // --- New Logic for Day-Based Filtering ---
+    if (this.state.currentDay >= 1 && this.state.currentDay <= 3) {
+      console.log(`Day ${this.state.currentDay}: Filtering shop for cards with brewCost <= 5.`);
+      availableCards = availableCards.filter(card => card.brewCost <= 5);
+    }
+    // --- End New Logic ---
+
     const selectedIds = new Set<string>();
 
-    while (selectedIds.size < 4 && availableCards.length > 0) {
-      const randomIndex = Math.floor(Math.random() * availableCards.length);
-      const chosenCard = availableCards.splice(randomIndex, 1)[0];
-      selectedIds.add(chosenCard.id);
+    // Ensure there are enough cards to offer after filtering
+    if (availableCards.length === 0) {
+        console.warn(`No cards available to offer after filtering for day ${this.state.currentDay}. Shop will be empty for ${player.username}.`);
+    } else if (availableCards.length < 4) {
+        console.warn(`Not enough unique cards (found ${availableCards.length}) to fill 4 shop slots for ${player.username} after filtering for day ${this.state.currentDay}. Offering all available.`);
+        // Offer all available if less than 4, but still try to pick unique ones
+        availableCards.forEach(card => selectedIds.add(card.id));
+    } else {
+        // Original logic to pick 4 cards
+        while (selectedIds.size < 4 && availableCards.length > 0) {
+          const randomIndex = Math.floor(Math.random() * availableCards.length);
+          const chosenCard = availableCards.splice(randomIndex, 1)[0]; // availableCards is modified here
+          selectedIds.add(chosenCard.id);
+        }
     }
 
     selectedIds.forEach((id) => player.shopOfferIds.push(id));
     console.log(
       `Generated shop offers for ${
         player.username
-      }: [${player.shopOfferIds.join(", ")}]`
+      }: [${player.shopOfferIds.join(", ")}] (Day: ${this.state.currentDay})`
     );
   }
   onCreate(options: any): void | Promise<any> {
