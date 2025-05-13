@@ -57,6 +57,9 @@ export class Battle extends Scene {
 
     // --- Colyseus Listeners ---
     this.setupColyseusListeners();
+
+    // Register shutdown event listener
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 
   setupColyseusListeners() {
@@ -180,5 +183,8 @@ export class Battle extends Scene {
 
      this.resultText?.destroy();
      this.statusText?.destroy();
+
+     // Unregister the shutdown event listener for this scene
+     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 }

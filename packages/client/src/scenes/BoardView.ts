@@ -156,8 +156,11 @@ export class BoardView extends Scene {
     // The Background scene will send itself to back.
     // Active phase scenes (Shop, Prep, Battle) will bring themselves to the top.
     // BoardView should sit between them.
+  
+    // Register shutdown event listener
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
-
+  
   private createNavbar() {
     const centerX = this.cameras.main.centerX;
     const gameWidth = this.cameras.main.width;
@@ -1735,5 +1738,8 @@ export class BoardView extends Scene {
   shutdown() {
     console.log("BoardView shutting down...");
     this.cleanupListeners();
+
+    // Unregister the shutdown event listener for this scene
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 }

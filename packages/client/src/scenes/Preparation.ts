@@ -39,6 +39,16 @@ export class Preparation extends Scene {
   private otherPlayerAddUnsub: (() => void) | null = null;
   private otherPlayerRemoveUnsub: (() => void) | null = null;
 
+  // Declare clientSideCardLayout
+  private clientSideCardLayout: Map<
+    string,
+    {
+      area: "hand" | "battlefield";
+      slotKey: string;
+      gameObject: Phaser.GameObjects.Container;
+    }
+  > = new Map();
+
   constructor() {
     super("Preparation");
   }
@@ -136,6 +146,9 @@ export class Preparation extends Scene {
 
     // --- Schedule button state update ---
     this.time.delayedCall(100, this.updateStartButtonState, [], this); // Ensure button state is correct after BoardView init
+
+    // Register shutdown event listener
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 
   // --- Drag and Drop ---
@@ -494,5 +507,9 @@ export class Preparation extends Scene {
     this.waitingText?.destroy();
 
     // Clear arrays and maps
+    this.clientSideCardLayout.clear(); // Clear the map
+
+    // Unregister the shutdown event listener for this scene
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 }

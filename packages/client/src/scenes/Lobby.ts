@@ -130,6 +130,9 @@ export class Lobby extends Scene {
 
     this.setupColyseusListeners();
     // Initial UI update is now handled by attachMainListenersAndUI via setupColyseusListeners
+
+    // Register shutdown event listener
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 
   private attachMainListenersAndUI() {
@@ -388,6 +391,9 @@ export class Lobby extends Scene {
     this.readyButton?.off('pointerdown');
     this.readyButton?.off('pointerover');
     this.readyButton?.off('pointerout');
+
+    // Unregister the shutdown event listener for this scene
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
 
     // super.shutdown(); // If extending a base class with shutdown logic
   }

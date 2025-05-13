@@ -200,8 +200,11 @@ export class Shop extends Scene {
     this.toggleShopButton.setText(
       this.shopOffersVisible ? "Hide Shop" : "Show Shop"
     );
+  
+    // Register shutdown event listener
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
-
+  
   private createShopCardsDisplay(
     centerX: number,
     centerY: number,
@@ -352,6 +355,63 @@ export class Shop extends Scene {
       cardContainer.setData("cardData", cardData); // Store full card data if needed
       this.input.setDraggable(cardContainer);
 
+      // Add pointerdown and pointerup listeners for click-to-buy
+      cardContainer.off('pointerdown').on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        if (!cardContainer.input?.enabled) return;
+        cardContainer.setData('isBeingDragged', false); // Reset flag on new pointer down
+      });
+
+      cardContainer.off('pointerup').on('pointerup', (pointer: Phaser.Input.Pointer) => {
+        if (!cardContainer.input?.enabled) return;
+        if (!colyseusRoom || !colyseusRoom.sessionId) return;
+
+        if (cardContainer.getData('isBeingDragged') === true) {
+            // This was a drag, dragend will handle it.
+            cardContainer.setData('isBeingDragged', false); // Reset for safety
+            return;
+        }
+
+        // If not dragged, treat as a click to buy
+        const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
+        if (!myPlayerState) return;
+
+        let firstEmptyHandSlot = -1;
+        for (let i = 0; i < 5; i++) { // Assuming 5 hand slots
+            if (!myPlayerState.hand.has(String(i))) {
+                firstEmptyHandSlot = i;
+                break;
+            }
+        }
+
+        if (firstEmptyHandSlot !== -1) {
+            const cardId = cardContainer.getData('cardId') as string;
+            const currentCardData = cardContainer.getData('cardData') as CardData; // Use currentCardData
+
+            if (cardId && currentCardData && myPlayerState.brews >= currentCardData.brewCost) {
+                console.log(`Shop: Click-to-buy card ${cardId} (Cost: ${currentCardData.brewCost}) into hand slot ${firstEmptyHandSlot}. Brews: ${myPlayerState.brews}`);
+                colyseusRoom.send("buyCard", {
+                    cardId: cardId,
+                    handSlotIndex: firstEmptyHandSlot,
+                });
+                // Card will be removed from shop offers by server state update & re-render.
+            } else {
+                if (currentCardData && myPlayerState.brews < currentCardData.brewCost) {
+                    console.log(`Shop: Not enough brews (${myPlayerState.brews}) to click-buy card ${cardId} (Cost: ${currentCardData.brewCost}).`);
+                    // TODO: Optionally show a "not enough brews" message to the player
+                } else {
+                    console.log(`Shop: Click-to-buy failed for card ${cardId}. CardData: ${!!currentCardData}`);
+                }
+            }
+        } else {
+            console.log("Shop: Hand is full, cannot click-buy.");
+            // TODO: Optionally show a "hand full" message to the player
+        }
+        // No need to snap back cardContainer here, as it wasn't moved for a click.
+        // If the buy is successful, the server will update shopOfferIds, and createShopCardsDisplay will be called,
+        // effectively removing the bought card from the display.
+      });
+
+
       this.shopCardObjects.push(cardContainer);
       this.shopOffersContainer.add(cardContainer);
     });
@@ -449,6 +509,15 @@ export class Shop extends Scene {
     this.input.off("dragstart");
     this.input.off("drag");
     this.input.off("dragend");
+    this.input.off("pointerdown"); // Ensure we clear previous general pointerdown if any
+    this.input.off("pointerup");   // Ensure we clear previous general pointerup if any
+
+    // Remove individual pointerdown/pointerup from shopCardObjects if set previously
+    this.shopCardObjects.forEach(cardContainer => {
+        cardContainer.off('pointerdown');
+        cardContainer.off('pointerup');
+    });
+
 
     this.input.on(
       "dragstart",
@@ -467,6 +536,7 @@ export class Shop extends Scene {
         gameObject.setAlpha(0.7);
         gameObject.setData("startX", gameObject.x);
         gameObject.setData("startY", gameObject.y);
+        gameObject.setData('isBeingDragged', true); // Flag that dragging has started
       }
     );
 
@@ -484,8 +554,10 @@ export class Shop extends Scene {
         )
           return;
         if (!gameObject.input?.enabled) return;
-        gameObject.x = dragX;
-        gameObject.y = dragY;
+        if (gameObject.getData('isBeingDragged') === true) { // Only move if dragging
+            gameObject.x = dragX;
+            gameObject.y = dragY;
+        }
       }
     );
 
@@ -499,94 +571,77 @@ export class Shop extends Scene {
           !colyseusRoom ||
           !(gameObject instanceof Phaser.GameObjects.Container) ||
           !this.shopCardObjects.includes(gameObject)
-        )
+        ) {
+          if (gameObject instanceof Phaser.GameObjects.Container) {
+            gameObject.setData('isBeingDragged', false); // Reset flag even if other conditions fail
+          }
           return;
-
+        }
+        
         gameObject.setAlpha(1.0);
-        const droppedX = gameObject.x;
-        const droppedY = gameObject.y;
         let buyAttempted = false;
 
-        const boardViewScene = this.scene.get(
-          "BoardView"
-        ) as import("./BoardView").BoardView;
+        if (gameObject.getData('isBeingDragged') === true) { // Process drop only if it was a drag
+            const droppedX = gameObject.x;
+            const droppedY = gameObject.y;
 
-        // Check hand slots
-        for (let i = 0; i < 5; i++) {
-          const slotPos = boardViewScene?.getSlotPixelPosition(true, "hand", i);
-          if (slotPos) {
-            const handSlotDropZone = new Phaser.Geom.Rectangle(
-              slotPos.x - 50,
-              slotPos.y - 70,
-              100,
-              140
-            );
-            if (
-              Phaser.Geom.Rectangle.Contains(
-                handSlotDropZone,
-                droppedX,
-                droppedY
-              )
-            ) {
-              const myPlayerState = colyseusRoom.state.players.get(
-                colyseusRoom.sessionId
-              );
-              if (myPlayerState && !myPlayerState.hand.has(String(i))) {
-                const cardId = gameObject.getData("cardId") as string;
-                if (cardId) {
-                  colyseusRoom.send("buyCard", {
-                    cardId: cardId,
-                    handSlotIndex: i,
-                  });
-                  buyAttempted = true;
-                }
-              }
-              break;
-            }
-          }
-        }
+            const boardViewScene = this.scene.get(
+              "BoardView"
+            ) as import("./BoardView").BoardView;
 
-        // Check battlefield slots
-        if (!buyAttempted) {
-          for (let i = 0; i < 5; i++) {
-            const slotPos = boardViewScene?.getSlotPixelPosition(true, "battlefield", i);
-            if (slotPos) {
-              const battlefieldSlotDropZone = new Phaser.Geom.Rectangle(
-                slotPos.x - 50,
-                slotPos.y - 70,
-                100,
-                140
-              );
-              if (
-                Phaser.Geom.Rectangle.Contains(
-                  battlefieldSlotDropZone,
-                  droppedX,
-                  droppedY
-                )
-              ) {
-                const myPlayerState = colyseusRoom.state.players.get(
-                  colyseusRoom.sessionId
+            // Check hand slots
+            for (let i = 0; i < 5; i++) {
+              const slotPos = boardViewScene?.getSlotPixelPosition(true, "hand", i);
+              if (slotPos) {
+                const handSlotDropZone = new Phaser.Geom.Rectangle(
+                  slotPos.x - 50,
+                  slotPos.y - 70,
+                  100,
+                  140
                 );
-                if (myPlayerState && !myPlayerState.battlefield.has(String(i))) {
-                  const cardId = gameObject.getData("cardId") as string;
-                  if (cardId) {
-                    colyseusRoom.send("buyCard", {
-                      cardId: cardId,
-                      battlefieldSlotIndex: i,
-                    });
-                    buyAttempted = true;
+                if (
+                  Phaser.Geom.Rectangle.Contains(
+                    handSlotDropZone,
+                    droppedX,
+                    droppedY
+                  )
+                ) {
+                  const myPlayerState = colyseusRoom.state.players.get(
+                    colyseusRoom.sessionId
+                  );
+                  if (myPlayerState && !myPlayerState.hand.has(String(i))) {
+                    const cardId = gameObject.getData("cardId") as string;
+                    const cardData = gameObject.getData("cardData") as CardData;
+                    if (cardId && cardData && myPlayerState.brews >= cardData.brewCost) {
+                      colyseusRoom.send("buyCard", {
+                        cardId: cardId,
+                        handSlotIndex: i,
+                      });
+                      buyAttempted = true;
+                    } else {
+                        // Not enough brews or cardData missing
+                        console.log("Shop: Drag-to-buy failed (not enough brews or card data missing).");
+                    }
                   }
+                  break;
                 }
-                break;
               }
             }
-          }
-        }
 
-        if (gameObject.active) {
-          gameObject.x = gameObject.getData("startX");
-          gameObject.y = gameObject.getData("startY");
+            // Check battlefield slots (No battlefield drop from shop)
+            // This part can be removed if shop cards can only go to hand.
+            // If shop cards *can* go to battlefield, this logic is fine.
+            // For now, let's assume shop cards only go to hand.
+
+            if (!buyAttempted) {
+              // Snap back if not bought
+              if (gameObject.active) {
+                gameObject.x = gameObject.getData("startX");
+                gameObject.y = gameObject.getData("startY");
+              }
+            }
         }
+        gameObject.setData('isBeingDragged', false); // Reset drag flag
       }
     );
   }
@@ -806,5 +861,8 @@ export class Shop extends Scene {
     this.refreshButton?.destroy();
     this.toggleShopButton?.destroy();
     this.shopOffersContainer?.destroy(); // Destroy container which holds background and cards
+
+    // Unregister the shutdown event listener for this scene
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 }
