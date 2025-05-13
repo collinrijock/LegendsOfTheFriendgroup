@@ -976,10 +976,9 @@ export class BoardView extends Scene {
         .setOrigin(1, 0.5);
       container.add(hpText);
       container.setData("hpTextObject", hpText);
-
+  
       const speedText = this.add
         .text(0, displayCardHeight / 2 - 50, `${cardSchema.speed}`, {
-          // Middle bottom
           fontFamily: "Arial",
           fontSize: 16,
           color: "#ffffff",
@@ -989,7 +988,25 @@ export class BoardView extends Scene {
         .setOrigin(0.5, 1);
       container.add(speedText);
     } else {
-
+      // Minion Card Sprite (Battlefield)
+      // Name Text (Top-center)
+      const nameText = this.add.text(
+        0,
+        -displayCardHeight / 2 + 5, // 12px from top
+        cardSchema.name,
+        {
+          fontFamily: "Arial",
+          fontSize: 14,
+          color: "#ffffff",
+          stroke: "#000000",
+          strokeThickness: 4,
+          align: "center",
+          wordWrap: { width: displayCardWidth }
+        }
+      ).setOrigin(0.5, 0);
+      container.add(nameText);
+  
+      // Attack Text (Top-left)
       const attackText = this.add
         .text(-displayCardWidth / 2 + 32, 32, `${cardSchema.attack}`, {
           // Middle-left
@@ -1001,27 +1018,40 @@ export class BoardView extends Scene {
         })
         .setOrigin(0, 0.5);
       container.add(attackText);
-
-      const hpText = this.add
-        .text(
-          displayCardWidth / 2 - 10,
-          displayCardHeight / 2 - 28,
-          `${cardSchema.currentHp}/${cardSchema.health}`,
-          {
-            // Bottom-right
-            fontFamily: "Arial",
-            fontSize: 16,
-            color: "#00ff00",
-            stroke: "#000000",
-            strokeThickness: 4,
-          }
-        )
-        .setOrigin(1, 1);
+  
+      // Speed Text (Top-right)
+      const speedText = this.add.text(
+        0,
+        43, // 30px from top
+        `${cardSchema.speed}`,
+        {
+          fontFamily: "Arial",
+          fontSize: 14,
+          color: "#ffffff",
+          stroke: "#000000",
+          strokeThickness: 3,
+        }
+      ).setOrigin(1, 0);
+      container.add(speedText);
+      
+      // HP Text (Bottom-right, above cooldown bar)
+      const hpText = this.add.text(
+        displayCardWidth / 2 - 10,
+        displayCardHeight / 2 - 30, // 30px from bottom
+        `${cardSchema.currentHp}/${cardSchema.health}`,
+        {
+          fontFamily: "Arial",
+          fontSize: 14,
+          color: "#00ff00",
+          stroke: "#000000",
+          strokeThickness: 3,
+        }
+      ).setOrigin(1, 1);
       container.add(hpText);
       container.setData("hpTextObject", hpText);
-
-      // Cooldown Bar elements for battlefield cards
-      const cooldownBarY = displayCardHeight / 2 - 8;
+  
+      // Cooldown Bar elements for battlefield cards (15px from bottom)
+      const cooldownBarY = displayCardHeight / 2 - 15;
       const cooldownBarWidth = displayCardWidth - 10;
       const cooldownBarBg = this.add
         .rectangle(0, cooldownBarY, cooldownBarWidth, 6, 0x000000, 0.5)
@@ -1272,11 +1302,22 @@ export class BoardView extends Scene {
                 instanceId
               )
             ) {
-              if (
-                this.currentPhase === Phase.Shop ||
-                this.currentPhase === Phase.Preparation
-              ) {
-                // Valid drop in hand
+              // MODIFICATION START: Check if drop to hand is allowed
+              let canDropInHandSlot = false;
+              if (this.currentPhase === Phase.Shop) {
+                // In Shop phase, cards can be moved within the hand.
+                if (originalArea === "hand") {
+                    canDropInHandSlot = true;
+                }
+              } else if (this.currentPhase === Phase.Preparation) {
+                // In Preparation phase, only cards originating from the hand can be dropped into a hand slot.
+                if (originalArea === "hand") {
+                    canDropInHandSlot = true;
+                }
+              }
+              // MODIFICATION END
+
+              if (canDropInHandSlot) { // Use the new condition
                 cardContainer.x = slotPos.x;
                 cardContainer.y = slotPos.y;
                 
@@ -1294,14 +1335,14 @@ export class BoardView extends Scene {
                   cardContainer
                 );
                 
-                // If area has changed, recreate the card visual to update appearance
                 if (areaChanged) {
-                  // Get the card data from the server state
                   const myPlayer = colyseusRoom?.state.players.get(ownerSessionId);
-                  const cardSchema = myPlayer?.hand.get(targetSlotKey) || myPlayer?.battlefield.get(originalSlotKey);
-                  
+                  // Try to find the schema from its new potential location first, then original
+                  const cardSchema = myPlayer?.hand.get(targetSlotKey) ||
+                                   (originalArea === 'battlefield' ? myPlayer?.battlefield.get(originalSlotKey) : undefined) ||
+                                   (originalArea === 'hand' ? myPlayer?.hand.get(originalSlotKey) : undefined);
+
                   if (cardSchema && cardSchema.instanceId === instanceId) {
-                    // Recreate the card with the correct appearance for its new area
                     this.updateCardVisual(ownerSessionId, "hand", targetSlotKey, cardSchema);
                   }
                 }
@@ -1320,10 +1361,9 @@ export class BoardView extends Scene {
                     toSlotKey: targetSlotKey,
                   });
                 }
-                // For Prep phase, real-time update will be sent below
               }
             }
-            break;
+            if (dropped) break; // Break if successfully dropped in any hand slot
           }
         }
       }
