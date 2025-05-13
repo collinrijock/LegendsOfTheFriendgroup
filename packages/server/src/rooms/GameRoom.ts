@@ -1187,8 +1187,8 @@ export class GameRoom extends Room<GameState> {
 
     // Calculate reward: (3 * currentDay) + (own dead cards * 2)
     const dailyBonus = 3 * this.state.currentDay;
-    const p1BrewReward = dailyBonus + (player1OwnDeadCards * 2);
-    const p2BrewReward = dailyBonus + (player2OwnDeadCards * 2);
+    const p1BrewReward = dailyBonus + (player1OwnDeadCards * 5);
+    const p2BrewReward = dailyBonus + (player2OwnDeadCards * 5);
 
     // --- Log Brew Calculation ---
     console.log(

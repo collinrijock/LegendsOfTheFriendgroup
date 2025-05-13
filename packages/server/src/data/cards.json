@@ -163,7 +163,7 @@
     "id": "minigunner_01",
     "name": "Minigunner",
     "attack": 2,
-    "speed": 2.5,
+    "speed": 2,
     "health": 10,
     "brewCost": 10,
     "description": "Pew pew pew.",
