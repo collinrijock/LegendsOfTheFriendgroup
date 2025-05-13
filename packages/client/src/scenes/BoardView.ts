@@ -60,6 +60,7 @@ export class BoardView extends Scene {
 
   // Listeners
   private listeners: Array<() => void> = [];
+  private cardSchemaListeners: Map<string, Array<() => void>> = new Map(); // Added: For card-specific schema listeners
 
   constructor() {
     super("BoardView");
@@ -628,7 +629,7 @@ export class BoardView extends Scene {
 
   private addPlayerListeners(player: PlayerState, sessionId: string) {
     const $ = getStateCallbacks(colyseusRoom!);
-    const playerListeners: Array<() => void> = [];
+    const playerListeners: Array<() => void> = []; // Listeners specific to this player instance/schema
 
     playerListeners.push(
       $(player).listen("health", () => this.updateNavbarText())
@@ -640,83 +641,75 @@ export class BoardView extends Scene {
       $(player).listen("username", () => this.updateNavbarText())
     );
 
-    // Add onChange listener for the hand map to catch all changes
-    const handChangeUnsub = $(player.hand).onChange(() => {
-      // Update all hand cards based on current state
-      player.hand.forEach((cardSchema, slotKey) => {
+    // Listen to additions/removals from hand
+    playerListeners.push(
+      $(player.hand).onAdd((cardSchema, slotKey) => {
         this.updateCardVisual(sessionId, "hand", slotKey, cardSchema);
-      });
-    });
-    playerListeners.push(handChangeUnsub);
-
-    // Add onChange listener for the battlefield map to catch all changes
-    const battlefieldChangeUnsub = $(player.battlefield).onChange(() => {
-      // Update all battlefield cards based on current state
-      player.battlefield.forEach((cardSchema, slotKey) => {
-        this.updateCardVisual(sessionId, "battlefield", slotKey, cardSchema);
-      });
-    });
-    playerListeners.push(battlefieldChangeUnsub);
-
-    // Keep existing onAdd/onRemove listeners
-    playerListeners.push(
-      $(player.hand).onAdd((cardSchema, slotKey) =>
-        this.updateCardVisual(sessionId, "hand", slotKey, cardSchema)
-      )
+        // Add card-specific listeners (like currentHp) inside updateCardVisual or here
+        this.addCardSchemaListeners(cardSchema);
+      })
     );
     playerListeners.push(
-      $(player.hand).onRemove((cardSchema, slotKey) =>
-        this.removeCardVisual(sessionId, "hand", slotKey)
-      )
+      $(player.hand).onRemove((cardSchema, slotKey) => {
+        // removeCardVisual will handle cleaning up cardSchemaListeners for this card
+        this.removeCardVisual(sessionId, "hand", slotKey);
+      })
     );
+    // Process existing cards in hand and add their schema listeners
     player.hand.forEach((cardSchema, slotKey) => {
-      // For existing cards
-      this.updateCardVisual(sessionId, "hand", slotKey, cardSchema);
-      const handCardHpUnsub = $(cardSchema).listen(
-        "currentHp",
-        (newHp, oldHp) => {
-          const cardContainer = this.getCardGameObjectByInstanceId(
-            cardSchema.instanceId
-          );
-          if (cardContainer) {
-            this.updateCardHpVisuals(cardContainer, newHp, cardSchema.health);
-          }
-        }
-      );
-      playerListeners.push(handCardHpUnsub);
+      // updateCardVisual is called by updatePlayerSlots, which is called after addPlayerListeners
+      // So, just add schema listeners here for existing cards.
+      // updateCardVisual will be called for initial population.
+      this.addCardSchemaListeners(cardSchema);
     });
 
+    // Listen to additions/removals from battlefield
     playerListeners.push(
-      $(player.battlefield).onAdd((cardSchema, slotKey) =>
-        this.updateCardVisual(sessionId, "battlefield", slotKey, cardSchema)
-      )
+      $(player.battlefield).onAdd((cardSchema, slotKey) => {
+        this.updateCardVisual(sessionId, "battlefield", slotKey, cardSchema);
+        this.addCardSchemaListeners(cardSchema);
+      })
     );
     playerListeners.push(
-      $(player.battlefield).onRemove((cardSchema, slotKey) =>
-        this.removeCardVisual(sessionId, "battlefield", slotKey)
-      )
+      $(player.battlefield).onRemove((cardSchema, slotKey) => {
+        this.removeCardVisual(sessionId, "battlefield", slotKey);
+      })
     );
+    // Process existing cards on battlefield and add their schema listeners
     player.battlefield.forEach((cardSchema, slotKey) => {
-      // For existing cards
-      this.updateCardVisual(sessionId, "battlefield", slotKey, cardSchema);
-      const battlefieldCardHpUnsub = $(cardSchema).listen(
-        "currentHp",
-        (newHp, oldHp) => {
-          const cardContainer = this.getCardGameObjectByInstanceId(
-            cardSchema.instanceId
-          );
-          if (cardContainer) {
-            this.updateCardHpVisuals(cardContainer, newHp, cardSchema.health);
-          }
-        }
-      );
-      playerListeners.push(battlefieldCardHpUnsub);
+      this.addCardSchemaListeners(cardSchema);
     });
 
-    // Store these listeners to be cleaned up if the player leaves
-    // This part is tricky with current structure, onLeave should handle cleanup of player-specific visuals and associated listeners.
-    // For now, the main listeners array will handle general cleanup.
     this.listeners.push(...playerListeners);
+  }
+
+  private addCardSchemaListeners(cardSchema: CardInstanceSchema) {
+    if (!cardSchema || !cardSchema.instanceId) return;
+    const $ = getStateCallbacks(colyseusRoom!);
+
+    // Clean up any existing listeners for this instanceId first to prevent duplicates
+    const existingUnsubs = this.cardSchemaListeners.get(cardSchema.instanceId);
+    if (existingUnsubs) {
+        existingUnsubs.forEach(unsub => unsub());
+        this.cardSchemaListeners.delete(cardSchema.instanceId);
+    }
+
+    const newUnsubs: Array<() => void> = [];
+
+    const hpUnsub = $(cardSchema).listen("currentHp", (newHp, oldHp) => {
+        const cardContainer = this.getCardGameObjectByInstanceId(cardSchema.instanceId);
+        if (cardContainer) {
+            this.updateCardHpVisuals(cardContainer, newHp, cardSchema.health);
+        }
+    });
+    newUnsubs.push(hpUnsub);
+
+    // Add other card-specific listeners here if needed in the future
+    // e.g., $(cardSchema).listen("attack", ...)
+
+    if (newUnsubs.length > 0) {
+        this.cardSchemaListeners.set(cardSchema.instanceId, newUnsubs);
+    }
   }
 
   private updatePlayerSlots(player: PlayerState, sessionId: string) {
@@ -841,6 +834,9 @@ export class BoardView extends Scene {
       playerVisuals.battlefield.set(slotKey, cardContainer);
     }
 
+    // Add/update schema listeners for this card
+    this.addCardSchemaListeners(cardSchema);
+
     // Make card interactive if it belongs to the local player
     if (isLocalPlayer) {
       this.makeCardInteractive(cardContainer);
@@ -858,6 +854,20 @@ export class BoardView extends Scene {
         area === "hand" ? playerVisuals.hand : playerVisuals.battlefield;
       const existingVisual = mapArea.get(slotKey);
       if (existingVisual) {
+        const instanceId = existingVisual.getData("instanceId") as string;
+        if (instanceId) {
+            const listenersToRemove = this.cardSchemaListeners.get(instanceId);
+            if (listenersToRemove) {
+                console.log(`BoardView: Cleaning up ${listenersToRemove.length} listeners for card instance ${instanceId} during removeCardVisual.`);
+                listenersToRemove.forEach(unsub => {
+                    if (typeof unsub === "function") {
+                        try { unsub(); } catch (e) { console.warn(`BoardView: Error unsubscribing card listener for ${instanceId}`, e); }
+                    }
+                });
+                this.cardSchemaListeners.delete(instanceId);
+            }
+        }
+
         if (existingVisual.input && existingVisual.input.enabled) {
           this.input.disable(existingVisual); // Disable input before destroying
         }
@@ -1688,6 +1698,18 @@ export class BoardView extends Scene {
       }
     });
     this.listeners = [];
+
+    // Clean up card schema listeners
+    this.cardSchemaListeners.forEach((unsubs, instanceId) => {
+        console.log(`BoardView cleanup: Cleaning up ${unsubs.length} listeners for card instance ${instanceId}`);
+        unsubs.forEach(unsub => {
+            if (typeof unsub === "function") {
+                try { unsub(); } catch (e) { console.warn(`BoardView: Error unsubscribing card listener for ${instanceId}`, e); }
+            }
+        });
+    });
+    this.cardSchemaListeners.clear();
+
     this.playerVisuals.forEach((areas) => {
       areas.hand.forEach((container) => container.destroy());
       areas.battlefield.forEach((container) => container.destroy());
