@@ -60,7 +60,7 @@ export class PlayerState extends Schema {
     @type("string") sessionId: string = ""; // Colyseus session ID
     @type("string") username: string = "Player"; // Discord username
     @type("number") health: number = 100;
-    @type("number") brews: number = 10; // Starting brews
+    @type("number") brews: number = 5; // Starting brews
     @type("number") shopRefreshCost: number = 1; // Cost to refresh shop, doubles each use
     @type({ map: CardInstanceSchema }) hand = new MapSchema<CardInstanceSchema>(); // Keyed by slot index "0"-"4"
     @type({ map: CardInstanceSchema }) battlefield = new MapSchema<CardInstanceSchema>(); // Keyed by slot index "0"-"4"

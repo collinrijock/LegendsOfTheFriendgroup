@@ -559,7 +559,7 @@ export class GameRoom extends Room<GameState> {
     );
 
     newPlayer.health = 100;
-    newPlayer.brews = 10; // Starting brews
+    newPlayer.brews = 5; // Starting brews
     newPlayer.isReady = false; // Ensure player starts as not ready
 
     this.state.players.set(client.sessionId, newPlayer);

@@ -11,7 +11,7 @@
   },
   {
     "id": "tanky_boi_01",
-    "name": "FNAF Security Guard",
+    "name": "Sleepy Snorlax",
     "attack": 3,
     "speed": 8,
     "health": 25,
@@ -20,12 +20,22 @@
     "isLegend": false
   },
   {
+    "id": "tanky_boi_02",
+    "name": "FNAF Security Guard",
+    "attack": 3,
+    "speed": 7,
+    "health": 20,
+    "brewCost": 5,
+    "description": "Takes a beating.",
+    "isLegend": false
+  },
+  {
     "id": "glass_cannon_01",
     "name": "Deagle David",
-    "attack": 14,
+    "attack": 12,
     "speed": 6,
     "health": 4,
-    "brewCost": 6,
+    "brewCost": 5,
     "description": "Hits hard, dies fast.",
     "isLegend": false
   },
@@ -72,7 +82,7 @@
   {
     "id": "bruiser_01",
     "name": "Darius",
-    "attack": 8,
+    "attack": 9,
     "speed": 8,
     "health": 18,
     "brewCost": 7,
