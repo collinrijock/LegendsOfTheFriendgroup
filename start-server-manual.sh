@@ -2,7 +2,7 @@
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
-echo "--- Starting Manual Server Build Script ---"
+echo "--- Starting Manual Server Setup Script (for pre-built app) ---"
 
 PROJECT_DIR="$(pwd)" # Use current working directory
 echo "[INFO] Project directory set to: $PROJECT_DIR"
@@ -11,63 +11,44 @@ echo "[INFO] Navigating to project directory to ensure context..."
 cd "$PROJECT_DIR" || { echo "[ERROR] Failed to navigate to project directory: $PROJECT_DIR. Exiting."; exit 1; }
 echo "[SUCCESS] Successfully navigated to project directory."
 
-echo "[INFO] Attempting to pull latest changes from Git..."
+echo "[INFO] Attempting to pull latest changes from Git (including pre-built 'dist' folders)..."
 git pull
 echo "[SUCCESS] Git pull completed."
 
-# Source NVM if not already available
-echo "[INFO] Setting up NVM environment..."
-export NVM_DIR="$HOME/.nvm"
-
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  echo "[DEBUG] Sourcing $NVM_DIR/nvm.sh..."
-  . "$NVM_DIR/nvm.sh"
-  if command -v nvm &>/dev/null; then
-    echo "[SUCCESS] NVM function is available."
-    if nvm use; then
-      echo "[SUCCESS] NVM Node.js version activated: $(node -v) (npm $(npm -v))"
-    else
-      echo "[ERROR] 'nvm use' command failed. Check .nvmrc or default alias."
-      exit 1
-    fi
-  else
-    echo "[ERROR] Sourced nvm.sh, but 'nvm' command is not available."
-    exit 1
-  fi
+# NVM setup block removed. Assuming Node.js is pre-installed and in PATH.
+echo "[INFO] Verifying Node.js and npm versions (using system-installed)..."
+if command -v node &>/dev/null && command -v npm &>/dev/null; then
+  echo "[INFO] Current Node version: $(node -v)"
+  echo "[INFO] Current npm version: $(npm -v)"
 else
-  echo "[ERROR] NVM script ($NVM_DIR/nvm.sh) not found or is empty."
+  echo "[ERROR] Node.js or npm is not installed or not found in PATH. Please install Node.js."
   exit 1
 fi
-
-echo "[INFO] Current Node version: $(node -v)"
-echo "[INFO] Current npm version: $(npm -v)"
 
 echo "[INFO] Installing client dependencies (packages/client)..."
 npm --prefix packages/client install
 echo "[SUCCESS] Client dependencies installed."
 
-echo "[INFO] Building client (packages/client)..."
-npm --prefix packages/client run build
-echo "[SUCCESS] Client build completed."
+# Client build step removed. Assuming client is built locally and 'dist' is committed.
 
 echo "[INFO] Installing server dependencies (packages/server)..."
 npm --prefix packages/server install
 echo "[SUCCESS] Server dependencies installed."
 
-echo "[INFO] Building server (TypeScript compilation for packages/server)..."
-npm --prefix packages/server run build
-echo "[SUCCESS] Server build completed."
+# Server build step removed. Assuming server is built locally and 'dist' is committed.
 
 echo ""
-echo "--- Build Process Complete ---"
+echo "--- Dependency Installation Complete ---"
+echo "The application should have been built locally (npm run build in client and server packages),"
+echo "and the resulting 'dist' folders committed to the repository before running this script."
 echo ""
-echo "To run your server using 'screen':"
+echo "To run your server manually (e.g., using 'screen'):"
 echo "1. If 'screen' is not installed, run: sudo apt-get install screen"
 echo "2. Start a new screen session: screen -S lotf-server"
 echo "   (You can name 'lotf-server' anything you like)"
 echo "3. Inside the screen session, navigate to your project directory if you're not already there:"
 echo "   cd $PROJECT_DIR"
-echo "4. Run the server (make sure your .env file is in $PROJECT_DIR):"
+echo "4. Run the server (make sure your .env file is in $PROJECT_DIR and app was built locally):"
 echo "   NODE_ENV=production node packages/server/dist/server.js"
 echo "5. To detach from the screen session (leaving the server running), press: Ctrl+A then D"
 echo ""
