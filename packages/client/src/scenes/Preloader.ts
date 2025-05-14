@@ -44,7 +44,10 @@ export class Preloader extends Scene {
 
   preload() {
     //  Load the assets for the game - Replace with your own assets
-    this.load.setPath("/.proxy/assets");
+    // For local dev with Vite proxy, `/.proxy/assets` is used.
+    // For production, when served by Node.js, assets are typically at `/assets/`.
+    const assetPath = import.meta.env.DEV ? "/.proxy/assets" : "assets";
+    this.load.setPath(assetPath);
     this.load.image("logo", "logo.png");
 
     // Remove loading of card data as it's now on the server
