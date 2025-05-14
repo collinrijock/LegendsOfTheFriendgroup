@@ -16,14 +16,36 @@ git pull
 echo "[SUCCESS] Git pull completed."
 
 # Source NVM if not already available (e.g., in cron or non-interactive shells)
-echo "[INFO] Sourcing NVM..."
-export NVM_DIR="$HOME/.nvm"
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  . "$NVM_DIR/nvm.sh"
-  echo "[SUCCESS] NVM sourced."
+# --- MODIFIED NVM SOURCING BLOCK START ---
+echo "[INFO] Setting up NVM environment..."
+export NVM_DIR="$HOME/.nvm" # Standard NVM directory
+
+if [ -s "$NVM_DIR/nvm.sh" ]; then # Check if nvm.sh exists and is not empty
+  echo "[DEBUG] Sourcing $NVM_DIR/nvm.sh..."
+  . "$NVM_DIR/nvm.sh" # Source NVM script. If this fails and set -e is on, script exits here.
+  
+  # After sourcing, nvm should be a shell function.
+  if command -v nvm &>/dev/null; then
+    echo "[SUCCESS] NVM function is available."
+    
+    echo "[INFO] Activating Node.js version using 'nvm use' (checks .nvmrc or uses default alias)..."
+    # 'nvm use' without arguments will try to use .nvmrc or the default alias.
+    # The setup.sh should have set a 'default' alias.
+    if nvm use; then
+      echo "[SUCCESS] NVM Node.js version activated: $(node -v) (npm $(npm -v))"
+    else
+      echo "[ERROR] 'nvm use' command failed. This could be due to a missing/invalid .nvmrc file, or no default NVM alias being set (e.g., 'nvm alias default node')."
+      exit 1 # Critical failure if Node version cannot be set
+    fi
+  else
+    echo "[ERROR] Sourced nvm.sh, but 'nvm' command/function is not available. This indicates a problem with NVM installation or the sourcing process."
+    exit 1 # Critical failure
+  fi
 else
-  echo "[WARNING] NVM script not found at $NVM_DIR/nvm.sh. Node/npm commands might fail if not in PATH."
+  echo "[ERROR] NVM script ($NVM_DIR/nvm.sh) not found or is empty. Please ensure NVM is installed correctly for the current user ($USER)."
+  exit 1 # Critical failure
 fi
+# --- MODIFIED NVM SOURCING BLOCK END ---
 
 echo "[INFO] Current Node version: $(node -v)"
 echo "[INFO] Current npm version: $(npm -v)"
