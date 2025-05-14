@@ -3,17 +3,18 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-PROJECT_DIR=\"/srv/LegendsOfTheFriendgroup\" # Change this to your actual project directory
+PROJECT_DIR="$(pwd)" # Use current working directory
 
-echo "Navigating to project directory: \$PROJECT_DIR"
-cd \"\$PROJECT_DIR\" || { echo "Failed to navigate to project directory. Exiting."; exit 1; }
+echo "Project directory set to: $PROJECT_DIR"
+echo "Navigating to project directory to ensure context..."
+cd "$PROJECT_DIR" || { echo "Failed to navigate to project directory. Exiting."; exit 1; }
 
 echo "Pulling latest changes from Git..."
 git pull
 
 # Source NVM if not already available (e.g., in cron or non-interactive shells)
-export NVM_DIR=\"\$HOME/.nvm\"
-[ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
 echo "Installing client dependencies..."
 npm --prefix packages/client install
