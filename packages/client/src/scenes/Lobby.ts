@@ -1,6 +1,6 @@
 import { Scene } from "phaser";
 // Import global room instance and username function
-import { colyseusRoom, globalCardDataCache } from "../utils/colyseusClient"; // Updated import
+import { colyseusRoom, globalCardDataCache, loadAllCardData } from "../utils/colyseusClient"; // Updated import
 import { getUserName } from "../utils/discordSDK";
 // Import Phase enum for type safety (adjust path if needed)
 import { Phase, PlayerState } from "../../../server/src/schemas/GameState"; // Adjust path as necessary
@@ -291,14 +291,13 @@ export class Lobby extends Scene {
     // Check if we have card data loaded
     if (globalCardDataCache.size === 0) {
         console.log("Lobby: Card data not loaded yet. Loading...");
-        import("../utils/colyseusClient").then(({ loadAllCardData }) => {
-            loadAllCardData().then(success => {
-                if (success) {
-                    console.log("Lobby: Card data loaded successfully");
-                } else {
-                    console.warn("Lobby: Failed to load card data");
-                }
-            });
+        // Use the statically imported loadAllCardData directly
+        loadAllCardData().then(success => {
+            if (success) {
+                console.log("Lobby: Card data loaded successfully");
+            } else {
+                console.warn("Lobby: Failed to load card data");
+            }
         });
     }
 
