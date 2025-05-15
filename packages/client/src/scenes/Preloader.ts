@@ -6,6 +6,7 @@ export class Preloader extends Scene {
   }
 
   init() {
+    // The "background" texture is now loaded by Boot.ts, so it's available here.
     const bg = this.add.image(
       this.cameras.main.width / 2,
       this.cameras.main.height / 2,
@@ -48,7 +49,9 @@ export class Preloader extends Scene {
     // For production, when served by Node.js, assets are typically at `/assets/`.
     const assetPath = import.meta.env.DEV ? "/.proxy/assets" : "assets";
     this.load.setPath(assetPath);
-    this.load.image("logo", "logo.png");
+
+    // TODO: logo.png is missing from public/assets/. Add the file or remove this line.
+    // this.load.image("logo", "logo.png");
 
     // Remove loading of card data as it's now on the server
     // this.load.json("cardData", "data/cards.json");

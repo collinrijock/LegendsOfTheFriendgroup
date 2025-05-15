@@ -145,8 +145,10 @@ export class Lobby extends Scene {
         console.warn("Lobby: attachMainListenersAndUI called but scene is not active. Aborting.");
         return;
     }
-    if (!colyseusRoom || !colyseusRoom.state) {
-        console.warn("Lobby: attachMainListenersAndUI called but Colyseus room or state is not ready. Aborting.");
+    // MODIFIED GUARD: Check for state.players as well
+    if (!colyseusRoom || !colyseusRoom.state || !colyseusRoom.state.players) {
+        console.warn("Lobby: attachMainListenersAndUI called but Colyseus room, state, or state.players is not ready. Aborting. Current state:", colyseusRoom?.state);
+        // Aborting this attempt. onStateChange.once should eventually provide a good state if this was premature.
         return;
     }
 
@@ -163,22 +165,23 @@ export class Lobby extends Scene {
     }
     console.log("Lobby: Setting up Colyseus general listeners.");
 
-    // If state is already available, schedule the main listener attachment and UI update.
-    // Using a small delay ensures Phaser's scene context is fully ready.
-    if (colyseusRoom.state && !this.listenersAttached) {
-        console.log("Lobby: State already available on setup. Scheduling attachMainListenersAndUI.");
-        this.time.delayedCall(1, this.attachMainListenersAndUI, [], this);
-    }
+    // Remove the direct check and delayedCall for attachMainListenersAndUI.
+    // Rely solely on onStateChange.once for the initial setup.
+    // if (colyseusRoom.state && colyseusRoom.state.players && !this.listenersAttached) {
+    //     console.log("Lobby: State AND state.players already available on setup. Scheduling attachMainListenersAndUI.");
+    //     this.time.delayedCall(1, this.attachMainListenersAndUI, [], this);
+    // }
 
     // Always set up onStateChange.once for the definitive first state synchronization.
     // This handles cases where state might not be immediately available or if a full state sync occurs.
-    colyseusRoom.onStateChange.once((state) => {
+    colyseusRoom.onStateChange.once((state) => { // state parameter is the new state
         console.log("Lobby: Initial state received via onStateChange.once.");
         if (!this.scene.isActive()) {
             console.log("Lobby: Scene became inactive before onStateChange.once processing could complete.");
             return;
         }
         // Call the consolidated method to attach listeners and update UI
+        // attachMainListenersAndUI will use colyseusRoom.state which is now updated.
         this.attachMainListenersAndUI();
     });
 
@@ -240,9 +243,13 @@ export class Lobby extends Scene {
     });
 
     // Add listeners for existing players
-    colyseusRoom.state.players.forEach((player, sessionId) => {
-        this.addPlayerStateListener(player, sessionId);
-    });
+    if (colyseusRoom.state.players && typeof colyseusRoom.state.players.forEach === 'function') {
+      colyseusRoom.state.players.forEach((player, sessionId) => {
+          this.addPlayerStateListener(player, sessionId);
+      });
+    } else {
+      console.warn("Lobby: attachMainListeners - colyseusRoom.state.players was undefined or not iterable when trying to add listeners for existing players. Current state:", colyseusRoom.state);
+    }
   }
 
   addPlayerStateListener(player: PlayerState, sessionId: string) {
