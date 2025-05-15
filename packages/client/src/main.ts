@@ -5,6 +5,7 @@ import { connectColyseus, colyseusRoom, colyseusClient } from "./utils/colyseusC
 
 // Import GameState schema if needed for type hints, though scenes will handle specifics
 // import { GameState } from "../../server/src/schemas/GameState"; // Adjust path
+import { GameState } from "./schemas/GameState"; // Use client's local copy
 
 import { Boot } from "./scenes/Boot";
 import { Game } from "./scenes/Game"; // Keep for now, but likely unused in main flow

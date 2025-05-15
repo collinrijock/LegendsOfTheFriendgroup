@@ -4,7 +4,7 @@ import {
   Phase,
   PlayerState,
   CardInstanceSchema,
-} from "../../../server/src/schemas/GameState";
+} from "../schemas/GameState"; // Use client's local copy
 import { getStateCallbacks } from "colyseus.js";
 
 const CARD_WIDTH = 120; // Was 100, updated for Full Card Sprite
