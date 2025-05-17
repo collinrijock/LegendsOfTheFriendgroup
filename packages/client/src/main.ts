@@ -1,10 +1,43 @@
+// Import schema classes for priming
+import { GameState, PlayerState, CardInstanceSchema } from "../../server/src/schemas/GameState";
+
+// --- Enhanced Schema Priming ---
+// This is to help bundlers like Vite/Rollup recognize these classes,
+// preventing issues with minification/tree-shaking where
+// class constructors might not be correctly identified by Colyseus client.
+// We instantiate them once to give a stronger hint to the bundler.
+function primeSchemasForBundler() {
+  try {
+    // @ts-ignore Unused instances are intentional for priming
+    const _gs = new GameState();
+    // @ts-ignore
+    const _ps = new PlayerState();
+    // @ts-ignore
+    const _cis = new CardInstanceSchema();
+
+    if (typeof window !== 'undefined' && (window as any).__SCHEMA_INSTANCES_PRIMED === undefined) {
+      (window as any).__SCHEMA_INSTANCES_PRIMED = true; // Mark as primed
+      console.log(
+        "Schema instances primed in main.ts for bundler awareness:",
+        _gs?.constructor?.name,
+        _ps?.constructor?.name,
+        _cis?.constructor?.name
+      );
+    }
+  } catch (e) {
+    console.warn("Error during schema priming (instantiation in main.ts):", e);
+  }
+}
+primeSchemasForBundler();
+// --- End Enhanced Schema Priming ---
+
 import { ScaleFlow } from "./utils/ScaleFlow";
 import { initiateDiscordSDK } from "./utils/discordSDK";
 // Import Colyseus connection function and room variable from the new file
 import { connectColyseus, colyseusRoom, colyseusClient } from "./utils/colyseusClient"; // Updated import
 
 // Import GameState schema if needed for type hints, though scenes will handle specifics
-// import { GameState } from "../../server/src/schemas/GameState"; // Adjust path
+// import { GameState } from "../../server/src/schemas/GameState"; // Adjust path - already imported above for priming
 
 import { Boot } from "./scenes/Boot";
 import { Game } from "./scenes/Game"; // Keep for now, but likely unused in main flow

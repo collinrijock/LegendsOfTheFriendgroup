@@ -22,9 +22,9 @@ export default (env, argv) => {
     entry: './src/main.ts',
     output: {
       path: path.resolve(__dirname, 'dist'), // Keep using path.resolve
-      filename: path.join('[name]', 'index.js'), // As per user's example structure
-      library: "LOTFClient", // Using a specific name for the library
-      libraryTarget: "umd", // As per user's suggestion
+      filename: '[name].bundle.js', // Simpler filename pattern
+      // library: "LOTFClient", // Removed
+      // libraryTarget: "umd", // Removed
       publicPath: '/', // Keep this for SPA routing and dev server
     },
     devtool: isProduction ? false : 'eval-source-map',

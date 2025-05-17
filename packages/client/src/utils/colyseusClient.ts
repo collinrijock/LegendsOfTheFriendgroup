@@ -1,35 +1,13 @@
 import { Client, Room } from "colyseus.js";
-// Import GameState schema if needed for type hints
+// Import GameState schema if needed for type hints - these might still be useful for type checking within this file.
+// If they are only for priming, they can be removed if priming is guaranteed in main.ts.
+// For safety, let's keep them for now if they are used for types.
 import { GameState, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState"; // Adjust path if needed
 
 // --- Enhanced Schema Priming ---
-// This is to help bundlers like Vite/Rollup recognize these classes,
-// preventing issues with minification/tree-shaking where
-// class constructors might not be correctly identified by Colyseus client.
-// We instantiate them once to give a stronger hint to the bundler.
-function primeSchemasForBundler() {
-  try {
-    // @ts-ignore Unused instances are intentional for priming
-    const _gs = new GameState();
-    // @ts-ignore
-    const _ps = new PlayerState();
-    // @ts-ignore
-    const _cis = new CardInstanceSchema();
-
-    if (typeof window !== 'undefined' && (window as any).__SCHEMA_INSTANCES_PRIMED === undefined) {
-      (window as any).__SCHEMA_INSTANCES_PRIMED = true; // Mark as primed
-      console.log(
-        "Schema instances primed for bundler awareness:",
-        _gs?.constructor?.name,
-        _ps?.constructor?.name,
-        _cis?.constructor?.name
-      );
-    }
-  } catch (e) {
-    console.warn("Error during schema priming (instantiation):", e);
-  }
-}
-primeSchemasForBundler();
+// MOVED TO main.ts
+// function primeSchemasForBundler() { ... }
+// primeSchemasForBundler();
 // --- End Enhanced Schema Priming ---
 
 // --- Global Colyseus Room Variable ---
