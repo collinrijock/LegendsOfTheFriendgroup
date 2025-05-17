@@ -9,7 +9,8 @@ const queryParams = new URLSearchParams(window.location.search);
 const isEmbedded = queryParams.get("frame_id") != null;
 
 let discordSdk: DiscordSDK | DiscordSDKMock;
-const clientId = process.env.VITE_CLIENT_ID;
+// @ts-ignore
+const clientId = import.meta.env.VITE_CLIENT_ID;
 
 // --- Define Mock IDs using helper function ---
 // These need to be defined *before* initiateDiscordSDK uses them.
