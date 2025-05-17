@@ -39,7 +39,7 @@ if (process.env.NODE_ENV === "production") {
 router.use("/colyseus", monitor(server as Partial<MonitorOptions>));
 
 // Fetch token from developer portal and return to the embedded app
-router.post("/api/token", async (req: Request, res: Response) => {
+router.post("/token", async (req: Request, res: Response) => {
   let b = new URLSearchParams({
     client_id: process.env.VITE_CLIENT_ID,
     client_secret: process.env.CLIENT_SECRET,
@@ -68,7 +68,7 @@ router.post("/api/token", async (req: Request, res: Response) => {
 });
 
 // Using a flat route in dev to match the vite server proxy config
-app.use(process.env.NODE_ENV === "production" ? "/.proxy/api" : "/", router);
+app.use("/", router);
 
 server.listen(port).then(() => {
   console.log(`App is listening on port ${port} !`);

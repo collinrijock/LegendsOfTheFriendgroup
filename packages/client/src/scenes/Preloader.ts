@@ -44,7 +44,7 @@ export class Preloader extends Scene {
 
   preload() {
     //  Load the assets for the game - Replace with your own assets
-    this.load.setPath("/.proxy/assets");
+    this.load.setPath("/assets");
     this.load.image("logo", "logo.png");
 
     // Remove loading of card data as it's now on the server
