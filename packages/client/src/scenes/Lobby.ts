@@ -3,7 +3,7 @@ import { Scene } from "phaser";
 import { colyseusRoom, globalCardDataCache, loadAllCardData } from "../utils/colyseusClient"; // Updated import
 import { getUserName } from "../utils/discordSDK";
 // Import Phase enum for type safety (adjust path if needed)
-import { Phase, PlayerState } from "../../../server/src/schemas/GameState"; // Adjust path as necessary
+import { Phase, PlayerState } from "../schemas/GameState"; // Adjust path as necessary
 // Import getStateCallbacks for 0.16 listener syntax
 import { getStateCallbacks } from "colyseus.js";
 

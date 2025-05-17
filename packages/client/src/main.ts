@@ -1,5 +1,5 @@
 // Import schema classes for priming
-import { GameState, PlayerState, CardInstanceSchema } from "../../server/src/schemas/GameState";
+import { GameState, PlayerState, CardInstanceSchema } from "./schemas/GameState";
 
 // --- Enhanced Schema Priming ---
 // This is to help bundlers like Vite/Rollup recognize these classes,
@@ -35,9 +35,6 @@ import { ScaleFlow } from "./utils/ScaleFlow";
 import { initiateDiscordSDK } from "./utils/discordSDK";
 // Import Colyseus connection function and room variable from the new file
 import { connectColyseus, colyseusRoom, colyseusClient } from "./utils/colyseusClient"; // Updated import
-
-// Import GameState schema if needed for type hints, though scenes will handle specifics
-// import { GameState } from "../../server/src/schemas/GameState"; // Adjust path - already imported above for priming
 
 import { Boot } from "./scenes/Boot";
 import { Game } from "./scenes/Game"; // Keep for now, but likely unused in main flow

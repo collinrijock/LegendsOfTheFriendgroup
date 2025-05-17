@@ -5,7 +5,7 @@ import {
   PlayerState,
   CardInstanceSchema,
   Phase,
-} from "../../../server/src/schemas/GameState"; // Adjust path
+} from "../schemas/GameState"; // Adjust path
 import { getStateCallbacks } from "colyseus.js";
 
 interface CardUIData {

@@ -6,7 +6,7 @@ import {
   Phase,
   PlayerState,
   CardInstanceSchema,
-} from "../../../server/src/schemas/GameState"; // Adjust path
+} from "../schemas/GameState"; // Adjust path
 // Reuse client interface if compatible
 // import { CardInstance } from "./Battle"; // Not strictly needed if using CardInstanceSchema
 // Import getStateCallbacks for 0.16 listener syntax

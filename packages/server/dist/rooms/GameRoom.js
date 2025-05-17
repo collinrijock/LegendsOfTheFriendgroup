@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GameRoom = void 0;
 const colyseus_1 = require("colyseus");
 // Import the updated schemas and Phase enum
-const GameState_1 = require("../schemas/GameState");
+const GameState_1 = require("../../schemas/src/GameState"); // UPDATED PATH
 // Add fs module import for reading JSON
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));

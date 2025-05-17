@@ -2,7 +2,7 @@ import { Scene } from "phaser";
 // Import global room instance
 import { colyseusRoom } from "../utils/colyseusClient"; // Updated import
 // Import schemas for type safety (adjust path)
-import { Phase, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState"; // Adjust path
+import { Phase, PlayerState, CardInstanceSchema } from "../schemas/GameState"; // Adjust path
 // Import getStateCallbacks for 0.16 listener syntax
 import { getStateCallbacks } from "colyseus.js";
 

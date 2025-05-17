@@ -2,7 +2,7 @@ import { Client, Room } from "colyseus.js";
 // Import GameState schema if needed for type hints - these might still be useful for type checking within this file.
 // If they are only for priming, they can be removed if priming is guaranteed in main.ts.
 // For safety, let's keep them for now if they are used for types.
-import { GameState, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState"; // Adjust path if needed
+import { GameState, PlayerState, CardInstanceSchema } from "../schemas/GameState"; // Adjust path if needed
 
 // --- Enhanced Schema Priming ---
 // MOVED TO main.ts
