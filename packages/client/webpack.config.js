@@ -85,7 +85,7 @@ export default (env, argv) => {
         new TerserPlugin({
           terserOptions: {
             mangle: {
-              reserved: ['GameState', 'PlayerState', 'CardInstanceSchema']
+              reserved: ['GameState', 'PlayerState', 'CardInstanceSchema', 'Schema', 'MapSchema', 'ArraySchema']
             },
             keep_classnames: true, // Preserve class names
             keep_fnames: true,     // Preserve function names
