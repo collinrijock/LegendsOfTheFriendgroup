@@ -84,10 +84,13 @@ export default (env, argv) => {
       minimizer: [
         new TerserPlugin({
           terserOptions: {
+            mangle: {
+              reserved: ['GameState', 'PlayerState', 'CardInstanceSchema']
+            },
             keep_classnames: true, // Preserve class names
             keep_fnames: true,     // Preserve function names
             compress: {
-              drop_console: isProduction, // Optionally drop console logs in production
+              drop_console: false, // Temporarily allow console logs in production for debugging
             },
             format: {
               comments: false, // Remove comments
