@@ -1,41 +1,28 @@
-import { defineConfig } from "vite";
+import { defineConfig } from 'vite';
 
-// https://vitejs.dev/config/
-export default ({ mode }) => {
-
-  const isLocalhost = process.env.NODE_ENV === 'development';
-
-  return defineConfig({
-    envDir: "../../",
-    build: {
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            phaser: ["phaser"],
-          },
-        },
-      },
+export default defineConfig({
+  build: {
+    minify: 'esbuild', // Vite 5 default for JS/TS. Can also be 'terser' or false.
+    esbuild: {
+      // This option is crucial for preventing class name mangling,
+      // which can break Colyseus schema instantiation in production.
+      keepNames: true,
     },
-    server: {
-      port: 3000,
-      proxy: {
-        "/.proxy/assets": {
-          target: "http://localhost:3000/assets",
-          changeOrigin: true,
-          ws: true,
-          rewrite: (path) => path.replace(/^\/.proxy\/assets/, ""),
-        },
-        "/.proxy/api": {
-          target: "http://localhost:4001",
-          changeOrigin: true,
-          secure: false,
-          ws: true,
-          rewrite: (path) => path.replace(/^\/.proxy\/api/, ""),
-        }
-      },
-      hmr: {
-        clientPort: isLocalhost ? 3000 : 443, 
-      },
-    },
-  });
-};
+    // If you were to use Terser instead of esbuild for minification:
+    // minify: 'terser',
+    // terserOptions: {
+    //   keep_classnames: true, // Equivalent for Terser
+    //   keep_fnames: true,     // Also good for Terser
+    // },
+  },
+  // If you have other Vite configurations (e.g., plugins for Phaser, server options),
+  // you can add them here. For example:
+  // plugins: [
+  //   // phaser({ // If using vite-plugin-phaser
+  //   //   phaserVersion: '3.80.1', // Specify your Phaser version
+  //   // })
+  // ],
+  // server: {
+  //   port: 3000, // Example development server port
+  // }
+});
