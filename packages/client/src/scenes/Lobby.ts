@@ -223,7 +223,7 @@ export class Lobby extends Scene {
 
     // Listen for players joining/leaving
     if (this.playerAddListenerUnsub) this.playerAddListenerUnsub();
-    this.playerAddListenerUnsub = $(colyseusRoom.state.players).onAdd((player, sessionId) => {
+    this.playerAddListenerUnsub = $(colyseusRoom.state.players).onAdd((player: PlayerState, sessionId: string) => {
       if (!this.scene.isActive()) return;
       console.log(`Lobby: Player joined: ${player.username} (${sessionId})`);
       this.addPlayerStateListener(player, sessionId);
@@ -231,7 +231,7 @@ export class Lobby extends Scene {
     });
 
     if (this.playerRemoveListenerUnsub) this.playerRemoveListenerUnsub();
-    this.playerRemoveListenerUnsub = $(colyseusRoom.state.players).onRemove((player, sessionId) => {
+    this.playerRemoveListenerUnsub = $(colyseusRoom.state.players).onRemove((player: PlayerState, sessionId: string) => {
       if (!this.scene.isActive()) return;
       console.log(`Lobby: Player left: ${player.username} (${sessionId})`);
       this.removePlayerStateListener(sessionId);
@@ -239,7 +239,7 @@ export class Lobby extends Scene {
     });
 
     // Add listeners for existing players
-    colyseusRoom.state.players.forEach((player, sessionId) => {
+    colyseusRoom.state.players.forEach((player: PlayerState, sessionId: string) => {
         this.addPlayerStateListener(player, sessionId);
     });
   }
@@ -322,7 +322,7 @@ export class Lobby extends Scene {
         localPlayerIsReady = localPlayer.isReady;
     }
 
-    players.forEach((player, sessionId) => {
+    players.forEach((player: PlayerState, sessionId: string) => {
         const isMe = sessionId === mySessionId;
         const readyMarker = player.isReady ? " [Ready]" : " [Not Ready]";
         const displayName = `${player.username || 'Joining...'}${isMe ? ' (You)' : ''}${readyMarker}`;

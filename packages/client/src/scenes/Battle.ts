@@ -108,7 +108,7 @@ export class Battle extends Scene {
 
     const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId);
     let opponentState: PlayerState | undefined;
-    colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== colyseusRoom?.sessionId) opponentState = p; });
+    colyseusRoom?.state.players.forEach((p: PlayerState, sid: string) => { if (sid !== colyseusRoom?.sessionId) opponentState = p; });
 
     let resultMessage = "Battle Ended";
     let resultColor = "#ffffff";
@@ -143,7 +143,7 @@ export class Battle extends Scene {
 
      const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId);
      let opponentState: PlayerState | undefined;
-     colyseusRoom?.state.players.forEach((p, sid) => { if (sid !== colyseusRoom?.sessionId) opponentState = p; });
+     colyseusRoom?.state.players.forEach((p: PlayerState, sid: string) => { if (sid !== colyseusRoom?.sessionId) opponentState = p; });
 
      let finalMessage = "Game Over!";
      let finalColor = "#ffffff";

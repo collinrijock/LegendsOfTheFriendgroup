@@ -9,6 +9,7 @@ const queryParams = new URLSearchParams(window.location.search);
 const isEmbedded = queryParams.get("frame_id") != null;
 
 let discordSdk: DiscordSDK | DiscordSDKMock;
+const clientId = process.env.VITE_CLIENT_ID;
 
 // --- Define Mock IDs using helper function ---
 // These need to be defined *before* initiateDiscordSDK uses them.
@@ -20,14 +21,14 @@ const mockChannelId = getOverrideOrRandomSessionValue("channel_id");
 const initiateDiscordSDK = async () => {
   // ... existing SDK initiation logic ...
   if (isEmbedded) {
-    const discordClientID = import.meta.env.VITE_CLIENT_ID;
+    const discordClientID = clientId;
     console.log("Discord SDK: Using embedded client ID:", discordClientID);
-    discordSdk = new DiscordSDK(discordClientID);
+    discordSdk = new DiscordSDK(discordClientID!);
     await discordSdk.ready();
   } else {
     // ... existing mock SDK logic ...
 
-    discordSdk = new DiscordSDKMock(import.meta.env.VITE_CLIENT_ID, mockGuildId, mockChannelId);
+    discordSdk = new DiscordSDKMock(clientId!, mockGuildId, mockChannelId);
     const discriminator = String(mockUserId.charCodeAt(0) % 5);
 
     // Mock authenticate needs to return the same structure as the real one
@@ -76,7 +77,7 @@ const authorizeDiscordUser = async () => {
       console.log("Running locally, attempting mock authentication...");
       try {
           // Trigger the mock authenticate command
-          await discordSdk.commands.authenticate();
+          await discordSdk.commands.authenticate({});
           // Connection happens inside the mock authenticate handler now
           return true; // Indicate success
       } catch (error) {
@@ -90,7 +91,7 @@ const authorizeDiscordUser = async () => {
   try {
       console.log("Requesting Discord authorization...");
       const { code } = await discordSdk.commands.authorize({
-        client_id: import.meta.env.VITE_CLIENT_ID,
+        client_id: clientId!,
         response_type: "code",
         state: "",
         prompt: "none",
@@ -156,7 +157,7 @@ const authorizeDiscordUser = async () => {
       // Check if it's a ProgressEvent, often related to network issues during fetch
       if (error instanceof ProgressEvent) {
           console.error("Network error (ProgressEvent) occurred, likely during fetch.");
-      } else if (error.message && error.message.includes("Token fetch failed")) {
+      } else if ((error as Error).message && (error as Error).message.includes("Token fetch failed")) {
           console.error("Error specifically during token fetch step.");
       } else if (step === "connectColyseus") {
           console.error("Error specifically during Colyseus connection step.");

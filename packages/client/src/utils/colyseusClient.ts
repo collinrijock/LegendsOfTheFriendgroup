@@ -30,10 +30,10 @@ export async function loadAllCardData(): Promise<boolean> {
       resolve(false);
     }, 5000);
 
-    colyseusRoom.send("getAllCards");
+    colyseusRoom!.send("getAllCards");
     
     // Set up one-time listener for the response
-    colyseusRoom.onMessage("allCards", (cardData: CardData[]) => {
+    colyseusRoom!.onMessage("allCards", (cardData: CardData[]) => {
       clearTimeout(timeout);
       console.log(`Received ${cardData.length} cards from server`);
       

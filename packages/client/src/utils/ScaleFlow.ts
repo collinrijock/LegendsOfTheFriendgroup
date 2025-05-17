@@ -3,9 +3,9 @@ import Phaser from "phaser";
 export class ScaleFlow {
   game: Phaser.Game;
 
-  canvas: HTMLCanvasElement;
-  parent: HTMLDivElement;
-  guide: HTMLDivElement;
+  canvas!: HTMLCanvasElement;
+  parent!: HTMLDivElement;
+  guide!: HTMLDivElement;
 
   static scaleManager: Phaser.Scale.ScaleManager;
   static cameras: Set<Phaser.Cameras.Scene2D.Camera>;

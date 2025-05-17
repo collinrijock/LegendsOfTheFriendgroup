@@ -10,16 +10,7 @@ import { getStateCallbacks } from "colyseus.js";
 const CARD_WIDTH = 120; // Was 100, updated for Full Card Sprite
 const CARD_HEIGHT = 168; // Was 140, updated for Full Card Sprite
 
-interface CardData {
-  id: string;
-  name: string;
-  attack: number;
-  speed: number;
-  health: number;
-  brewCost: number;
-  description: string;
-  isLegend: boolean;
-}
+// Removed local CardData interface, using imported one from colyseusClient
 
 export class Shop extends Scene {
   private continueButton!: Phaser.GameObjects.Text;
@@ -256,7 +247,7 @@ export class Shop extends Scene {
     );
     this.shopOffersContainer.add(this.shopOffersBackground);
 
-    shopOfferIds.forEach((cardId, index) => {
+    shopOfferIds.forEach((cardId: string, index: number) => {
       // For each card ID, we need to find the card data
       // Since we don't load card data locally anymore, we'll request it from the server
       
@@ -428,7 +419,7 @@ export class Shop extends Scene {
     if (shopOfferIds && shopOfferIds.length > 0) {
       // Get IDs for cards not in global cache
       const missingIds: string[] = [];
-      shopOfferIds.forEach(id => {
+      shopOfferIds.forEach((id: string) => { // Type 'string' inferred from shopOfferIds: ArraySchema<string>
         if (!globalCardDataCache.has(id)) {
           missingIds.push(id);
         }
@@ -453,9 +444,9 @@ export class Shop extends Scene {
     
     let cardData: CardData | undefined = undefined;
     
-    colyseusRoom.state.players.forEach(player => {
+    colyseusRoom.state.players.forEach((player: PlayerState) => {
       // Look in player's hand
-      player.hand.forEach(card => {
+      player.hand.forEach((card: CardInstanceSchema) => {
         if (card.cardId === cardId) {
           cardData = {
             id: card.cardId,
@@ -471,7 +462,7 @@ export class Shop extends Scene {
       });
       
       // Look in player's battlefield
-      player.battlefield.forEach(card => {
+      player.battlefield.forEach((card: CardInstanceSchema) => {
         if (card.cardId === cardId) {
           cardData = {
             id: card.cardId,
@@ -694,7 +685,7 @@ export class Shop extends Scene {
       }
     );
 
-    colyseusRoom.state.players.forEach((player, sessionId) => {
+    colyseusRoom.state.players.forEach((player: PlayerState, sessionId: string) => {
       const unsub = $(player).listen("isReady", () => {
         if (this.scene.isActive()) this.updateWaitingStatus();
       });
@@ -702,7 +693,7 @@ export class Shop extends Scene {
     });
 
     this.listeners.push(
-      $(colyseusRoom.state.players).onAdd((player, sessionId) => {
+      $(colyseusRoom.state.players).onAdd((player: PlayerState, sessionId: string) => {
         if (this.playerStateListenersUnsub.has(sessionId)) {
           this.playerStateListenersUnsub.get(sessionId)?.();
         }
@@ -715,7 +706,7 @@ export class Shop extends Scene {
     );
 
     this.listeners.push(
-      $(colyseusRoom.state.players).onRemove((player, sessionId) => {
+      $(colyseusRoom.state.players).onRemove((player: PlayerState, sessionId: string) => {
         this.playerStateListenersUnsub.get(sessionId)?.();
         this.playerStateListenersUnsub.delete(sessionId);
         if (this.scene.isActive()) this.updateWaitingStatus();
@@ -813,7 +804,7 @@ export class Shop extends Scene {
     if (!myPlayerState) return;
 
     let allPlayersReady = true;
-    colyseusRoom.state.players.forEach((player) => {
+    colyseusRoom.state.players.forEach((player: PlayerState) => {
       if (!player.isReady) allPlayersReady = false;
     });
 
@@ -822,8 +813,7 @@ export class Shop extends Scene {
     const canInteract = !amReady && isShopPhase;
 
     this.continueButton.setInteractive(canInteract);
-    if (this.continueButton.input)
-      this.continueButton.input.useHandCursor = canInteract;
+    // Removed incorrect line: this.continueButton.input.useHandCursor = canInteract;
     this.continueButton.setColor(canInteract ? "#00ff00" : "#888888");
 
     if (amReady && !allPlayersReady && isShopPhase) {

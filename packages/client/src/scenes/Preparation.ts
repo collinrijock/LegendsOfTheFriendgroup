@@ -260,7 +260,7 @@ export class Preparation extends Scene {
       }
     );
     // Add listeners for existing other players
-    colyseusRoom.state.players.forEach((existingPlayer, sessionId) => {
+    colyseusRoom.state.players.forEach((existingPlayer: PlayerState, sessionId: string) => {
       if (sessionId !== myPlayerId) {
         // Use proxy for existing player
         const unsub = $(existingPlayer).listen("isReady", () => {
@@ -390,7 +390,7 @@ export class Preparation extends Scene {
     if (!myPlayerState) return;
 
     let allPlayersReady = true;
-    colyseusRoom.state.players.forEach((player) => {
+    colyseusRoom.state.players.forEach((player: PlayerState) => {
       if (!player.isReady) allPlayersReady = false;
     });
 

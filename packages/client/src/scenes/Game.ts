@@ -3,7 +3,7 @@ import { Room, Client } from "colyseus.js";
 import { getUserName } from "../utils/discordSDK";
 
 export class Game extends Scene {
-  room: Room;
+  room!: Room;
 
   constructor() {
     super("Game");
@@ -23,7 +23,7 @@ export class Game extends Scene {
       image.setScale(0.8);
 
       this.input.setDraggable(image);
-      image.on("drag", (pointer, dragX, dragY) => {
+      image.on("drag", (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
         if (!this.room) {
           return;
         }
