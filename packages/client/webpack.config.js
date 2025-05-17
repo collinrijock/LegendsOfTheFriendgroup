@@ -3,7 +3,6 @@ import { fileURLToPath } from 'url';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
 import { CleanWebpackPlugin } from 'clean-webpack-plugin';
-import TerserPlugin from 'terser-webpack-plugin';
 import webpack from 'webpack';
 import dotenv from 'dotenv';
 
@@ -20,6 +19,7 @@ export default (env, argv) => {
 
   return {
     entry: './src/main.ts',
+    mode: 'development',
     output: {
       path: path.resolve(__dirname, 'dist'), // Keep using path.resolve
       filename: '[name].bundle.js', // Simpler filename pattern
@@ -80,25 +80,7 @@ export default (env, argv) => {
       // },
     },
     optimization: {
-      minimize: isProduction,
-      minimizer: [
-        new TerserPlugin({
-          terserOptions: {
-            mangle: {
-              reserved: ['GameState', 'PlayerState', 'CardInstanceSchema', 'Schema', 'MapSchema', 'ArraySchema']
-            },
-            keep_classnames: true, // Preserve class names
-            keep_fnames: true,     // Preserve function names
-            compress: {
-              drop_console: false, // Temporarily allow console logs in production for debugging
-            },
-            format: {
-              comments: false, // Remove comments
-            },
-          },
-          extractComments: false,
-        }),
-      ],
+      minimize: false
     },
   };
 };
