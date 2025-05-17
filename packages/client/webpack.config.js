@@ -21,9 +21,11 @@ export default (env, argv) => {
   return {
     entry: './src/main.ts',
     output: {
-      filename: 'bundle.[contenthash].js',
-      path: path.resolve(__dirname, 'dist'),
-      publicPath: '/', // Important for dev server and routing
+      path: path.resolve(__dirname, 'dist'), // Keep using path.resolve
+      filename: path.join('[name]', 'index.js'), // As per user's example structure
+      library: "LOTFClient", // Using a specific name for the library
+      libraryTarget: "umd", // As per user's suggestion
+      publicPath: '/', // Keep this for SPA routing and dev server
     },
     devtool: isProduction ? false : 'eval-source-map',
     module: {
