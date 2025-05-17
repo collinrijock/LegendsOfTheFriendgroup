@@ -20,14 +20,23 @@ const mockChannelId = getOverrideOrRandomSessionValue("channel_id");
 const initiateDiscordSDK = async () => {
   // ... existing SDK initiation logic ...
   if (isEmbedded) {
-    const discordClientID = import.meta.env.VITE_CLIENT_ID;
+    const discordClientID = process.env.CLIENT_ID; // MODIFIED
     console.log("Discord SDK: Using embedded client ID:", discordClientID);
+    if (!discordClientID) {
+      console.error("CLIENT_ID is not defined. Check your .env file and Webpack configuration.");
+      alert("Configuration error: CLIENT_ID is missing.");
+      return;
+    }
     discordSdk = new DiscordSDK(discordClientID);
     await discordSdk.ready();
   } else {
     // ... existing mock SDK logic ...
-
-    discordSdk = new DiscordSDKMock(import.meta.env.VITE_CLIENT_ID, mockGuildId, mockChannelId);
+    const discordClientID = process.env.CLIENT_ID; // MODIFIED
+    if (!discordClientID) {
+      console.error("CLIENT_ID is not defined for mock SDK. Check your .env file and Webpack configuration.");
+      // You might want to fallback to a default mock ID or handle this error
+    }
+    discordSdk = new DiscordSDKMock(discordClientID || "mock_client_id", mockGuildId, mockChannelId); // MODIFIED (added fallback for mock)
     const discriminator = String(mockUserId.charCodeAt(0) % 5);
 
     // Mock authenticate needs to return the same structure as the real one
@@ -89,8 +98,14 @@ const authorizeDiscordUser = async () => {
   let step = "authorize"; // Track the current step
   try {
       console.log("Requesting Discord authorization...");
+      const clientIdFromEnv = process.env.CLIENT_ID; // MODIFIED
+      if (!clientIdFromEnv) {
+        console.error("CLIENT_ID is not defined for authorization. Check your .env file and Webpack configuration.");
+        alert("Configuration error: CLIENT_ID is missing for authorization.");
+        return false;
+      }
       const { code } = await discordSdk.commands.authorize({
-        client_id: import.meta.env.VITE_CLIENT_ID,
+        client_id: clientIdFromEnv, // MODIFIED
         response_type: "code",
         state: "",
         prompt: "none",
