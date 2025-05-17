@@ -12,6 +12,7 @@ export default ({ mode }) => {
         output: {
           manualChunks: {
             phaser: ["phaser"],
+            colyseus: ["colyseus.js"],
           },
         },
       },
