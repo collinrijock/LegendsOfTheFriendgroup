@@ -1,6 +1,23 @@
 import { Client, Room } from "colyseus.js";
 // Import GameState schema if needed for type hints
-// import { GameState } from "../../../server/src/schemas/GameState"; // Adjust path if needed
+import { GameState, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState"; // Adjust path if needed
+
+// --- Schema Priming ---
+// This is to help bundlers like Vite/Rollup recognize these classes,
+// potentially preventing issues with minification/tree-shaking where
+// class constructors might not be correctly identified by Colyseus client.
+// We create a simple array holding the constructors to ensure they are
+// acknowledged by the bundler.
+const _schemaTypesForBundler = [GameState, PlayerState, CardInstanceSchema];
+// Optional: log to console for debugging, ensuring this code runs and types are defined.
+if (typeof window !== 'undefined' && (window as any).__SCHEMA_TYPES_PRIMED === undefined) {
+  (window as any).__SCHEMA_TYPES_PRIMED = true; // Mark as primed to avoid re-logging on HMR
+  console.log(
+    "Schema classes primed for bundler awareness:",
+    _schemaTypesForBundler.map(s => s?.name || "undefined_schema")
+  );
+}
+// --- End Schema Priming ---
 
 // --- Global Colyseus Room Variable ---
 export let colyseusRoom: Room | null = null;
