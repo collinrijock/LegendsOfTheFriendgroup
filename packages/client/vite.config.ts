@@ -2,27 +2,36 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   build: {
-    minify: 'esbuild', // Vite 5 default for JS/TS. Can also be 'terser' or false.
+    minify: 'esbuild', // Use esbuild for minification (Vite 5 default)
     esbuild: {
-      // This option is crucial for preventing class name mangling,
-      // which can break Colyseus schema instantiation in production.
-      keepNames: true,
+      keepNames: true, // CRITICAL for Colyseus schema class names
+      // You might want to uncomment the line below to remove console logs from production builds
+      // drop: ['console', 'debugger'],
     },
-    // If you were to use Terser instead of esbuild for minification:
-    // minify: 'terser',
-    // terserOptions: {
-    //   keep_classnames: true, // Equivalent for Terser
-    //   keep_fnames: true,     // Also good for Terser
+    sourcemap: false, // Disable sourcemaps for production for smaller bundles
+    commonjsOptions: {
+      // Vite's default CommonJS handling is usually good.
+      // If you encounter issues with CJS dependencies of colyseus.js, you might need:
+      // transformMixedEsModules: true,
+      // include: [/node_modules/], // Or more specific paths
+    },
+    // rollupOptions: { // Advanced customization if needed
+    //   output: {
+    //     manualChunks: {
+    //       phaser: ['phaser'],
+    //       colyseus: ['colyseus.js'],
+    //     },
+    //   },
     // },
   },
-  // If you have other Vite configurations (e.g., plugins for Phaser, server options),
-  // you can add them here. For example:
-  // plugins: [
-  //   // phaser({ // If using vite-plugin-phaser
-  //   //   phaserVersion: '3.80.1', // Specify your Phaser version
-  //   // })
-  // ],
-  // server: {
-  //   port: 3000, // Example development server port
+  optimizeDeps: {
+    include: [
+      'colyseus.js', // Ensures colyseus.js is correctly processed and pre-bundled by Vite
+      // '@colyseus/schema', // Usually a sub-dependency of colyseus.js, but can be added if specific issues arise
+    ],
+    // disabled: false, // Default is false (enabled), which is generally what you want for optimizeDeps.
+  },
+  // server: { // Development server specific options
+  //   port: 3000, // Example: Set a custom dev server port
   // }
 });

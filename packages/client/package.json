@@ -12,9 +12,8 @@
     "vite": "^5.0.8"
   },
   "dependencies": {
-    "@discord/embedded-app-sdk": "^1.4.3",
-    "colyseus": "^0.16.4",
+    "@discord/embedded-app-sdk": "^2.0.0",
     "colyseus.js": "^0.16.0",
-    "phaser": "^3.87.0"
+    "phaser": "^3.88.2"
   }
 }
