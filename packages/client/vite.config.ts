@@ -2,20 +2,12 @@ import { defineConfig } from "vite";
 
 // https://vitejs.dev/config/
 export default ({ mode }) => {
-
-  const isLocalhost = process.env.NODE_ENV === 'development';
+  const isLocalhost = process.env.NODE_ENV === "development";
 
   return defineConfig({
     envDir: "../../",
     build: {
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            phaser: ["phaser"],
-            colyseus: ["colyseus.js"],
-          },
-        },
-      },
+      minify: false,
     },
     server: {
       port: 3000,
@@ -32,10 +24,10 @@ export default ({ mode }) => {
           secure: false,
           ws: true,
           rewrite: (path) => path.replace(/^\/.proxy\/api/, ""),
-        }
+        },
       },
       hmr: {
-        clientPort: isLocalhost ? 3000 : 443, 
+        clientPort: isLocalhost ? 3000 : 443,
       },
     },
   });
