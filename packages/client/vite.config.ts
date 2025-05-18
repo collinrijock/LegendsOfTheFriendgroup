@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["@colyseus/schema"],
   },
   build: {
-    minify: 'terser',
+    minify: false, // Changed from 'terser' to false for diagnostics
     sourcemap: true,
     terserOptions: {
       mangle: false ,
