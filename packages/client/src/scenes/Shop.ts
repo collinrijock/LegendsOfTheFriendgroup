@@ -2,9 +2,9 @@ import { Scene } from "phaser";
 import { colyseusRoom, globalCardDataCache, CardData } from "../utils/colyseusClient";
 import {
   Phase,
-  PlayerState,
-  CardInstanceSchema,
-} from "../../../server/src/schemas/GameState";
+  ClientPlayerState,
+  ClientCardInstance,
+} from "../schemas/ClientSchemas";
 import { getStateCallbacks } from "colyseus.js";
 
 const CARD_WIDTH = 120; // Was 100, updated for Full Card Sprite
@@ -441,12 +441,12 @@ export class Shop extends Scene {
     
     // If not in global cache, check existing instances in the state
     if (!colyseusRoom || !colyseusRoom.state) return undefined;
-    
+
     let cardData: CardData | undefined = undefined;
-    
-    colyseusRoom.state.players.forEach((player: PlayerState) => {
+
+    colyseusRoom.state.players.forEach((player: any) => { // Cast to any or use ClientPlayerState
       // Look in player's hand
-      player.hand.forEach((card: CardInstanceSchema) => {
+      (player as ClientPlayerState).hand.forEach((card: ClientCardInstance) => {
         if (card.cardId === cardId) {
           cardData = {
             id: card.cardId,
@@ -462,7 +462,7 @@ export class Shop extends Scene {
       });
       
       // Look in player's battlefield
-      player.battlefield.forEach((card: CardInstanceSchema) => {
+      (player as ClientPlayerState).battlefield.forEach((card: ClientCardInstance) => {
         if (card.cardId === cardId) {
           cardData = {
             id: card.cardId,
@@ -685,19 +685,19 @@ export class Shop extends Scene {
       }
     );
 
-    colyseusRoom.state.players.forEach((player: PlayerState, sessionId: string) => {
-      const unsub = $(player).listen("isReady", () => {
+    colyseusRoom.state.players.forEach((player: any, sessionId: string) => { // Cast to any or use ClientPlayerState
+      const unsub = $(player as ClientPlayerState).listen("isReady", () => {
         if (this.scene.isActive()) this.updateWaitingStatus();
       });
       this.playerStateListenersUnsub.set(sessionId, unsub);
     });
 
     this.listeners.push(
-      $(colyseusRoom.state.players).onAdd((player: PlayerState, sessionId: string) => {
+      $(colyseusRoom.state.players).onAdd((player: any, sessionId: string) => { // Cast to any or use ClientPlayerState
         if (this.playerStateListenersUnsub.has(sessionId)) {
           this.playerStateListenersUnsub.get(sessionId)?.();
         }
-        const unsub = $(player).listen("isReady", () => {
+        const unsub = $(player as ClientPlayerState).listen("isReady", () => {
           if (this.scene.isActive()) this.updateWaitingStatus();
         });
         this.playerStateListenersUnsub.set(sessionId, unsub);
@@ -706,7 +706,7 @@ export class Shop extends Scene {
     );
 
     this.listeners.push(
-      $(colyseusRoom.state.players).onRemove((player: PlayerState, sessionId: string) => {
+      $(colyseusRoom.state.players).onRemove((player: any, sessionId: string) => {
         this.playerStateListenersUnsub.get(sessionId)?.();
         this.playerStateListenersUnsub.delete(sessionId);
         if (this.scene.isActive()) this.updateWaitingStatus();
@@ -804,8 +804,8 @@ export class Shop extends Scene {
     if (!myPlayerState) return;
 
     let allPlayersReady = true;
-    colyseusRoom.state.players.forEach((player: PlayerState) => {
-      if (!player.isReady) allPlayersReady = false;
+    colyseusRoom.state.players.forEach((player: any) => { // Cast to any or use ClientPlayerState
+      if (!(player as ClientPlayerState).isReady) allPlayersReady = false;
     });
 
     const amReady = myPlayerState.isReady;

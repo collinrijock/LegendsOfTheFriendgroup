@@ -1,8 +1,8 @@
 import { Scene } from "phaser";
 // Import global room instance
 import { colyseusRoom } from "../utils/colyseusClient"; // Updated import
-// Import schemas for type safety (adjust path)
-import { Phase, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState"; // Adjust path
+// Import client-side schemas for type safety
+import { Phase, ClientPlayerState, ClientCardInstance } from "../schemas/ClientSchemas";
 // Import getStateCallbacks for 0.16 listener syntax
 import { getStateCallbacks } from "colyseus.js";
 
@@ -106,9 +106,9 @@ export class Battle extends Scene {
     this.battleOver = true;
     console.log("Battle ended (server signal received). Displaying results.");
 
-    const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId);
-    let opponentState: PlayerState | undefined;
-    colyseusRoom?.state.players.forEach((p: PlayerState, sid: string) => { if (sid !== colyseusRoom?.sessionId) opponentState = p; });
+    const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+    let opponentState: ClientPlayerState | undefined;
+    colyseusRoom?.state.players.forEach((p: any, sid: string) => { if (sid !== colyseusRoom?.sessionId) opponentState = p as ClientPlayerState; });
 
     let resultMessage = "Battle Ended";
     let resultColor = "#ffffff";
@@ -141,9 +141,9 @@ export class Battle extends Scene {
      this.battleOver = true;
      console.log("Game Over signal received.");
 
-     const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId);
-     let opponentState: PlayerState | undefined;
-     colyseusRoom?.state.players.forEach((p: PlayerState, sid: string) => { if (sid !== colyseusRoom?.sessionId) opponentState = p; });
+     const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+     let opponentState: ClientPlayerState | undefined;
+     colyseusRoom?.state.players.forEach((p: any, sid: string) => { if (sid !== colyseusRoom?.sessionId) opponentState = p as ClientPlayerState; });
 
      let finalMessage = "Game Over!";
      let finalColor = "#ffffff";

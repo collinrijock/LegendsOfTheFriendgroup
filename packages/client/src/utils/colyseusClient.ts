@@ -1,10 +1,6 @@
 import { Client } from "colyseus.js";
 import { Room } from "colyseus.js";
 
-// Import GameState schema if needed for type hints
-// import { GameState } from "../../../server/src/schemas/GameState"; // Adjust path if needed
-
-// --- Global Colyseus Room Variable ---
 export let colyseusRoom: Room | null = null;
 export let colyseusClient: Client | null = null;
 

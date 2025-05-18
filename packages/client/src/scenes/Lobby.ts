@@ -1,24 +1,19 @@
 import { Scene } from "phaser";
-// Import global room instance and username function
-import { colyseusRoom, globalCardDataCache, loadAllCardData } from "../utils/colyseusClient"; // Updated import
-import { getUserName } from "../utils/discordSDK";
-// Import Phase enum for type safety (adjust path if needed)
-import { Phase, PlayerState } from "../../../server/src/schemas/GameState"; // Adjust path as necessary
-// Import getStateCallbacks for 0.16 listener syntax
+import { colyseusRoom, globalCardDataCache, loadAllCardData } from "../utils/colyseusClient"; 
+import { Phase, ClientPlayerState } from "../schemas/ClientSchemas";
 import { getStateCallbacks } from "colyseus.js";
 
 export class Lobby extends Scene {
-  private playerTextObjects: Map<string, Phaser.GameObjects.Text> = new Map(); // Map sessionId to Text object
+  private playerTextObjects: Map<string, Phaser.GameObjects.Text> = new Map();
   private statusText!: Phaser.GameObjects.Text;
   private readyButton!: Phaser.GameObjects.Text;
   private waitingText!: Phaser.GameObjects.Text;
 
-  // Listener tracking
   private phaseListenerUnsub: (() => void) | null = null;
   private playerAddListenerUnsub: (() => void) | null = null;
   private playerRemoveListenerUnsub: (() => void) | null = null;
-  private playerStateListeners: Map<string, () => void> = new Map(); // Track individual player 'isReady' listeners
-  private listenersAttached: boolean = false; // Flag to ensure main listeners are attached once
+  private playerStateListeners: Map<string, () => void> = new Map();
+  private listenersAttached: boolean = false;
 
   constructor() {
     super("Lobby");
@@ -28,7 +23,6 @@ export class Lobby extends Scene {
     this.scene.launch("background");
     this.listenersAttached = false; // Reset flag on scene creation
 
-    // Check if connected
     if (!colyseusRoom || !colyseusRoom.sessionId) { // Added sessionId check
       console.error("Lobby Scene: Not connected to Colyseus room or no session ID!");
       this.add
@@ -223,7 +217,7 @@ export class Lobby extends Scene {
 
     // Listen for players joining/leaving
     if (this.playerAddListenerUnsub) this.playerAddListenerUnsub();
-    this.playerAddListenerUnsub = $(colyseusRoom.state.players).onAdd((player: PlayerState, sessionId: string) => {
+    this.playerAddListenerUnsub = $(colyseusRoom.state.players).onAdd((player: ClientPlayerState, sessionId: string) => {
       if (!this.scene.isActive()) return;
       console.log(`Lobby: Player joined: ${player.username} (${sessionId})`);
       this.addPlayerStateListener(player, sessionId);
@@ -231,7 +225,7 @@ export class Lobby extends Scene {
     });
 
     if (this.playerRemoveListenerUnsub) this.playerRemoveListenerUnsub();
-    this.playerRemoveListenerUnsub = $(colyseusRoom.state.players).onRemove((player: PlayerState, sessionId: string) => {
+    this.playerRemoveListenerUnsub = $(colyseusRoom.state.players).onRemove((player: ClientPlayerState, sessionId: string) => {
       if (!this.scene.isActive()) return;
       console.log(`Lobby: Player left: ${player.username} (${sessionId})`);
       this.removePlayerStateListener(sessionId);
@@ -239,12 +233,12 @@ export class Lobby extends Scene {
     });
 
     // Add listeners for existing players
-    colyseusRoom.state.players.forEach((player: PlayerState, sessionId: string) => {
+    colyseusRoom.state.players.forEach((player: ClientPlayerState, sessionId: string) => {
         this.addPlayerStateListener(player, sessionId);
     });
   }
 
-  addPlayerStateListener(player: PlayerState, sessionId: string) {
+  addPlayerStateListener(player: ClientPlayerState, sessionId: string) {
     if (!colyseusRoom) return;
     const $ = getStateCallbacks(colyseusRoom);
 
@@ -315,12 +309,12 @@ export class Lobby extends Scene {
     let playerIndex = 0;
     let allPlayersReady = playerCount > 0; // Assume ready if players exist, check below
     let localPlayerIsReady = false;
-    const localPlayer = players.get(mySessionId);
+    const localPlayer = players.get(mySessionId) as ClientPlayerState | undefined;
     if (localPlayer) {
         localPlayerIsReady = localPlayer.isReady;
     }
 
-    players.forEach((player: PlayerState, sessionId: string) => {
+    players.forEach((player: ClientPlayerState, sessionId: string) => {
         const isMe = sessionId === mySessionId;
         const readyMarker = player.isReady ? " [Ready]" : " [Not Ready]";
         const displayName = `${player.username || 'Joining...'}${isMe ? ' (You)' : ''}${readyMarker}`;

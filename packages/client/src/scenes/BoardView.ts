@@ -5,25 +5,26 @@ import {
   CardData,
 } from "../utils/colyseusClient";
 import {
-  GameState,
-  PlayerState,
-  CardInstanceSchema,
+  ClientGameState, // Use ClientGameState if needed for full state typing
+  ClientPlayerState,
+  ClientCardInstance,
   Phase,
-} from "../../../server/src/schemas/GameState"; // Adjust path
+} from "../schemas/ClientSchemas"; // Adjust path
 import { getStateCallbacks } from "colyseus.js";
 
-interface CardUIData {
-  id: string;
-  name: string;
-  attack: number;
-  speed: number;
-  health: number;
-  brewCost: number;
-  description: string;
-  isLegend: boolean;
-  currentHp?: number;
-  instanceId?: string;
-}
+// Remove CardUIData as ClientCardInstance can be used
+// interface CardUIData {
+//   id: string;
+//   name: string;
+//   attack: number;
+//   speed: number;
+//   health: number;
+//   brewCost: number;
+//   description: string;
+//   isLegend: boolean;
+//   currentHp?: number;
+//   instanceId?: string;
+// }
 
 const MINION_CARD_WIDTH = 100;
 const MINION_CARD_HEIGHT = 140;
@@ -334,7 +335,7 @@ export class BoardView extends Scene {
 
         const processCardVisualsPostBattle = (
           cardContainer: Phaser.GameObjects.Container,
-          cardSchema: CardInstanceSchema | undefined,
+          cardSchema: any | undefined,
           ownerSessionId: string,
           slotKey: string
         ) => {
@@ -418,7 +419,7 @@ export class BoardView extends Scene {
           playerData.battlefield.forEach((cardContainer, slotKey) => {
             const cardSchema = colyseusRoom?.state.players
               .get(playerId)
-              ?.battlefield.get(slotKey);
+              ?.battlefield.get(slotKey) as ClientCardInstance | undefined; // Use ClientCardInstance
             processCardVisualsPostBattle(
               cardContainer,
               cardSchema,
@@ -430,7 +431,7 @@ export class BoardView extends Scene {
           playerData.hand.forEach((cardContainer, slotKey) => {
             const cardSchema = colyseusRoom?.state.players
               .get(playerId)
-              ?.hand.get(slotKey);
+              ?.hand.get(slotKey) as ClientCardInstance | undefined; // Use ClientCardInstance
             // Process hand cards if they need any visual reset (e.g. if they could be 'dead' visually)
             if (oldPhase === Phase.Battle || oldPhase === Phase.BattleEnd) {
               if (newPhase !== Phase.Battle && newPhase !== Phase.BattleEnd) {
@@ -457,7 +458,7 @@ export class BoardView extends Scene {
 
     this.listeners.push(
       $(colyseusRoom.state.players).onAdd(
-        (player: PlayerState, sessionId: string) => {
+        (player: ClientPlayerState, sessionId: string) => {
           console.log(`BoardView: Player added ${sessionId}`);
           this.addPlayerVisuals(sessionId);
           this.addPlayerListeners(player, sessionId);
@@ -469,7 +470,7 @@ export class BoardView extends Scene {
 
     this.listeners.push(
       $(colyseusRoom.state.players).onRemove(
-        (player: PlayerState, sessionId: string) => {
+        (player: ClientPlayerState, sessionId: string) => {
           console.log(`BoardView: Player removed ${sessionId}`);
           this.removePlayerVisuals(sessionId);
           this.updateNavbarText(); // Update opponent name if they left
@@ -549,7 +550,7 @@ export class BoardView extends Scene {
             ) {
               const targetPlayer = colyseusRoom!.state.players.get(
                 message.targetPlayerId
-              );
+              ) as ClientPlayerState | undefined;
               const cardSchema =
                 targetPlayer?.battlefield.get(targetCardSlotKey);
 
@@ -588,7 +589,7 @@ export class BoardView extends Scene {
     );
 
     colyseusRoom.state.players.forEach(
-      (player: PlayerState, sessionId: string) => {
+      (player: ClientPlayerState, sessionId: string) => {
         this.addPlayerVisuals(sessionId);
         this.addPlayerListeners(player, sessionId);
         this.updatePlayerSlots(player, sessionId); // Initial population
@@ -642,7 +643,7 @@ export class BoardView extends Scene {
     });
   }
 
-  private addPlayerListeners(player: PlayerState, sessionId: string) {
+  private addPlayerListeners(player: ClientPlayerState, sessionId: string) {
     const $ = getStateCallbacks(colyseusRoom!);
     const playerListeners: Array<() => void> = []; // Listeners specific to this player instance/schema
 
@@ -660,7 +661,7 @@ export class BoardView extends Scene {
     playerListeners.push(
       // @ts-ignore
       $(player.hand).onAdd(
-        (cardSchema: CardInstanceSchema, slotKey: string) => {
+        (cardSchema: ClientCardInstance, slotKey: string) => {
           this.updateCardVisual(sessionId, "hand", slotKey, cardSchema);
           this.addCardSchemaListeners(cardSchema);
         }
@@ -669,7 +670,7 @@ export class BoardView extends Scene {
     playerListeners.push(
       // @ts-ignore
       $(player.hand).onRemove(
-        (cardSchema: CardInstanceSchema, slotKey: string) => {
+        (cardSchema: ClientCardInstance, slotKey: string) => {
           // removeCardVisual will handle cleaning up cardSchemaListeners for this card
           this.removeCardVisual(sessionId, "hand", slotKey);
         }
@@ -687,7 +688,7 @@ export class BoardView extends Scene {
     playerListeners.push(
       // @ts-ignore
       $(player.battlefield).onAdd(
-        (cardSchema: CardInstanceSchema, slotKey: string) => {
+        (cardSchema: ClientCardInstance, slotKey: string) => {
           this.updateCardVisual(sessionId, "battlefield", slotKey, cardSchema);
           this.addCardSchemaListeners(cardSchema);
         }
@@ -696,7 +697,7 @@ export class BoardView extends Scene {
     playerListeners.push(
       // @ts-ignore
       $(player.battlefield).onRemove(
-        (cardSchema: CardInstanceSchema, slotKey: string) => {
+        (cardSchema: ClientCardInstance, slotKey: string) => {
           this.removeCardVisual(sessionId, "battlefield", slotKey);
         }
       )
@@ -709,7 +710,7 @@ export class BoardView extends Scene {
     this.listeners.push(...playerListeners);
   }
 
-  private addCardSchemaListeners(cardSchema: CardInstanceSchema) {
+  private addCardSchemaListeners(cardSchema: ClientCardInstance) {
     if (!cardSchema || !cardSchema.instanceId) return;
     const $ = getStateCallbacks(colyseusRoom!);
 
@@ -740,7 +741,7 @@ export class BoardView extends Scene {
     }
   }
 
-  private updatePlayerSlots(player: PlayerState, sessionId: string) {
+  private updatePlayerSlots(player: ClientPlayerState, sessionId: string) {
     player.hand.forEach((card, slotKey) =>
       this.updateCardVisual(sessionId, "hand", slotKey, card)
     );
@@ -799,7 +800,7 @@ export class BoardView extends Scene {
     sessionId: string,
     area: "hand" | "battlefield",
     slotKey: string,
-    cardSchema: CardInstanceSchema
+    cardSchema: ClientCardInstance
   ) {
     if (!this.scene.isActive()) {
       // Don't update visuals if scene isn't active
@@ -933,7 +934,7 @@ export class BoardView extends Scene {
   }
 
   private createCardGameObject(
-    cardSchema: CardInstanceSchema,
+    cardSchema: ClientCardInstance,
     x: number,
     y: number,
     isObscured: boolean,
@@ -1303,8 +1304,8 @@ export class BoardView extends Scene {
         // Get card information from the server state to calculate value
         const myPlayer = colyseusRoom?.state.players.get(
           colyseusRoom?.sessionId
-        );
-        let cardSchema: CardInstanceSchema | undefined;
+        ) as ClientPlayerState | undefined;
+        let cardSchema: ClientCardInstance | undefined;
 
         // Find the card schema based on area and slotKey
         if (originalArea === "hand" && myPlayer?.hand.has(originalSlotKey)) {
@@ -1332,125 +1333,28 @@ export class BoardView extends Scene {
 
           return; // Exit the handler after selling
         }
-      }
+        const ownerId = cardContainer.getData("ownerSessionId") as string;
 
-      let dropped = false;
-      let newAreaForServer: "hand" | "battlefield" | undefined;
-      let newSlotKeyForServer: string | undefined;
+        const player = colyseusRoom?.state.players.get(ownerId) as
+          | ClientPlayerState
+          | undefined;
 
-      // Check drop on local player's hand slots
-      for (let i = 0; i < 5; i++) {
-        const targetSlotKey = String(i);
-        const slotPos = this.getSlotPixelPosition(true, "hand", i); // true for local player
-        if (slotPos) {
-          const dropZone = new Phaser.Geom.Rectangle(
-            slotPos.x - FULL_CARD_WIDTH / 2,
-            slotPos.y - FULL_CARD_HEIGHT / 2,
-            FULL_CARD_WIDTH,
-            FULL_CARD_HEIGHT
-          );
-          if (
-            Phaser.Geom.Rectangle.Contains(
-              dropZone,
-              cardContainer.x,
-              cardContainer.y
-            )
-          ) {
-            if (
-              this.isSlotEmpty(
-                ownerSessionId,
-                "hand",
-                targetSlotKey,
-                instanceId
-              )
-            ) {
-              // MODIFICATION START: Check if drop to hand is allowed
-              let canDropInHandSlot = false;
-              if (this.currentPhase === Phase.Shop) {
-                // In Shop phase, cards can be moved within the hand.
-                if (originalArea === "hand") {
-                  canDropInHandSlot = true;
-                }
-              } else if (this.currentPhase === Phase.Preparation) {
-                // In Preparation phase, only cards originating from the hand can be dropped into a hand slot.
-                if (originalArea === "hand") {
-                  canDropInHandSlot = true;
-                }
-              }
-              // MODIFICATION END
-
-              if (canDropInHandSlot) {
-                // Use the new condition
-                cardContainer.x = slotPos.x;
-                cardContainer.y = slotPos.y;
-
-                // Change area attribute
-                const areaChanged = originalArea !== "hand";
-                cardContainer.setData("area", "hand");
-                cardContainer.setData("slotKey", targetSlotKey);
-
-                this.updateVisualMaps(
-                  ownerSessionId,
-                  originalArea,
-                  originalSlotKey,
-                  "hand",
-                  targetSlotKey,
-                  cardContainer
-                );
-
-                if (areaChanged) {
-                  const myPlayer =
-                    colyseusRoom?.state.players.get(ownerSessionId);
-                  // Try to find the schema from its new potential location first, then original
-                  let cardSchema: CardInstanceSchema | undefined;
-                  if (myPlayer) {
-                    cardSchema = myPlayer.hand.get(targetSlotKey);
-                    if (!cardSchema) {
-                      if (originalArea === "battlefield") {
-                        cardSchema = myPlayer.battlefield.get(originalSlotKey);
-                      } else {
-                        // originalArea must be 'hand' if not 'battlefield'
-                        cardSchema = myPlayer.hand.get(originalSlotKey);
-                      }
-                    }
-                  }
-
-                  if (cardSchema && cardSchema.instanceId === instanceId) {
-                    this.updateCardVisual(
-                      ownerSessionId,
-                      "hand",
-                      targetSlotKey,
-                      cardSchema
-                    );
-                  }
-                }
-
-                dropped = true;
-                newAreaForServer = "hand";
-                newSlotKeyForServer = targetSlotKey;
-
-                if (
-                  this.currentPhase === Phase.Shop &&
-                  (originalArea !== "hand" || originalSlotKey !== targetSlotKey)
-                ) {
-                  colyseusRoom?.send("moveCardInHand", {
-                    instanceId,
-                    fromSlotKey: originalSlotKey,
-                    toSlotKey: targetSlotKey,
-                  });
-                }
-              }
-            }
-            if (dropped) break; // Break if successfully dropped in any hand slot
+        if (player) {
+          if (originalArea === "hand") {
+            cardSchema = player.hand.get(originalSlotKey);
+          } else {
+            cardSchema = player.battlefield.get(originalSlotKey);
           }
         }
-      }
 
-      // Check drop on local player's battlefield slots (only if in Preparation phase)
-      if (!dropped && this.currentPhase === Phase.Preparation) {
+        let dropped = false;
+        let newAreaForServer: "hand" | "battlefield" | undefined;
+        let newSlotKeyForServer: string | undefined;
+
+        // Check drop on local player's hand slots
         for (let i = 0; i < 5; i++) {
           const targetSlotKey = String(i);
-          const slotPos = this.getSlotPixelPosition(true, "battlefield", i); // true for local player
+          const slotPos = this.getSlotPixelPosition(true, "hand", i); // true for local player
           if (slotPos) {
             const dropZone = new Phaser.Geom.Rectangle(
               slotPos.x - FULL_CARD_WIDTH / 2,
@@ -1468,96 +1372,208 @@ export class BoardView extends Scene {
               if (
                 this.isSlotEmpty(
                   ownerSessionId,
-                  "battlefield",
+                  "hand",
                   targetSlotKey,
                   instanceId
                 )
               ) {
-                // Valid drop on battlefield
-                cardContainer.x = slotPos.x;
-                cardContainer.y = slotPos.y;
-
-                // Change area attribute
-                const areaChanged = originalArea !== "battlefield";
-                cardContainer.setData("area", "battlefield");
-                cardContainer.setData("slotKey", targetSlotKey);
-
-                this.updateVisualMaps(
-                  ownerSessionId,
-                  originalArea,
-                  originalSlotKey,
-                  "battlefield",
-                  targetSlotKey,
-                  cardContainer
-                );
-
-                // If area has changed, recreate the card visual to update appearance
-                if (areaChanged) {
-                  // Get the card data from the server state
-                  const myPlayer =
-                    colyseusRoom?.state.players.get(ownerSessionId);
-                  const cardSchema =
-                    myPlayer?.battlefield.get(targetSlotKey) ||
-                    myPlayer?.hand.get(originalSlotKey);
-
-                  if (cardSchema && cardSchema.instanceId === instanceId) {
-                    // Recreate the card with the correct appearance for its new area
-                    this.updateCardVisual(
-                      ownerSessionId,
-                      "battlefield",
-                      targetSlotKey,
-                      cardSchema
-                    );
+                // MODIFICATION START: Check if drop to hand is allowed
+                let canDropInHandSlot = false;
+                if (this.currentPhase === Phase.Shop) {
+                  // In Shop phase, cards can be moved within the hand.
+                  if (originalArea === "hand") {
+                    canDropInHandSlot = true;
+                  }
+                } else if (this.currentPhase === Phase.Preparation) {
+                  // In Preparation phase, only cards originating from the hand can be dropped into a hand slot.
+                  if (originalArea === "hand") {
+                    canDropInHandSlot = true;
                   }
                 }
+                // MODIFICATION END
 
-                dropped = true;
-                newAreaForServer = "battlefield";
-                newSlotKeyForServer = targetSlotKey;
-                // Preparation.ts will read the final layout for its own send, this is for real-time sync
+                if (canDropInHandSlot) {
+                  // Use the new condition
+                  cardContainer.x = slotPos.x;
+                  cardContainer.y = slotPos.y;
+
+                  // Change area attribute
+                  const areaChanged = originalArea !== "hand";
+                  cardContainer.setData("area", "hand");
+                  cardContainer.setData("slotKey", targetSlotKey);
+
+                  this.updateVisualMaps(
+                    ownerSessionId,
+                    originalArea,
+                    originalSlotKey,
+                    "hand",
+                    targetSlotKey,
+                    cardContainer
+                  );
+
+                  if (areaChanged) {
+                    const myPlayer =
+                      colyseusRoom?.state.players.get(ownerSessionId);
+                    // Try to find the schema from its new potential location first, then original
+                    let cardSchema: CardInstanceSchema | undefined;
+                    if (myPlayer) {
+                      cardSchema = myPlayer.hand.get(targetSlotKey);
+                      if (!cardSchema) {
+                        if (originalArea === "battlefield") {
+                          cardSchema =
+                            myPlayer.battlefield.get(originalSlotKey);
+                        } else {
+                          // originalArea must be 'hand' if not 'battlefield'
+                          cardSchema = myPlayer.hand.get(originalSlotKey);
+                        }
+                      }
+                    }
+
+                    if (cardSchema && cardSchema.instanceId === instanceId) {
+                      this.updateCardVisual(
+                        ownerSessionId,
+                        "hand",
+                        targetSlotKey,
+                        cardSchema
+                      );
+                    }
+                  }
+
+                  dropped = true;
+                  newAreaForServer = "hand";
+                  newSlotKeyForServer = targetSlotKey;
+
+                  if (
+                    this.currentPhase === Phase.Shop &&
+                    (originalArea !== "hand" ||
+                      originalSlotKey !== targetSlotKey)
+                  ) {
+                    colyseusRoom?.send("moveCardInHand", {
+                      instanceId,
+                      fromSlotKey: originalSlotKey,
+                      toSlotKey: targetSlotKey,
+                    });
+                  }
+                }
               }
-              break;
+              if (dropped) break; // Break if successfully dropped in any hand slot
             }
           }
         }
-      }
 
-      if (!dropped) {
-        cardContainer.x = cardContainer.getData("originalX");
-        cardContainer.y = cardContainer.getData("originalY");
-        // Reset area and slotKey to original if not dropped successfully
-        cardContainer.setData("area", originalArea);
-        cardContainer.setData("slotKey", originalSlotKey);
-      } else {
-        // If dropped successfully and in Preparation phase, send update to server
-        if (
-          this.currentPhase === Phase.Preparation &&
-          newAreaForServer &&
-          newSlotKeyForServer
-        ) {
-          // Only send if it actually moved to a new logical slot
-          if (
-            originalArea !== newAreaForServer ||
-            originalSlotKey !== newSlotKeyForServer
-          ) {
-            colyseusRoom?.send("updatePrepLayout", {
-              instanceId,
-              newArea: newAreaForServer,
-              newSlotKey: newSlotKeyForServer,
-            });
+        // Check drop on local player's battlefield slots (only if in Preparation phase)
+        if (!dropped && this.currentPhase === Phase.Preparation) {
+          for (let i = 0; i < 5; i++) {
+            const targetSlotKey = String(i);
+            const slotPos = this.getSlotPixelPosition(true, "battlefield", i); // true for local player
+            if (slotPos) {
+              const dropZone = new Phaser.Geom.Rectangle(
+                slotPos.x - FULL_CARD_WIDTH / 2,
+                slotPos.y - FULL_CARD_HEIGHT / 2,
+                FULL_CARD_WIDTH,
+                FULL_CARD_HEIGHT
+              );
+              if (
+                Phaser.Geom.Rectangle.Contains(
+                  dropZone,
+                  cardContainer.x,
+                  cardContainer.y
+                )
+              ) {
+                if (
+                  this.isSlotEmpty(
+                    ownerSessionId,
+                    "battlefield",
+                    targetSlotKey,
+                    instanceId
+                  )
+                ) {
+                  // Valid drop on battlefield
+                  cardContainer.x = slotPos.x;
+                  cardContainer.y = slotPos.y;
+
+                  // Change area attribute
+                  const areaChanged = originalArea !== "battlefield";
+                  cardContainer.setData("area", "battlefield");
+                  cardContainer.setData("slotKey", targetSlotKey);
+
+                  this.updateVisualMaps(
+                    ownerSessionId,
+                    originalArea,
+                    originalSlotKey,
+                    "battlefield",
+                    targetSlotKey,
+                    cardContainer
+                  );
+
+                  // If area has changed, recreate the card visual to update appearance
+                  if (areaChanged) {
+                    // Get the card data from the server state
+                    const myPlayer =
+                      colyseusRoom?.state.players.get(ownerSessionId);
+                    const cardSchema =
+                      myPlayer?.battlefield.get(targetSlotKey) ||
+                      myPlayer?.hand.get(originalSlotKey);
+
+                    if (cardSchema && cardSchema.instanceId === instanceId) {
+                      // Recreate the card with the correct appearance for its new area
+                      this.updateCardVisual(
+                        ownerSessionId,
+                        "battlefield",
+                        targetSlotKey,
+                        cardSchema
+                      );
+                    }
+                  }
+
+                  dropped = true;
+                  newAreaForServer = "battlefield";
+                  newSlotKeyForServer = targetSlotKey;
+                  // Preparation.ts will read the final layout for its own send, this is for real-time sync
+                }
+                break;
+              }
+            }
           }
         }
-      }
 
-      // Notify Preparation scene if it's active and phase is Prep, so it can update button state
-      if (this.currentPhase === Phase.Preparation) {
-        const prepScene = this.scene.get("Preparation");
-        if (
-          prepScene &&
-          prepScene.scene.isActive() &&
-          (prepScene as any).updateStartButtonState
-        ) {
-          (prepScene as any).updateStartButtonState();
+        if (!dropped) {
+          cardContainer.x = cardContainer.getData("originalX");
+          cardContainer.y = cardContainer.getData("originalY");
+          // Reset area and slotKey to original if not dropped successfully
+          cardContainer.setData("area", originalArea);
+          cardContainer.setData("slotKey", originalSlotKey);
+        } else {
+          // If dropped successfully and in Preparation phase, send update to server
+          if (
+            this.currentPhase === Phase.Preparation &&
+            newAreaForServer &&
+            newSlotKeyForServer
+          ) {
+            // Only send if it actually moved to a new logical slot
+            if (
+              originalArea !== newAreaForServer ||
+              originalSlotKey !== newSlotKeyForServer
+            ) {
+              colyseusRoom?.send("updatePrepLayout", {
+                instanceId,
+                newArea: newAreaForServer,
+                newSlotKey: newSlotKeyForServer,
+              });
+            }
+          }
+        }
+
+        // Notify Preparation scene if it's active and phase is Prep, so it can update button state
+        if (this.currentPhase === Phase.Preparation) {
+          const prepScene = this.scene.get("Preparation");
+          if (
+            prepScene &&
+            prepScene.scene.isActive() &&
+            (prepScene as any).updateStartButtonState
+          ) {
+            (prepScene as any).updateStartButtonState();
+          }
         }
       }
     });
@@ -1860,13 +1876,16 @@ export class BoardView extends Scene {
       return; // Ensure elements are valid
 
     const myPlayerId = colyseusRoom.sessionId;
-    const myPlayerState = colyseusRoom.state.players.get(myPlayerId);
-    let opponentState: PlayerState | undefined;
+    const myPlayerState = colyseusRoom.state.players.get(myPlayerId) as
+      | ClientPlayerState
+      | undefined;
+    let opponentState: ClientPlayerState | undefined;
     let opponentName = "Opponent: --";
 
     colyseusRoom.state.players.forEach((player: any, sessionId: any) => {
+      // Cast to any or use ClientPlayerState
       if (sessionId !== myPlayerId) {
-        opponentState = player;
+        opponentState = player as ClientPlayerState;
         opponentName = `Opponent: ${player.username || "Connecting..."}`;
       }
     });

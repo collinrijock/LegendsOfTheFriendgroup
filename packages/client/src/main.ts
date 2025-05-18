@@ -4,7 +4,7 @@ import { initiateDiscordSDK } from "./utils/discordSDK";
 import { connectColyseus, colyseusRoom, colyseusClient } from "./utils/colyseusClient"; // Updated import
 
 // Import GameState schema if needed for type hints, though scenes will handle specifics
-// import { GameState } from "../../server/src/schemas/GameState"; // Adjust path
+// import { ClientGameState } from "./schemas/ClientSchemas"; // Use client-side schema
 
 import { Boot } from "./scenes/Boot";
 import { Game } from "./scenes/Game"; // Keep for now, but likely unused in main flow

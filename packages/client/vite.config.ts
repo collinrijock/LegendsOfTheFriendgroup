@@ -1,28 +1,37 @@
-// vite.config.js
+// vite.config.ts
 import { defineConfig } from "vite";
-import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
-import { NodeModulesPolyfillPlugin } from "@esbuild-plugins/node-modules-polyfill";
 
-export default defineConfig({
-  define: {
-    // allow `process.env.NODE_ENV` and friends
-    "process.env": {},
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      define: { global: "globalThis" },
-      plugins: [
-        NodeGlobalsPolyfillPlugin({ process: true, buffer: true }),
-        NodeModulesPolyfillPlugin(),
-      ],
-    },
-  },
+export default defineConfig(({ mode }) => ({
+  envDir: "../../",
   build: {
     rollupOptions: {
-      plugins: [
-        NodeGlobalsPolyfillPlugin({ process: true, buffer: true }),
-        NodeModulesPolyfillPlugin(),
-      ],
+      output: {
+        manualChunks: {
+          phaser: ["phaser"],
+        },
+      },
     },
   },
-});
+
+  server: {
+    port: 3000,
+    proxy: {
+      "/.proxy/assets": {
+        target: "http://localhost:3000/assets",
+        changeOrigin: true,
+        ws: true,
+        rewrite: (p) => p.replace(/^\/.proxy\/assets/, ""),
+      },
+      "/.proxy/api": {
+        target: "http://localhost:4001",
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        rewrite: (p) => p.replace(/^\/.proxy\/api/, ""),
+      },
+    },
+    hmr: {
+      clientPort: mode === "development" ? 3000 : 443,
+    },
+  },
+}));

@@ -1,14 +1,14 @@
 import { Scene } from "phaser";
 // Import global room instance
 import { colyseusRoom } from "../utils/colyseusClient"; // Updated import
-// Import schemas for type safety (adjust path)
+// Import client-side schemas for type safety
 import {
   Phase,
-  PlayerState,
-  CardInstanceSchema,
-} from "../../../server/src/schemas/GameState"; // Adjust path
+  ClientPlayerState,
+  ClientCardInstance,
+} from "../schemas/ClientSchemas";
 // Reuse client interface if compatible
-// import { CardInstance } from "./Battle"; // Not strictly needed if using CardInstanceSchema
+// import { CardInstance } from "./Battle"; // Not strictly needed if using ClientCardInstance
 // Import getStateCallbacks for 0.16 listener syntax
 import { getStateCallbacks } from "colyseus.js";
 import { BoardView } from "./BoardView"; // Import BoardView
@@ -260,17 +260,17 @@ export class Preparation extends Scene {
       }
     );
     // Add listeners for existing other players
-    colyseusRoom.state.players.forEach((existingPlayer: PlayerState, sessionId: string) => {
-      if (sessionId !== myPlayerId) {
-        // Use proxy for existing player
-        const unsub = $(existingPlayer).listen("isReady", () => {
-          // Listen specifically to isReady
-          if (this.scene.isActive()) this.updateWaitingStatus();
-        });
-        this.otherPlayerChangeListeners.set(sessionId, unsub);
-      }
-    });
-  }
+  colyseusRoom.state.players.forEach((existingPlayer: any, sessionId: string) => { // Cast to any or use ClientPlayerState
+    if (sessionId !== myPlayerId) {
+      // Use proxy for existing player
+      const unsub = $(existingPlayer as ClientPlayerState).listen("isReady", () => {
+        // Listen specifically to isReady
+        if (this.scene.isActive()) this.updateWaitingStatus();
+      });
+      this.otherPlayerChangeListeners.set(sessionId, unsub);
+    }
+  });
+}
 
   cleanupListeners() {
     console.log("Preparation Scene: Cleaning up listeners.");
@@ -340,7 +340,7 @@ export class Preparation extends Scene {
     this.clientSideCardLayout.clear();
 
     const processCards = (
-      collection: Map<string, CardInstanceSchema>,
+      collection: Map<string, ClientCardInstance>, // Updated type
       area: "hand" | "battlefield"
     ) => {
       collection.forEach((cardSchema, slotKey) => {
@@ -390,8 +390,8 @@ export class Preparation extends Scene {
     if (!myPlayerState) return;
 
     let allPlayersReady = true;
-    colyseusRoom.state.players.forEach((player: PlayerState) => {
-      if (!player.isReady) allPlayersReady = false;
+    colyseusRoom.state.players.forEach((player: any) => { // Cast to any or use ClientPlayerState
+      if (!(player as ClientPlayerState).isReady) allPlayersReady = false;
     });
 
     const amReady = myPlayerState.isReady;
