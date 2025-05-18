@@ -31,7 +31,7 @@ server
   .define("game", GameRoom) // Define room without /api prefix
   // filterBy allows us to call joinOrCreate and then hold one game per channel
   // https://discuss.colyseus.io/topic/345/is-it-possible-to-run-joinorcreatebyid/3
-  .filterBy(["channelId"]);
+  // .filterBy(["channelId"]); // Temporarily commented out for diagnostics
 
 app.use(express.json());
 // Mount the main API router under /api

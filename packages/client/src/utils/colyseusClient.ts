@@ -61,7 +61,7 @@ export async function loadAllCardData(): Promise<boolean> {
 }
 
 // Function to connect to Colyseus
-export async function connectColyseus(accessToken: string, username: string, channelId: string | null) {
+export async function connectColyseus(accessToken: string, username: string) { // Removed channelId parameter
   // Construct URL consistently. Vite's proxy will handle /.proxy for dev.
   const protocol = location.protocol === "https:" ? "wss" : "ws";
   // Connect to the root of the proxy, room name will be appended.
@@ -70,12 +70,12 @@ export async function connectColyseus(accessToken: string, username: string, cha
   colyseusClient = new Client(url);
 
   try {
-    console.log("Attempting to join or create Colyseus room with channelId:", channelId);
+    console.log("Attempting to join or create Colyseus room (channelId filter temporarily removed for diagnostics)");
     // Pass username and potentially other Discord info
     colyseusRoom = await colyseusClient.joinOrCreate("game", {
         accessToken: accessToken, // Pass token for potential server-side validation/use
         username: username,
-        channelId: channelId // Pass channelId for server-side filtering
+        // channelId: channelId // Temporarily removed for diagnostics
     });
 
     console.log("Successfully joined room:", colyseusRoom.roomId);

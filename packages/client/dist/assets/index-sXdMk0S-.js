@@ -22088,18 +22088,17 @@ async function loadAllCardData() {
   });
 }
 __name(loadAllCardData, "loadAllCardData");
-async function connectColyseus(accessToken, username, channelId) {
+async function connectColyseus(accessToken, username) {
   const protocol = location.protocol === "https:" ? "wss" : "ws";
   const url = `${protocol}://${location.host}/.proxy/`;
   colyseusClient = new cjs.Client(url);
   try {
-    console.log("Attempting to join or create Colyseus room with channelId:", channelId);
+    console.log("Attempting to join or create Colyseus room (channelId filter temporarily removed for diagnostics)");
     colyseusRoom = await colyseusClient.joinOrCreate("game", {
       accessToken,
       // Pass token for potential server-side validation/use
-      username,
-      channelId
-      // Pass channelId for server-side filtering
+      username
+      // channelId: channelId // Temporarily removed for diagnostics
     });
     console.log("Successfully joined room:", colyseusRoom.roomId);
     console.log("Session ID:", colyseusRoom.sessionId);
@@ -22176,7 +22175,7 @@ const initiateDiscordSDK = /* @__PURE__ */ __name(async () => {
       authenticate: /* @__PURE__ */ __name(async () => {
         auth = mockAuthData;
         console.log("Mock Authentication successful:", auth);
-        await connectColyseus(auth.access_token, auth.user.username, mockChannelId);
+        await connectColyseus(auth.access_token, auth.user.username);
         return mockAuthData;
       }, "authenticate"),
       // Add mock for authorize if needed for local testing flow
@@ -22253,11 +22252,7 @@ const authorizeDiscordUser = /* @__PURE__ */ __name(async () => {
     step = "connectColyseus";
     console.log("Connecting to Colyseus...");
     try {
-      if (!discordSdk.channelId) {
-        console.error("Colyseus connection failed: discordSdk.channelId is null or undefined.");
-        throw new Error("discordSdk.channelId is not available.");
-      }
-      await connectColyseus(auth.access_token, auth.user.username, discordSdk.channelId);
+      await connectColyseus(auth.access_token, auth.user.username);
       console.log("Colyseus connection successful.");
     } catch (colyseusError) {
       console.error("Colyseus connection failed:", colyseusError);

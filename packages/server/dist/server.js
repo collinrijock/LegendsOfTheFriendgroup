@@ -36,10 +36,10 @@ const server = new colyseus_1.Server({
 });
 // Game Rooms
 server
-    .define("game", GameRoom_1.GameRoom) // Define room without /api prefix
-    // filterBy allows us to call joinOrCreate and then hold one game per channel
-    // https://discuss.colyseus.io/topic/345/is-it-possible-to-run-joinorcreatebyid/3
-    .filterBy(["channelId"]);
+    .define("game", GameRoom_1.GameRoom); // Define room without /api prefix
+// filterBy allows us to call joinOrCreate and then hold one game per channel
+// https://discuss.colyseus.io/topic/345/is-it-possible-to-run-joinorcreatebyid/3
+// .filterBy(["channelId"]); // Temporarily commented out for diagnostics
 app.use(express_1.default.json());
 // Mount the main API router under /api
 app.use('/api', router);
