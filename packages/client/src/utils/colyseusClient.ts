@@ -62,10 +62,10 @@ export async function loadAllCardData(): Promise<boolean> {
 
 // Function to connect to Colyseus
 export async function connectColyseus(accessToken: string, username: string) {
-  const url =
-    location.host.includes("localhost") // Check if running locally
-      ? `ws://localhost:4001` // Changed from 3001
-      : `wss://${location.host}/.proxy/api`; // Adjust proxy path if needed
+  // Construct URL consistently. Vite's proxy will handle /.proxy for dev.
+  const protocol = location.protocol === "https:" ? "wss" : "ws";
+  // Connect to the root of the proxy, room name will be appended.
+  const url = `${protocol}://${location.host}/.proxy/`;
 
   colyseusClient = new Client(url);
 

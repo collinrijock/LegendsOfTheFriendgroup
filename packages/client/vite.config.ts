@@ -23,19 +23,23 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 3000,
     proxy: {
-      "/.proxy/assets": {
-        target: "http://localhost:3000/assets",
-        changeOrigin: true,
-        ws: true,
-        rewrite: (p) => p.replace(/^\/.proxy\/assets/, ""),
-      },
-      "/.proxy/api": {
-        target: "http://localhost:4001",
+      // Proxy for all backend calls, REST and WS, via /.proxy/
+      // This makes the client code consistent for dev and prod regarding /.proxy/ prefix.
+      "/.proxy": {
+        target: "http://localhost:4001", // Your backend server
         changeOrigin: true,
         secure: false,
         ws: true,
-        rewrite: (p) => p.replace(/^\/.proxy\/api/, ""),
-      },
+        rewrite: (path) => path.replace(/^\/\.proxy/, ''), // Strips /.proxy prefix
+                                                          // e.g., /.proxy/api/token -> /api/token
+                                                          // e.g., /.proxy/api/game (WS) -> /api/game (WS)
+      }
+      // Note: For production, Nginx needs a similar rule:
+      // location /.proxy/ {
+      //     rewrite ^/\.proxy/(.*)$ /$1 break;
+      //     proxy_pass http://localhost:4001; # (or your backend's actual address)
+      //     # ... other necessary proxy headers for HTTP & WS ...
+      // }
     },
     hmr: {
       clientPort: mode === "development" ? 3000 : 443,

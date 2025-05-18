@@ -18662,13 +18662,25 @@ Schema instances may only have up to 64 fields.`);
         const metadata = this.ref.constructor[Symbol.metadata];
         if (metadata) {
           (_a10 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a10.forEach((index) => {
+            var _a11;
             const field = metadata[index];
-            const value = this.ref[field.name];
-            value == null ? void 0 : value[$changes].setRoot(root);
+            const changeTree = (_a11 = this.ref[field.name]) == null ? void 0 : _a11[$changes];
+            if (changeTree) {
+              if (changeTree.root !== root) {
+                changeTree.setRoot(root);
+              } else {
+                root.add(changeTree);
+              }
+            }
           });
         } else if (this.ref[$childType] && typeof this.ref[$childType] !== "string") {
           this.ref.forEach((value, key) => {
-            value[$changes].setRoot(root);
+            const changeTree = value[$changes];
+            if (changeTree.root !== root) {
+              changeTree.setRoot(root);
+            } else {
+              root.add(changeTree);
+            }
           });
         }
       }
@@ -18688,13 +18700,19 @@ Schema instances may only have up to 64 fields.`);
         const metadata = this.ref.constructor[Symbol.metadata];
         if (metadata) {
           (_a10 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a10.forEach((index) => {
+            var _a11;
             const field = metadata[index];
-            const value = this.ref[field.name];
-            value == null ? void 0 : value[$changes].setParent(this.ref, root, index);
+            const changeTree = (_a11 = this.ref[field.name]) == null ? void 0 : _a11[$changes];
+            if (changeTree && changeTree.root !== root) {
+              changeTree.setParent(this.ref, root, index);
+            }
           });
         } else if (this.ref[$childType] && typeof this.ref[$childType] !== "string") {
           this.ref.forEach((value, key) => {
-            value[$changes].setParent(this.ref, root, this.indexes[key] ?? key);
+            const changeTree = value[$changes];
+            if (changeTree.root !== root) {
+              changeTree.setParent(this.ref, root, this.indexes[key] ?? key);
+            }
           });
         }
       }
@@ -18863,14 +18881,11 @@ Schema instances may only have up to 64 fields.`);
             this.allFilteredChanges.indexes = {};
             this.allFilteredChanges.operations.length = 0;
           }
-          this.forEachChild((changeTree, _) => {
-            var _a11;
-            return (_a11 = this.root) == null ? void 0 : _a11.remove(changeTree);
-          });
         }
       }
       /**
        * Recursively discard all changes from this, and child structures.
+       * (Used in tests only)
        */
       discardAll() {
         const keys = Object.keys(this.indexedOperations);
@@ -19390,7 +19405,7 @@ Schema instances may only have up to 64 fields.`);
         var _a10;
         let length = this.tmpItems.length;
         const changeTree = this[$changes];
-        for (let i = 0, l = values.length; i < values.length; i++, length++) {
+        for (let i = 0, l = values.length; i < l; i++, length++) {
           const value = values[i];
           if (value === void 0 || value === null) {
             return;
@@ -19462,14 +19477,9 @@ Schema instances may only have up to 64 fields.`);
           return;
         }
         const changeTree = this[$changes];
-        changeTree.forEachChild((changeTree2, _) => {
-          changeTree2.discard(true);
-          const root = changeTree2.root;
-          if (root !== void 0) {
-            root.removeChangeFromChangeSet("changes", changeTree2);
-            root.removeChangeFromChangeSet("allChanges", changeTree2);
-            root.removeChangeFromChangeSet("allFilteredChanges", changeTree2);
-          }
+        changeTree.forEachChild((childChangeTree, _) => {
+          var _a10;
+          (_a10 = changeTree.root) == null ? void 0 : _a10.remove(childChangeTree);
         });
         changeTree.discard(true);
         changeTree.operation(exports2.OPERATION.CLEAR);
@@ -19994,6 +20004,10 @@ Schema instances may only have up to 64 fields.`);
         const changeTree = this[$changes];
         changeTree.discard(true);
         changeTree.indexes = {};
+        changeTree.forEachChild((childChangeTree, _) => {
+          var _a10;
+          (_a10 = changeTree.root) == null ? void 0 : _a10.remove(childChangeTree);
+        });
         this.$indexes.clear();
         this.$items.clear();
         changeTree.operation(exports2.OPERATION.CLEAR);
@@ -20357,6 +20371,10 @@ Check @type() annotation`);
         }
         return obj;
       }
+      /**
+       * Used in tests only
+       * @internal
+       */
       discardAllChanges() {
         this[$changes].discardAll();
       }
@@ -20376,11 +20394,12 @@ Check @type() annotation`);
        * @returns
        */
       static debugRefIds(ref, showContents = false, level = 0) {
+        var _a10, _b2;
         const contents = showContents ? ` - ${JSON.stringify(ref.toJSON())}` : "";
         const changeTree = ref[$changes];
         const refId = changeTree.refId;
-        let output = "";
-        output += `${getIndent(level)}${ref.constructor.name} (refId: ${refId})${contents}
+        const refCount = ((_b2 = (_a10 = changeTree.root) == null ? void 0 : _a10.refCount) == null ? void 0 : _b2[refId]) > 1 ? ` [×${changeTree.root.refCount[refId]}]` : "";
+        let output = `${getIndent(level)}${ref.constructor.name} (refId: ${refId})${refCount}${contents}
 `;
         changeTree.forEachChild((childChangeTree) => output += this.debugRefIds(childChangeTree.ref, showContents, level + 1));
         return output;
@@ -20565,6 +20584,10 @@ Check @type() annotation`);
         const changeTree = this[$changes];
         changeTree.discard(true);
         changeTree.indexes = {};
+        changeTree.forEachChild((childChangeTree, _) => {
+          var _a10;
+          (_a10 = changeTree.root) == null ? void 0 : _a10.remove(childChangeTree);
+        });
         this.$indexes.clear();
         this.$items.clear();
         changeTree.operation(exports2.OPERATION.CLEAR);
@@ -20853,6 +20876,7 @@ Check @type() annotation`);
             this.removeChangeFromChangeSet("filteredChanges", changeTree);
           }
           this.refCount[changeTree.refId] = 0;
+          changeTree.forEachChild((child, _) => this.remove(child));
         } else {
           this.refCount[changeTree.refId] = refCount;
           if (changeTree.filteredChanges !== void 0) {
@@ -20863,7 +20887,6 @@ Check @type() annotation`);
             enqueueChangeTree(this, changeTree, "changes");
           }
         }
-        changeTree.forEachChild((child, _) => this.remove(child));
         return refCount;
       }
       removeChangeFromChangeSet(changeSetName, changeTree) {
@@ -21165,7 +21188,7 @@ Check @type() annotation`);
       removeCallback(refId, field, callback) {
         var _a10, _b2, _c;
         const index = (_c = (_b2 = (_a10 = this.callbacks) == null ? void 0 : _a10[refId]) == null ? void 0 : _b2[field]) == null ? void 0 : _c.indexOf(callback);
-        if (index !== -1) {
+        if (index !== void 0 && index !== -1) {
           spliceOne(this.callbacks[refId][field], index);
         }
       }
@@ -22066,7 +22089,8 @@ async function loadAllCardData() {
 }
 __name(loadAllCardData, "loadAllCardData");
 async function connectColyseus(accessToken, username) {
-  const url = location.host.includes("localhost") ? `ws://localhost:4001` : `wss://${location.host}/.proxy/api`;
+  const protocol = location.protocol === "https:" ? "wss" : "ws";
+  const url = `${protocol}://${location.host}/.proxy/`;
   colyseusClient = new cjs.Client(url);
   try {
     console.log("Attempting to join or create Colyseus room...");

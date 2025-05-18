@@ -47,7 +47,7 @@ export class Preloader extends Scene {
 
   preload() {
     //  Load the assets for the game - Replace with your own assets
-    const assetPath = isProd ? "/assets" : "/.proxy/assets";
+    const assetPath = "/assets"; // Standardized path
     this.load.setPath(assetPath);
     this.load.image("logo", "logo.png");
 

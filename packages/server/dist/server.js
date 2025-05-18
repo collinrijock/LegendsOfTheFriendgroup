@@ -24,6 +24,11 @@ dotenv_1.default.config({ path: "../../.env" });
 const app = (0, express_1.default)();
 const router = express_1.default.Router();
 const port = Number(process.env.PORT) || 4001;
+// Add this logging middleware
+app.use((req, res, next) => {
+    console.log(`[BACKEND SERVER INCOMING]: ${req.method} ${req.originalUrl}`);
+    next();
+});
 const server = new colyseus_1.Server({
     transport: new ws_transport_1.WebSocketTransport({
         server: (0, http_1.createServer)(app),
@@ -31,20 +36,23 @@ const server = new colyseus_1.Server({
 });
 // Game Rooms
 server
-    .define("game", GameRoom_1.GameRoom)
+    .define("game", GameRoom_1.GameRoom) // Define room without /api prefix
     // filterBy allows us to call joinOrCreate and then hold one game per channel
     // https://discuss.colyseus.io/topic/345/is-it-possible-to-run-joinorcreatebyid/3
     .filterBy(["channelId"]);
 app.use(express_1.default.json());
-app.use(router);
+// Mount the main API router under /api
+app.use('/api', router);
 if (process.env.NODE_ENV === "production") {
     const clientBuildPath = path_1.default.join(__dirname, "../../client/dist");
     app.use(express_1.default.static(clientBuildPath));
 }
 // If you don't want people accessing your server stats, comment this line.
+// This is now relative to the '/api' mount point of the router.
 router.use("/colyseus", (0, monitor_1.monitor)(server));
 // Fetch token from developer portal and return to the embedded app
-router.post("/api/token", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// Path is now /token, relative to the /api mount point of `router`
+router.post("/token", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     let b = new URLSearchParams({
         client_id: process.env.VITE_CLIENT_ID,
         client_secret: process.env.CLIENT_SECRET,
@@ -66,8 +74,8 @@ router.post("/api/token", (req, res) => __awaiter(void 0, void 0, void 0, functi
     const { access_token } = (yield response.json());
     res.send({ access_token });
 }));
-// Using a flat route in dev to match the vite server proxy config
-app.use(process.env.NODE_ENV === "production" ? "/.proxy/api" : "/", router);
+// The router is already mounted at /api. No need for app.use("/", router);
+// server.listen should be called on the Colyseus Server instance directly.
 server.listen(port).then(() => {
     console.log(`App is listening on port ${port} !`);
 });
