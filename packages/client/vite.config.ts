@@ -1,14 +1,21 @@
+// vite.config.js
 import { defineConfig } from "vite";
+import { terser } from "rollup-plugin-terser";
 
-// https://vitejs.dev/config/
 export default ({ mode }) => {
   const isLocalhost = process.env.NODE_ENV === "development";
 
   return defineConfig({
     envDir: "../../",
     build: {
-      minify: false,
+      minify: "terser",
+      terserOptions: {
+        mangle: false,
+        keep_classnames: true,
+        keep_fnames: true,
+      },
     },
+
     server: {
       port: 3000,
       proxy: {
