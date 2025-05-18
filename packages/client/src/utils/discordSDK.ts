@@ -116,17 +116,28 @@ const authorizeDiscordUser = async () => {
       console.log("Token fetch response received. Status:", response.status);
 
       if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Token fetch failed:", response.status, response.statusText, errorText);
-          throw new Error(`Token fetch failed: ${response.status} ${response.statusText} - ${errorText}`);
+          const errorText = await response.text(); // Get raw text for better error diagnosis
+          console.error("Token fetch failed with status:", response.status, response.statusText);
+          console.error("Token fetch response body:", errorText); // Log the actual response body
+          throw new Error(`Token fetch failed: ${response.status} ${response.statusText} - Body: ${errorText}`);
       }
 
-      const { access_token } = await response.json();
-      console.log("Access token received successfully.");
+      const tokenResponseData = await response.json(); // Get the whole object
+      console.log("Token fetch response JSON data:", JSON.stringify(tokenResponseData)); // Log the entire parsed JSON
+
+      const access_token = tokenResponseData.access_token; // Extract it
+
+      if (!access_token) { // Explicit check for the access_token
+          console.error("Extracted access_token is undefined or empty from response:", tokenResponseData);
+          throw new Error("Failed to extract access_token from server response. Full response: " + JSON.stringify(tokenResponseData));
+      }
+      // Mask the token in logs for security, but confirm it was found
+      console.log("Access token extracted successfully:", access_token ? "********" : "UNDEFINED/EMPTY");
+
 
       // Authenticate with Discord client (using the access_token)
       step = "discordAuthenticate";
-      console.log("Authenticating with Discord SDK...");
+      console.log("Authenticating with Discord SDK using the extracted access_token...");
       auth = await discordSdk.commands.authenticate({
         access_token,
       });

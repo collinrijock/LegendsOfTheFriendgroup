@@ -22226,13 +22226,20 @@ const authorizeDiscordUser = /* @__PURE__ */ __name(async () => {
     console.log("Token fetch response received. Status:", response.status);
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Token fetch failed:", response.status, response.statusText, errorText);
-      throw new Error(`Token fetch failed: ${response.status} ${response.statusText} - ${errorText}`);
+      console.error("Token fetch failed with status:", response.status, response.statusText);
+      console.error("Token fetch response body:", errorText);
+      throw new Error(`Token fetch failed: ${response.status} ${response.statusText} - Body: ${errorText}`);
     }
-    const { access_token } = await response.json();
-    console.log("Access token received successfully.");
+    const tokenResponseData = await response.json();
+    console.log("Token fetch response JSON data:", JSON.stringify(tokenResponseData));
+    const access_token = tokenResponseData.access_token;
+    if (!access_token) {
+      console.error("Extracted access_token is undefined or empty from response:", tokenResponseData);
+      throw new Error("Failed to extract access_token from server response. Full response: " + JSON.stringify(tokenResponseData));
+    }
+    console.log("Access token extracted successfully:", access_token ? "********" : "UNDEFINED/EMPTY");
     step = "discordAuthenticate";
-    console.log("Authenticating with Discord SDK...");
+    console.log("Authenticating with Discord SDK using the extracted access_token...");
     auth = await discordSdk.commands.authenticate({
       access_token
     });
