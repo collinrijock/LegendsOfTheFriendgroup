@@ -3,25 +3,14 @@ import { defineConfig } from "vite";
 
 export default defineConfig(({ mode }) => ({
   envDir: "../../",
-  resolve: {
-    dedupe: ["@colyseus/schema"],
-  },
   build: {
-    minify: false, // Changed from 'terser' to false for diagnostics
-    sourcemap: true,
-    terserOptions: {
-      mangle: false ,
-      // Keep compression disabled as per the existing configuration
-      compress: false,
-      keep_classnames: true, // Preserve class names
-      keep_fnames: true,     // Preserve function names
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          phaser: ["phaser"],
+        },
+      },
     },
-    commonjsOptions: {
-      include: [/node_modules/], // Or more specific paths
-      extensions: ['.js', '.ts', '.jsx', '.tsx', '.json'],
-      strictRequires: true,
-      transformMixedEsModules: true,
-    }
   },
 
   server: {
