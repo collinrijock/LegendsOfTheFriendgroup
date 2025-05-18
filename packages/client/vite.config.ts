@@ -3,6 +3,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig(({ mode }) => ({
   envDir: "../../",
+  resolve: {
+    dedupe: ["@colyseus/schema"],
+  },
   build: {
     minify: 'terser',
     sourcemap: true,
