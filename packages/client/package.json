@@ -15,8 +15,7 @@
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^1.4.3",
-    "colyseus": "^0.16.4",
-    "colyseus.js": "^0.16.0",
+    "colyseus.js": "^0.16.17",
     "phaser": "^3.87.0",
     "rollup-plugin-terser": "^7.0.2"
   }
