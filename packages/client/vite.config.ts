@@ -5,6 +5,7 @@ export default defineConfig(({ mode }) => ({
   envDir: "../../",
   build: {
     minify: 'terser',
+    sourcemap: true,
     terserOptions: {
       mangle: false ,
       // Keep compression disabled as per the existing configuration
@@ -12,6 +13,12 @@ export default defineConfig(({ mode }) => ({
       keep_classnames: true, // Preserve class names
       keep_fnames: true,     // Preserve function names
     },
+    commonjsOptions: {
+      include: [/node_modules/], // Or more specific paths
+      extensions: ['.js', '.ts', '.jsx', '.tsx', '.json'],
+      strictRequires: true,
+      transformMixedEsModules: true,
+    }
   },
 
   server: {
