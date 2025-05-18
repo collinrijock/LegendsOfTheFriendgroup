@@ -1,6 +1,17 @@
 import { Client } from "colyseus.js";
 import { Room } from "colyseus.js";
 
+// Import the actual schema definitions from the server.
+// This is necessary for Colyseus to be able to deserialize the state
+// received from the server. The client application code can still use
+// the interfaces from `ClientSchemas.ts` for its own type safety.
+import { GameState, PlayerState, CardInstanceSchema } from "../../../server/src/schemas/GameState";
+
+// Log to confirm schemas are imported.
+// These are the actual class definitions needed by Colyseus for deserialization.
+// Client-side interfaces in ClientSchemas.ts are for TypeScript type checking and are erased at runtime.
+console.log("Server schema classes (GameState, PlayerState, CardInstanceSchema) imported for Colyseus runtime:", { GameState, PlayerState, CardInstanceSchema });
+
 export let colyseusRoom: Room | null = null;
 export let colyseusClient: Client | null = null;
 

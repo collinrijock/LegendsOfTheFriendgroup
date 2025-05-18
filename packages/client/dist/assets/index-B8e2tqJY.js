@@ -9972,7 +9972,7 @@ var ServerError$3 = {};
 var Room$2 = {};
 var Connection$2 = {};
 var H3Transport$1 = {};
-var umd = { exports: {} };
+var umd$1 = { exports: {} };
 (function(module, exports) {
   (function(global2, factory) {
     factory(exports);
@@ -13998,10 +13998,10 @@ Check @type() annotation`);
     exports2.type = type;
     exports2.view = view;
   });
-})(umd, umd.exports);
-var umdExports = umd.exports;
+})(umd$1, umd$1.exports);
+var umdExports$1 = umd$1.exports;
 var tslib$3 = require$$0;
-var schema$2 = umdExports;
+var schema$2 = umdExports$1;
 class H3TransportTransport {
   constructor(events) {
     this.events = events;
@@ -14311,7 +14311,7 @@ function createSignal() {
 signal$1.EventEmitter = EventEmitter;
 signal$1.createSignal = createSignal;
 var SchemaSerializer$2 = {};
-var schema$1 = umdExports;
+var schema$1 = umdExports$1;
 function getStateCallbacks(room) {
   try {
     return schema$1.getDecoderStateCallbacks(room["serializer"].decoder);
@@ -16498,7 +16498,7 @@ var Protocol = Protocol$1;
 var Serializer = Serializer$1;
 var nanoevents$1 = nanoevents$2;
 var signal = signal$1;
-var schema = umdExports;
+var schema = umdExports$1;
 var SchemaSerializer2 = SchemaSerializer$2;
 var ServerError$2 = ServerError$3;
 var msgpackr = require$$8;
@@ -17278,6 +17278,4146 @@ NoneSerializer$1.NoneSerializer = NoneSerializer;
   exports.getStateCallbacks = SchemaSerializer3.getStateCallbacks;
   exports.registerSerializer = Serializer2.registerSerializer;
 })(cjs);
+var umd = { exports: {} };
+(function(module, exports) {
+  (function(global2, factory) {
+    factory(exports);
+  })(commonjsGlobal$1, function(exports2) {
+    const SWITCH_TO_STRUCTURE = 255;
+    const TYPE_ID = 213;
+    exports2.OPERATION = void 0;
+    (function(OPERATION) {
+      OPERATION[OPERATION["ADD"] = 128] = "ADD";
+      OPERATION[OPERATION["REPLACE"] = 0] = "REPLACE";
+      OPERATION[OPERATION["DELETE"] = 64] = "DELETE";
+      OPERATION[OPERATION["DELETE_AND_MOVE"] = 96] = "DELETE_AND_MOVE";
+      OPERATION[OPERATION["MOVE_AND_ADD"] = 160] = "MOVE_AND_ADD";
+      OPERATION[OPERATION["DELETE_AND_ADD"] = 192] = "DELETE_AND_ADD";
+      OPERATION[OPERATION["CLEAR"] = 10] = "CLEAR";
+      OPERATION[OPERATION["REVERSE"] = 15] = "REVERSE";
+      OPERATION[OPERATION["MOVE"] = 32] = "MOVE";
+      OPERATION[OPERATION["DELETE_BY_REFID"] = 33] = "DELETE_BY_REFID";
+      OPERATION[OPERATION["ADD_BY_REFID"] = 129] = "ADD_BY_REFID";
+    })(exports2.OPERATION || (exports2.OPERATION = {}));
+    Symbol.metadata ?? (Symbol.metadata = Symbol.for("Symbol.metadata"));
+    const $track = Symbol("$track");
+    const $encoder = Symbol("$encoder");
+    const $decoder = Symbol("$decoder");
+    const $filter = Symbol("$filter");
+    const $getByIndex = Symbol("$getByIndex");
+    const $deleteByIndex = Symbol("$deleteByIndex");
+    const $changes = Symbol("$changes");
+    const $childType = Symbol("$childType");
+    const $onEncodeEnd = Symbol("$onEncodeEnd");
+    const $onDecodeEnd = Symbol("$onDecodeEnd");
+    const $descriptors = Symbol("$descriptors");
+    const $numFields = "$__numFields";
+    const $refTypeFieldIndexes = "$__refTypeFieldIndexes";
+    const $viewFieldIndexes = "$__viewFieldIndexes";
+    const $fieldIndexesByViewTag = "$__fieldIndexesByViewTag";
+    let textEncoder2;
+    try {
+      textEncoder2 = new TextEncoder();
+    } catch (e) {
+    }
+    const _convoBuffer$1 = new ArrayBuffer(8);
+    const _int32$1 = new Int32Array(_convoBuffer$1);
+    const _float32$1 = new Float32Array(_convoBuffer$1);
+    const _float64$1 = new Float64Array(_convoBuffer$1);
+    const _int64$1 = new BigInt64Array(_convoBuffer$1);
+    const hasBufferByteLength = typeof Buffer !== "undefined" && Buffer.byteLength;
+    const utf8Length = hasBufferByteLength ? Buffer.byteLength : function(str, _) {
+      var c = 0, length = 0;
+      for (var i = 0, l = str.length; i < l; i++) {
+        c = str.charCodeAt(i);
+        if (c < 128) {
+          length += 1;
+        } else if (c < 2048) {
+          length += 2;
+        } else if (c < 55296 || c >= 57344) {
+          length += 3;
+        } else {
+          i++;
+          length += 4;
+        }
+      }
+      return length;
+    };
+    function utf8Write(view2, str, it) {
+      var c = 0;
+      for (var i = 0, l = str.length; i < l; i++) {
+        c = str.charCodeAt(i);
+        if (c < 128) {
+          view2[it.offset++] = c;
+        } else if (c < 2048) {
+          view2[it.offset] = 192 | c >> 6;
+          view2[it.offset + 1] = 128 | c & 63;
+          it.offset += 2;
+        } else if (c < 55296 || c >= 57344) {
+          view2[it.offset] = 224 | c >> 12;
+          view2[it.offset + 1] = 128 | c >> 6 & 63;
+          view2[it.offset + 2] = 128 | c & 63;
+          it.offset += 3;
+        } else {
+          i++;
+          c = 65536 + ((c & 1023) << 10 | str.charCodeAt(i) & 1023);
+          view2[it.offset] = 240 | c >> 18;
+          view2[it.offset + 1] = 128 | c >> 12 & 63;
+          view2[it.offset + 2] = 128 | c >> 6 & 63;
+          view2[it.offset + 3] = 128 | c & 63;
+          it.offset += 4;
+        }
+      }
+    }
+    function int8$1(bytes, value, it) {
+      bytes[it.offset++] = value & 255;
+    }
+    function uint8$1(bytes, value, it) {
+      bytes[it.offset++] = value & 255;
+    }
+    function int16$1(bytes, value, it) {
+      bytes[it.offset++] = value & 255;
+      bytes[it.offset++] = value >> 8 & 255;
+    }
+    function uint16$1(bytes, value, it) {
+      bytes[it.offset++] = value & 255;
+      bytes[it.offset++] = value >> 8 & 255;
+    }
+    function int32$1(bytes, value, it) {
+      bytes[it.offset++] = value & 255;
+      bytes[it.offset++] = value >> 8 & 255;
+      bytes[it.offset++] = value >> 16 & 255;
+      bytes[it.offset++] = value >> 24 & 255;
+    }
+    function uint32$1(bytes, value, it) {
+      const b4 = value >> 24;
+      const b3 = value >> 16;
+      const b2 = value >> 8;
+      const b1 = value;
+      bytes[it.offset++] = b1 & 255;
+      bytes[it.offset++] = b2 & 255;
+      bytes[it.offset++] = b3 & 255;
+      bytes[it.offset++] = b4 & 255;
+    }
+    function int64$1(bytes, value, it) {
+      const high = Math.floor(value / Math.pow(2, 32));
+      const low = value >>> 0;
+      uint32$1(bytes, low, it);
+      uint32$1(bytes, high, it);
+    }
+    function uint64$1(bytes, value, it) {
+      const high = value / Math.pow(2, 32) >> 0;
+      const low = value >>> 0;
+      uint32$1(bytes, low, it);
+      uint32$1(bytes, high, it);
+    }
+    function bigint64$1(bytes, value, it) {
+      _int64$1[0] = BigInt.asIntN(64, value);
+      int32$1(bytes, _int32$1[0], it);
+      int32$1(bytes, _int32$1[1], it);
+    }
+    function biguint64$1(bytes, value, it) {
+      _int64$1[0] = BigInt.asIntN(64, value);
+      int32$1(bytes, _int32$1[0], it);
+      int32$1(bytes, _int32$1[1], it);
+    }
+    function float32$1(bytes, value, it) {
+      _float32$1[0] = value;
+      int32$1(bytes, _int32$1[0], it);
+    }
+    function float64$1(bytes, value, it) {
+      _float64$1[0] = value;
+      int32$1(bytes, _int32$1[0], it);
+      int32$1(bytes, _int32$1[1], it);
+    }
+    function boolean$1(bytes, value, it) {
+      bytes[it.offset++] = value ? 1 : 0;
+    }
+    function string$1(bytes, value, it) {
+      if (!value) {
+        value = "";
+      }
+      let length = utf8Length(value, "utf8");
+      let size = 0;
+      if (length < 32) {
+        bytes[it.offset++] = length | 160;
+        size = 1;
+      } else if (length < 256) {
+        bytes[it.offset++] = 217;
+        bytes[it.offset++] = length % 255;
+        size = 2;
+      } else if (length < 65536) {
+        bytes[it.offset++] = 218;
+        uint16$1(bytes, length, it);
+        size = 3;
+      } else if (length < 4294967296) {
+        bytes[it.offset++] = 219;
+        uint32$1(bytes, length, it);
+        size = 5;
+      } else {
+        throw new Error("String too long");
+      }
+      utf8Write(bytes, value, it);
+      return size + length;
+    }
+    function number$1(bytes, value, it) {
+      if (isNaN(value)) {
+        return number$1(bytes, 0, it);
+      } else if (!isFinite(value)) {
+        return number$1(bytes, value > 0 ? Number.MAX_SAFE_INTEGER : -Number.MAX_SAFE_INTEGER, it);
+      } else if (value !== (value | 0)) {
+        if (Math.abs(value) <= 34028235e31) {
+          _float32$1[0] = value;
+          if (Math.abs(Math.abs(_float32$1[0]) - Math.abs(value)) < 1e-4) {
+            bytes[it.offset++] = 202;
+            float32$1(bytes, value, it);
+            return 5;
+          }
+        }
+        bytes[it.offset++] = 203;
+        float64$1(bytes, value, it);
+        return 9;
+      }
+      if (value >= 0) {
+        if (value < 128) {
+          bytes[it.offset++] = value & 255;
+          return 1;
+        }
+        if (value < 256) {
+          bytes[it.offset++] = 204;
+          bytes[it.offset++] = value & 255;
+          return 2;
+        }
+        if (value < 65536) {
+          bytes[it.offset++] = 205;
+          uint16$1(bytes, value, it);
+          return 3;
+        }
+        if (value < 4294967296) {
+          bytes[it.offset++] = 206;
+          uint32$1(bytes, value, it);
+          return 5;
+        }
+        bytes[it.offset++] = 207;
+        uint64$1(bytes, value, it);
+        return 9;
+      } else {
+        if (value >= -32) {
+          bytes[it.offset++] = 224 | value + 32;
+          return 1;
+        }
+        if (value >= -128) {
+          bytes[it.offset++] = 208;
+          int8$1(bytes, value, it);
+          return 2;
+        }
+        if (value >= -32768) {
+          bytes[it.offset++] = 209;
+          int16$1(bytes, value, it);
+          return 3;
+        }
+        if (value >= -2147483648) {
+          bytes[it.offset++] = 210;
+          int32$1(bytes, value, it);
+          return 5;
+        }
+        bytes[it.offset++] = 211;
+        int64$1(bytes, value, it);
+        return 9;
+      }
+    }
+    const encode2 = {
+      int8: int8$1,
+      uint8: uint8$1,
+      int16: int16$1,
+      uint16: uint16$1,
+      int32: int32$1,
+      uint32: uint32$1,
+      int64: int64$1,
+      uint64: uint64$1,
+      bigint64: bigint64$1,
+      biguint64: biguint64$1,
+      float32: float32$1,
+      float64: float64$1,
+      boolean: boolean$1,
+      string: string$1,
+      number: number$1,
+      utf8Write,
+      utf8Length
+    };
+    const _convoBuffer = new ArrayBuffer(8);
+    const _int32 = new Int32Array(_convoBuffer);
+    const _float32 = new Float32Array(_convoBuffer);
+    const _float64 = new Float64Array(_convoBuffer);
+    const _uint64 = new BigUint64Array(_convoBuffer);
+    const _int64 = new BigInt64Array(_convoBuffer);
+    function utf8Read(bytes, it, length) {
+      var string2 = "", chr = 0;
+      for (var i = it.offset, end = it.offset + length; i < end; i++) {
+        var byte = bytes[i];
+        if ((byte & 128) === 0) {
+          string2 += String.fromCharCode(byte);
+          continue;
+        }
+        if ((byte & 224) === 192) {
+          string2 += String.fromCharCode((byte & 31) << 6 | bytes[++i] & 63);
+          continue;
+        }
+        if ((byte & 240) === 224) {
+          string2 += String.fromCharCode((byte & 15) << 12 | (bytes[++i] & 63) << 6 | (bytes[++i] & 63) << 0);
+          continue;
+        }
+        if ((byte & 248) === 240) {
+          chr = (byte & 7) << 18 | (bytes[++i] & 63) << 12 | (bytes[++i] & 63) << 6 | (bytes[++i] & 63) << 0;
+          if (chr >= 65536) {
+            chr -= 65536;
+            string2 += String.fromCharCode((chr >>> 10) + 55296, (chr & 1023) + 56320);
+          } else {
+            string2 += String.fromCharCode(chr);
+          }
+          continue;
+        }
+        console.error("Invalid byte " + byte.toString(16));
+      }
+      it.offset += length;
+      return string2;
+    }
+    function int8(bytes, it) {
+      return uint8(bytes, it) << 24 >> 24;
+    }
+    function uint8(bytes, it) {
+      return bytes[it.offset++];
+    }
+    function int16(bytes, it) {
+      return uint16(bytes, it) << 16 >> 16;
+    }
+    function uint16(bytes, it) {
+      return bytes[it.offset++] | bytes[it.offset++] << 8;
+    }
+    function int32(bytes, it) {
+      return bytes[it.offset++] | bytes[it.offset++] << 8 | bytes[it.offset++] << 16 | bytes[it.offset++] << 24;
+    }
+    function uint32(bytes, it) {
+      return int32(bytes, it) >>> 0;
+    }
+    function float32(bytes, it) {
+      _int32[0] = int32(bytes, it);
+      return _float32[0];
+    }
+    function float64(bytes, it) {
+      _int32[0] = int32(bytes, it);
+      _int32[1] = int32(bytes, it);
+      return _float64[0];
+    }
+    function int64(bytes, it) {
+      const low = uint32(bytes, it);
+      const high = int32(bytes, it) * Math.pow(2, 32);
+      return high + low;
+    }
+    function uint64(bytes, it) {
+      const low = uint32(bytes, it);
+      const high = uint32(bytes, it) * Math.pow(2, 32);
+      return high + low;
+    }
+    function bigint64(bytes, it) {
+      _int32[0] = int32(bytes, it);
+      _int32[1] = int32(bytes, it);
+      return _int64[0];
+    }
+    function biguint64(bytes, it) {
+      _int32[0] = int32(bytes, it);
+      _int32[1] = int32(bytes, it);
+      return _uint64[0];
+    }
+    function boolean(bytes, it) {
+      return uint8(bytes, it) > 0;
+    }
+    function string(bytes, it) {
+      const prefix = bytes[it.offset++];
+      let length;
+      if (prefix < 192) {
+        length = prefix & 31;
+      } else if (prefix === 217) {
+        length = uint8(bytes, it);
+      } else if (prefix === 218) {
+        length = uint16(bytes, it);
+      } else if (prefix === 219) {
+        length = uint32(bytes, it);
+      }
+      return utf8Read(bytes, it, length);
+    }
+    function number(bytes, it) {
+      const prefix = bytes[it.offset++];
+      if (prefix < 128) {
+        return prefix;
+      } else if (prefix === 202) {
+        return float32(bytes, it);
+      } else if (prefix === 203) {
+        return float64(bytes, it);
+      } else if (prefix === 204) {
+        return uint8(bytes, it);
+      } else if (prefix === 205) {
+        return uint16(bytes, it);
+      } else if (prefix === 206) {
+        return uint32(bytes, it);
+      } else if (prefix === 207) {
+        return uint64(bytes, it);
+      } else if (prefix === 208) {
+        return int8(bytes, it);
+      } else if (prefix === 209) {
+        return int16(bytes, it);
+      } else if (prefix === 210) {
+        return int32(bytes, it);
+      } else if (prefix === 211) {
+        return int64(bytes, it);
+      } else if (prefix > 223) {
+        return (255 - prefix + 1) * -1;
+      }
+    }
+    function stringCheck(bytes, it) {
+      const prefix = bytes[it.offset];
+      return (
+        // fixstr
+        prefix < 192 && prefix > 160 || // str 8
+        prefix === 217 || // str 16
+        prefix === 218 || // str 32
+        prefix === 219
+      );
+    }
+    const decode2 = {
+      utf8Read,
+      int8,
+      uint8,
+      int16,
+      uint16,
+      int32,
+      uint32,
+      float32,
+      float64,
+      int64,
+      uint64,
+      bigint64,
+      biguint64,
+      boolean,
+      string,
+      number,
+      stringCheck
+    };
+    const registeredTypes = {};
+    const identifiers = /* @__PURE__ */ new Map();
+    function registerType(identifier, definition) {
+      if (definition.constructor) {
+        identifiers.set(definition.constructor, identifier);
+        registeredTypes[identifier] = definition;
+      }
+      if (definition.encode) {
+        encode2[identifier] = definition.encode;
+      }
+      if (definition.decode) {
+        decode2[identifier] = definition.decode;
+      }
+    }
+    function getType(identifier) {
+      return registeredTypes[identifier];
+    }
+    function defineCustomTypes(types) {
+      for (const identifier in types) {
+        registerType(identifier, types[identifier]);
+      }
+      return (t) => type(t);
+    }
+    const _TypeContext = class _TypeContext {
+      static register(target2) {
+        const parent = Object.getPrototypeOf(target2);
+        if (parent !== Schema) {
+          let inherits = _TypeContext.inheritedTypes.get(parent);
+          if (!inherits) {
+            inherits = /* @__PURE__ */ new Set();
+            _TypeContext.inheritedTypes.set(parent, inherits);
+          }
+          inherits.add(target2);
+        }
+      }
+      static cache(rootClass) {
+        let context = _TypeContext.cachedContexts.get(rootClass);
+        if (!context) {
+          context = new _TypeContext(rootClass);
+          _TypeContext.cachedContexts.set(rootClass, context);
+        }
+        return context;
+      }
+      constructor(rootClass) {
+        this.types = {};
+        this.schemas = /* @__PURE__ */ new Map();
+        this.hasFilters = false;
+        this.parentFiltered = {};
+        if (rootClass) {
+          this.discoverTypes(rootClass);
+        }
+      }
+      has(schema3) {
+        return this.schemas.has(schema3);
+      }
+      get(typeid) {
+        return this.types[typeid];
+      }
+      add(schema3, typeid = this.schemas.size) {
+        if (this.schemas.has(schema3)) {
+          return false;
+        }
+        this.types[typeid] = schema3;
+        if (schema3[Symbol.metadata] === void 0) {
+          Metadata.initialize(schema3);
+        }
+        this.schemas.set(schema3, typeid);
+        return true;
+      }
+      getTypeId(klass) {
+        return this.schemas.get(klass);
+      }
+      discoverTypes(klass, parentType, parentIndex, parentHasViewTag) {
+        var _a3, _b2;
+        if (parentHasViewTag) {
+          this.registerFilteredByParent(klass, parentType, parentIndex);
+        }
+        if (!this.add(klass)) {
+          return;
+        }
+        (_a3 = _TypeContext.inheritedTypes.get(klass)) == null ? void 0 : _a3.forEach((child) => {
+          this.discoverTypes(child, parentType, parentIndex, parentHasViewTag);
+        });
+        let parent = klass;
+        while ((parent = Object.getPrototypeOf(parent)) && parent !== Schema && // stop at root (Schema)
+        parent !== Function.prototype) {
+          this.discoverTypes(parent);
+        }
+        const metadata = klass[_b2 = Symbol.metadata] ?? (klass[_b2] = {});
+        if (metadata[$viewFieldIndexes]) {
+          this.hasFilters = true;
+        }
+        for (const fieldIndex in metadata) {
+          const index = fieldIndex;
+          const fieldType = metadata[index].type;
+          const fieldHasViewTag = metadata[index].tag !== void 0;
+          if (typeof fieldType === "string") {
+            continue;
+          }
+          if (Array.isArray(fieldType)) {
+            const type2 = fieldType[0];
+            if (type2 === "string") {
+              continue;
+            }
+            this.discoverTypes(type2, klass, index, parentHasViewTag || fieldHasViewTag);
+          } else if (typeof fieldType === "function") {
+            this.discoverTypes(fieldType, klass, index, parentHasViewTag || fieldHasViewTag);
+          } else {
+            const type2 = Object.values(fieldType)[0];
+            if (typeof type2 === "string") {
+              continue;
+            }
+            this.discoverTypes(type2, klass, index, parentHasViewTag || fieldHasViewTag);
+          }
+        }
+      }
+      /**
+       * Keep track of which classes have filters applied.
+       * Format: `${typeid}-${parentTypeid}-${parentIndex}`
+       */
+      registerFilteredByParent(schema3, parentType, parentIndex) {
+        const typeid = this.schemas.get(schema3) ?? this.schemas.size;
+        let key = `${typeid}`;
+        if (parentType) {
+          key += `-${this.schemas.get(parentType)}`;
+        }
+        key += `-${parentIndex}`;
+        this.parentFiltered[key] = true;
+      }
+      debug() {
+        let parentFiltered = "";
+        for (const key in this.parentFiltered) {
+          const keys = key.split("-").map(Number);
+          const fieldIndex = keys.pop();
+          parentFiltered += `
+		`;
+          parentFiltered += `${key}: ${keys.reverse().map((id, i) => {
+            const klass = this.types[id];
+            const metadata = klass[Symbol.metadata];
+            let txt = klass.name;
+            if (i === 0) {
+              txt += `[${metadata[fieldIndex].name}]`;
+            }
+            return `${txt}`;
+          }).join(" -> ")}`;
+        }
+        return `TypeContext ->
+	Schema types: ${this.schemas.size}
+	hasFilters: ${this.hasFilters}
+	parentFiltered:${parentFiltered}`;
+      }
+    };
+    _TypeContext.inheritedTypes = /* @__PURE__ */ new Map();
+    _TypeContext.cachedContexts = /* @__PURE__ */ new Map();
+    let TypeContext = _TypeContext;
+    function getNormalizedType(type2) {
+      return Array.isArray(type2) ? { array: type2[0] } : typeof type2["type"] !== "undefined" ? type2["type"] : type2;
+    }
+    const Metadata = {
+      addField(metadata, index, name, type2, descriptor) {
+        if (index > 64) {
+          throw new Error(`Can't define field '${name}'.
+Schema instances may only have up to 64 fields.`);
+        }
+        metadata[index] = Object.assign(
+          metadata[index] || {},
+          // avoid overwriting previous field metadata (@owned / @deprecated)
+          {
+            type: getNormalizedType(type2),
+            index,
+            name
+          }
+        );
+        Object.defineProperty(metadata, $descriptors, {
+          value: metadata[$descriptors] || {},
+          enumerable: false,
+          configurable: true
+        });
+        if (descriptor) {
+          metadata[$descriptors][name] = descriptor;
+          metadata[$descriptors][`_${name}`] = {
+            value: void 0,
+            writable: true,
+            enumerable: false,
+            configurable: true
+          };
+        } else {
+          metadata[$descriptors][name] = {
+            value: void 0,
+            writable: true,
+            enumerable: true,
+            configurable: true
+          };
+        }
+        Object.defineProperty(metadata, $numFields, {
+          value: index,
+          enumerable: false,
+          configurable: true
+        });
+        Object.defineProperty(metadata, name, {
+          value: index,
+          enumerable: false,
+          configurable: true
+        });
+        if (typeof metadata[index].type !== "string") {
+          if (metadata[$refTypeFieldIndexes] === void 0) {
+            Object.defineProperty(metadata, $refTypeFieldIndexes, {
+              value: [],
+              enumerable: false,
+              configurable: true
+            });
+          }
+          metadata[$refTypeFieldIndexes].push(index);
+        }
+      },
+      setTag(metadata, fieldName, tag) {
+        const index = metadata[fieldName];
+        const field = metadata[index];
+        field.tag = tag;
+        if (!metadata[$viewFieldIndexes]) {
+          Object.defineProperty(metadata, $viewFieldIndexes, {
+            value: [],
+            enumerable: false,
+            configurable: true
+          });
+          Object.defineProperty(metadata, $fieldIndexesByViewTag, {
+            value: {},
+            enumerable: false,
+            configurable: true
+          });
+        }
+        metadata[$viewFieldIndexes].push(index);
+        if (!metadata[$fieldIndexesByViewTag][tag]) {
+          metadata[$fieldIndexesByViewTag][tag] = [];
+        }
+        metadata[$fieldIndexesByViewTag][tag].push(index);
+      },
+      setFields(target2, fields) {
+        const constructor = target2.prototype.constructor;
+        TypeContext.register(constructor);
+        const parentClass = Object.getPrototypeOf(constructor);
+        const parentMetadata = parentClass && parentClass[Symbol.metadata];
+        const metadata = Metadata.initialize(constructor);
+        if (!constructor[$track]) {
+          constructor[$track] = Schema[$track];
+        }
+        if (!constructor[$encoder]) {
+          constructor[$encoder] = Schema[$encoder];
+        }
+        if (!constructor[$decoder]) {
+          constructor[$decoder] = Schema[$decoder];
+        }
+        if (!constructor.prototype.toJSON) {
+          constructor.prototype.toJSON = Schema.prototype.toJSON;
+        }
+        let fieldIndex = metadata[$numFields] ?? (parentMetadata && parentMetadata[$numFields]) ?? -1;
+        fieldIndex++;
+        for (const field in fields) {
+          const type2 = fields[field];
+          const complexTypeKlass = Array.isArray(type2) ? getType("array") : typeof Object.keys(type2)[0] === "string" && getType(Object.keys(type2)[0]);
+          const childType = complexTypeKlass ? Object.values(type2)[0] : getNormalizedType(type2);
+          Metadata.addField(metadata, fieldIndex, field, type2, getPropertyDescriptor(`_${field}`, fieldIndex, childType, complexTypeKlass));
+          fieldIndex++;
+        }
+        return target2;
+      },
+      isDeprecated(metadata, field) {
+        return metadata[field].deprecated === true;
+      },
+      init(klass) {
+        const metadata = {};
+        klass[Symbol.metadata] = metadata;
+        Object.defineProperty(metadata, $numFields, {
+          value: 0,
+          enumerable: false,
+          configurable: true
+        });
+      },
+      initialize(constructor) {
+        const parentClass = Object.getPrototypeOf(constructor);
+        const parentMetadata = parentClass[Symbol.metadata];
+        let metadata = constructor[Symbol.metadata] ?? /* @__PURE__ */ Object.create(null);
+        if (parentClass !== Schema && metadata === parentMetadata) {
+          metadata = /* @__PURE__ */ Object.create(null);
+          if (parentMetadata) {
+            Object.setPrototypeOf(metadata, parentMetadata);
+            Object.defineProperty(metadata, $numFields, {
+              value: parentMetadata[$numFields],
+              enumerable: false,
+              configurable: true,
+              writable: true
+            });
+            if (parentMetadata[$viewFieldIndexes] !== void 0) {
+              Object.defineProperty(metadata, $viewFieldIndexes, {
+                value: [...parentMetadata[$viewFieldIndexes]],
+                enumerable: false,
+                configurable: true,
+                writable: true
+              });
+              Object.defineProperty(metadata, $fieldIndexesByViewTag, {
+                value: { ...parentMetadata[$fieldIndexesByViewTag] },
+                enumerable: false,
+                configurable: true,
+                writable: true
+              });
+            }
+            if (parentMetadata[$refTypeFieldIndexes] !== void 0) {
+              Object.defineProperty(metadata, $refTypeFieldIndexes, {
+                value: [...parentMetadata[$refTypeFieldIndexes]],
+                enumerable: false,
+                configurable: true,
+                writable: true
+              });
+            }
+            Object.defineProperty(metadata, $descriptors, {
+              value: { ...parentMetadata[$descriptors] },
+              enumerable: false,
+              configurable: true,
+              writable: true
+            });
+          }
+        }
+        constructor[Symbol.metadata] = metadata;
+        return metadata;
+      },
+      isValidInstance(klass) {
+        return klass.constructor[Symbol.metadata] && Object.prototype.hasOwnProperty.call(klass.constructor[Symbol.metadata], $numFields);
+      },
+      getFields(klass) {
+        const metadata = klass[Symbol.metadata];
+        const fields = {};
+        for (let i = 0; i <= metadata[$numFields]; i++) {
+          fields[metadata[i].name] = metadata[i].type;
+        }
+        return fields;
+      },
+      hasViewTagAtIndex(metadata, index) {
+        var _a3;
+        return (_a3 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a3.includes(index);
+      }
+    };
+    function createChangeSet() {
+      return { indexes: {}, operations: [] };
+    }
+    function setOperationAtIndex(changeSet, index) {
+      const operationsIndex = changeSet.indexes[index];
+      if (operationsIndex === void 0) {
+        changeSet.indexes[index] = changeSet.operations.push(index) - 1;
+      } else {
+        changeSet.operations[operationsIndex] = index;
+      }
+    }
+    function deleteOperationAtIndex(changeSet, index) {
+      var _a3;
+      let operationsIndex = changeSet.indexes[index];
+      if (operationsIndex === void 0) {
+        operationsIndex = Object.values(changeSet.indexes).at(-1);
+        index = (_a3 = Object.entries(changeSet.indexes).find(([_, value]) => value === operationsIndex)) == null ? void 0 : _a3[0];
+      }
+      changeSet.operations[operationsIndex] = void 0;
+      delete changeSet.indexes[index];
+    }
+    function enqueueChangeTree(root, changeTree, changeSet, queueRootIndex = changeTree[changeSet].queueRootIndex) {
+      if (!root) {
+        return;
+      } else if (root[changeSet][queueRootIndex] !== changeTree) {
+        changeTree[changeSet].queueRootIndex = root[changeSet].push(changeTree) - 1;
+      }
+    }
+    class ChangeTree {
+      constructor(ref) {
+        this.isFiltered = false;
+        this.indexedOperations = {};
+        this.changes = { indexes: {}, operations: [] };
+        this.allChanges = { indexes: {}, operations: [] };
+        this.isNew = true;
+        this.ref = ref;
+        const metadata = ref.constructor[Symbol.metadata];
+        if (metadata == null ? void 0 : metadata[$viewFieldIndexes]) {
+          this.allFilteredChanges = { indexes: {}, operations: [] };
+          this.filteredChanges = { indexes: {}, operations: [] };
+        }
+      }
+      setRoot(root) {
+        var _a3;
+        this.root = root;
+        this.checkIsFiltered(this.parent, this.parentIndex);
+        const metadata = this.ref.constructor[Symbol.metadata];
+        if (metadata) {
+          (_a3 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a3.forEach((index) => {
+            const field = metadata[index];
+            const value = this.ref[field.name];
+            value == null ? void 0 : value[$changes].setRoot(root);
+          });
+        } else if (this.ref[$childType] && typeof this.ref[$childType] !== "string") {
+          this.ref.forEach((value, key) => {
+            value[$changes].setRoot(root);
+          });
+        }
+      }
+      setParent(parent, root, parentIndex) {
+        var _a3;
+        this.parent = parent;
+        this.parentIndex = parentIndex;
+        if (!root) {
+          return;
+        }
+        if (root !== this.root) {
+          this.root = root;
+          this.checkIsFiltered(parent, parentIndex);
+        } else {
+          root.add(this);
+        }
+        const metadata = this.ref.constructor[Symbol.metadata];
+        if (metadata) {
+          (_a3 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a3.forEach((index) => {
+            const field = metadata[index];
+            const value = this.ref[field.name];
+            value == null ? void 0 : value[$changes].setParent(this.ref, root, index);
+          });
+        } else if (this.ref[$childType] && typeof this.ref[$childType] !== "string") {
+          this.ref.forEach((value, key) => {
+            value[$changes].setParent(this.ref, root, this.indexes[key] ?? key);
+          });
+        }
+      }
+      forEachChild(callback) {
+        var _a3;
+        const metadata = this.ref.constructor[Symbol.metadata];
+        if (metadata) {
+          (_a3 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a3.forEach((index) => {
+            const field = metadata[index];
+            const value = this.ref[field.name];
+            if (value) {
+              callback(value[$changes], index);
+            }
+          });
+        } else if (this.ref[$childType] && typeof this.ref[$childType] !== "string") {
+          this.ref.forEach((value, key) => {
+            callback(value[$changes], this.indexes[key] ?? key);
+          });
+        }
+      }
+      operation(op) {
+        if (this.filteredChanges !== void 0) {
+          this.filteredChanges.operations.push(-op);
+          enqueueChangeTree(this.root, this, "filteredChanges");
+        } else {
+          this.changes.operations.push(-op);
+          enqueueChangeTree(this.root, this, "changes");
+        }
+      }
+      change(index, operation = exports2.OPERATION.ADD) {
+        var _a3;
+        const metadata = this.ref.constructor[Symbol.metadata];
+        const isFiltered = this.isFiltered || ((_a3 = metadata == null ? void 0 : metadata[index]) == null ? void 0 : _a3.tag) !== void 0;
+        const changeSet = isFiltered ? this.filteredChanges : this.changes;
+        const previousOperation = this.indexedOperations[index];
+        if (!previousOperation || previousOperation === exports2.OPERATION.DELETE) {
+          const op = !previousOperation ? operation : previousOperation === exports2.OPERATION.DELETE ? exports2.OPERATION.DELETE_AND_ADD : operation;
+          this.indexedOperations[index] = op;
+        }
+        setOperationAtIndex(changeSet, index);
+        if (isFiltered) {
+          setOperationAtIndex(this.allFilteredChanges, index);
+          if (this.root) {
+            enqueueChangeTree(this.root, this, "filteredChanges");
+            enqueueChangeTree(this.root, this, "allFilteredChanges");
+          }
+        } else {
+          setOperationAtIndex(this.allChanges, index);
+          enqueueChangeTree(this.root, this, "changes");
+        }
+      }
+      shiftChangeIndexes(shiftIndex) {
+        const changeSet = this.isFiltered ? this.filteredChanges : this.changes;
+        const newIndexedOperations = {};
+        const newIndexes = {};
+        for (const index in this.indexedOperations) {
+          newIndexedOperations[Number(index) + shiftIndex] = this.indexedOperations[index];
+          newIndexes[Number(index) + shiftIndex] = changeSet.indexes[index];
+        }
+        this.indexedOperations = newIndexedOperations;
+        changeSet.indexes = newIndexes;
+        changeSet.operations = changeSet.operations.map((index) => index + shiftIndex);
+      }
+      shiftAllChangeIndexes(shiftIndex, startIndex = 0) {
+        if (this.filteredChanges !== void 0) {
+          this._shiftAllChangeIndexes(shiftIndex, startIndex, this.allFilteredChanges);
+          this._shiftAllChangeIndexes(shiftIndex, startIndex, this.allChanges);
+        } else {
+          this._shiftAllChangeIndexes(shiftIndex, startIndex, this.allChanges);
+        }
+      }
+      _shiftAllChangeIndexes(shiftIndex, startIndex = 0, changeSet) {
+        const newIndexes = {};
+        let newKey = 0;
+        for (const key in changeSet.indexes) {
+          newIndexes[newKey++] = changeSet.indexes[key];
+        }
+        changeSet.indexes = newIndexes;
+        for (let i = 0; i < changeSet.operations.length; i++) {
+          const index = changeSet.operations[i];
+          if (index > startIndex) {
+            changeSet.operations[i] = index + shiftIndex;
+          }
+        }
+      }
+      indexedOperation(index, operation, allChangesIndex = index) {
+        this.indexedOperations[index] = operation;
+        if (this.filteredChanges !== void 0) {
+          setOperationAtIndex(this.allFilteredChanges, allChangesIndex);
+          setOperationAtIndex(this.filteredChanges, index);
+          enqueueChangeTree(this.root, this, "filteredChanges");
+        } else {
+          setOperationAtIndex(this.allChanges, allChangesIndex);
+          setOperationAtIndex(this.changes, index);
+          enqueueChangeTree(this.root, this, "changes");
+        }
+      }
+      getType(index) {
+        if (Metadata.isValidInstance(this.ref)) {
+          const metadata = this.ref.constructor[Symbol.metadata];
+          return metadata[index].type;
+        } else {
+          return this.ref[$childType];
+        }
+      }
+      getChange(index) {
+        return this.indexedOperations[index];
+      }
+      //
+      // used during `.encode()`
+      //
+      getValue(index, isEncodeAll = false) {
+        return this.ref[$getByIndex](index, isEncodeAll);
+      }
+      delete(index, operation, allChangesIndex = index) {
+        var _a3;
+        if (index === void 0) {
+          try {
+            throw new Error(`@colyseus/schema ${this.ref.constructor.name}: trying to delete non-existing index '${index}'`);
+          } catch (e) {
+            console.warn(e);
+          }
+          return;
+        }
+        const changeSet = this.filteredChanges !== void 0 ? this.filteredChanges : this.changes;
+        this.indexedOperations[index] = operation ?? exports2.OPERATION.DELETE;
+        setOperationAtIndex(changeSet, index);
+        deleteOperationAtIndex(this.allChanges, allChangesIndex);
+        const previousValue = this.getValue(index);
+        if (previousValue && previousValue[$changes]) {
+          (_a3 = this.root) == null ? void 0 : _a3.remove(previousValue[$changes]);
+        }
+        if (this.filteredChanges !== void 0) {
+          deleteOperationAtIndex(this.allFilteredChanges, allChangesIndex);
+          enqueueChangeTree(this.root, this, "filteredChanges");
+        } else {
+          enqueueChangeTree(this.root, this, "changes");
+        }
+        return previousValue;
+      }
+      endEncode(changeSetName) {
+        var _a3, _b2;
+        this.indexedOperations = {};
+        this[changeSetName].indexes = {};
+        this[changeSetName].operations.length = 0;
+        this[changeSetName].queueRootIndex = void 0;
+        (_b2 = (_a3 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b2.call(_a3);
+        this.isNew = false;
+      }
+      discard(discardAll = false) {
+        var _a3, _b2;
+        (_b2 = (_a3 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b2.call(_a3);
+        this.indexedOperations = {};
+        this.changes.indexes = {};
+        this.changes.operations.length = 0;
+        this.changes.queueRootIndex = void 0;
+        if (this.filteredChanges !== void 0) {
+          this.filteredChanges.indexes = {};
+          this.filteredChanges.operations.length = 0;
+          this.filteredChanges.queueRootIndex = void 0;
+        }
+        if (discardAll) {
+          this.allChanges.indexes = {};
+          this.allChanges.operations.length = 0;
+          if (this.allFilteredChanges !== void 0) {
+            this.allFilteredChanges.indexes = {};
+            this.allFilteredChanges.operations.length = 0;
+          }
+          this.forEachChild((changeTree, _) => {
+            var _a4;
+            return (_a4 = this.root) == null ? void 0 : _a4.remove(changeTree);
+          });
+        }
+      }
+      /**
+       * Recursively discard all changes from this, and child structures.
+       */
+      discardAll() {
+        const keys = Object.keys(this.indexedOperations);
+        for (let i = 0, len = keys.length; i < len; i++) {
+          const value = this.getValue(Number(keys[i]));
+          if (value && value[$changes]) {
+            value[$changes].discardAll();
+          }
+        }
+        this.discard();
+      }
+      ensureRefId() {
+        if (this.refId !== void 0) {
+          return;
+        }
+        this.refId = this.root.getNextUniqueId();
+      }
+      get changed() {
+        return Object.entries(this.indexedOperations).length > 0;
+      }
+      checkIsFiltered(parent, parentIndex) {
+        const isNewChangeTree = this.root.add(this);
+        if (this.root.types.hasFilters) {
+          this._checkFilteredByParent(parent, parentIndex);
+          if (this.filteredChanges !== void 0) {
+            enqueueChangeTree(this.root, this, "filteredChanges");
+            if (isNewChangeTree) {
+              this.root.allFilteredChanges.push(this);
+            }
+          }
+        }
+        if (!this.isFiltered) {
+          enqueueChangeTree(this.root, this, "changes");
+          if (isNewChangeTree) {
+            this.root.allChanges.push(this);
+          }
+        }
+      }
+      _checkFilteredByParent(parent, parentIndex) {
+        if (!parent) {
+          return;
+        }
+        const refType = Metadata.isValidInstance(this.ref) ? this.ref.constructor : this.ref[$childType];
+        let parentChangeTree;
+        let parentIsCollection = !Metadata.isValidInstance(parent);
+        if (parentIsCollection) {
+          parentChangeTree = parent[$changes];
+          parent = parentChangeTree.parent;
+          parentIndex = parentChangeTree.parentIndex;
+        } else {
+          parentChangeTree = parent[$changes];
+        }
+        const parentConstructor = parent.constructor;
+        let key = `${this.root.types.getTypeId(refType)}`;
+        if (parentConstructor) {
+          key += `-${this.root.types.schemas.get(parentConstructor)}`;
+        }
+        key += `-${parentIndex}`;
+        const fieldHasViewTag = Metadata.hasViewTagAtIndex(parentConstructor == null ? void 0 : parentConstructor[Symbol.metadata], parentIndex);
+        this.isFiltered = parent[$changes].isFiltered || this.root.types.parentFiltered[key] || fieldHasViewTag;
+        if (this.isFiltered) {
+          this.isVisibilitySharedWithParent = parentChangeTree.isFiltered && typeof refType !== "string" && !fieldHasViewTag && parentIsCollection;
+          if (!this.filteredChanges) {
+            this.filteredChanges = createChangeSet();
+            this.allFilteredChanges = createChangeSet();
+          }
+          if (this.changes.operations.length > 0) {
+            this.changes.operations.forEach((index) => setOperationAtIndex(this.filteredChanges, index));
+            this.allChanges.operations.forEach((index) => setOperationAtIndex(this.allFilteredChanges, index));
+            this.changes = createChangeSet();
+            this.allChanges = createChangeSet();
+          }
+        }
+      }
+    }
+    function encodeValue(encoder, bytes, type2, value, operation, it) {
+      var _a3;
+      if (typeof type2 === "string") {
+        (_a3 = encode2[type2]) == null ? void 0 : _a3.call(encode2, bytes, value, it);
+      } else if (type2[Symbol.metadata] !== void 0) {
+        encode2.number(bytes, value[$changes].refId, it);
+        if ((operation & exports2.OPERATION.ADD) === exports2.OPERATION.ADD) {
+          encoder.tryEncodeTypeId(bytes, type2, value.constructor, it);
+        }
+      } else {
+        encode2.number(bytes, value[$changes].refId, it);
+      }
+    }
+    const encodeSchemaOperation = function(encoder, bytes, changeTree, index, operation, it, _, __, metadata) {
+      bytes[it.offset++] = (index | operation) & 255;
+      if (operation === exports2.OPERATION.DELETE) {
+        return;
+      }
+      const ref = changeTree.ref;
+      const field = metadata[index];
+      encodeValue(encoder, bytes, metadata[index].type, ref[field.name], operation, it);
+    };
+    const encodeKeyValueOperation = function(encoder, bytes, changeTree, index, operation, it) {
+      bytes[it.offset++] = operation & 255;
+      if (operation === exports2.OPERATION.CLEAR) {
+        return;
+      }
+      encode2.number(bytes, index, it);
+      if (operation === exports2.OPERATION.DELETE) {
+        return;
+      }
+      const ref = changeTree.ref;
+      if ((operation & exports2.OPERATION.ADD) === exports2.OPERATION.ADD) {
+        if (typeof ref["set"] === "function") {
+          const dynamicIndex = changeTree.ref["$indexes"].get(index);
+          encode2.string(bytes, dynamicIndex, it);
+        }
+      }
+      const type2 = ref[$childType];
+      const value = ref[$getByIndex](index);
+      encodeValue(encoder, bytes, type2, value, operation, it);
+    };
+    const encodeArray = function(encoder, bytes, changeTree, field, operation, it, isEncodeAll, hasView) {
+      const ref = changeTree.ref;
+      const useOperationByRefId = hasView && changeTree.isFiltered && typeof changeTree.getType(field) !== "string";
+      let refOrIndex;
+      if (useOperationByRefId) {
+        refOrIndex = ref["tmpItems"][field][$changes].refId;
+        if (operation === exports2.OPERATION.DELETE) {
+          operation = exports2.OPERATION.DELETE_BY_REFID;
+        } else if (operation === exports2.OPERATION.ADD) {
+          operation = exports2.OPERATION.ADD_BY_REFID;
+        }
+      } else {
+        refOrIndex = field;
+      }
+      bytes[it.offset++] = operation & 255;
+      if (operation === exports2.OPERATION.CLEAR || operation === exports2.OPERATION.REVERSE) {
+        return;
+      }
+      encode2.number(bytes, refOrIndex, it);
+      if (operation === exports2.OPERATION.DELETE || operation === exports2.OPERATION.DELETE_BY_REFID) {
+        return;
+      }
+      const type2 = changeTree.getType(field);
+      const value = changeTree.getValue(field, isEncodeAll);
+      encodeValue(encoder, bytes, type2, value, operation, it);
+    };
+    const DEFINITION_MISMATCH = -1;
+    function decodeValue(decoder2, operation, ref, index, type2, bytes, it, allChanges) {
+      const $root = decoder2.root;
+      const previousValue = ref[$getByIndex](index);
+      let value;
+      if ((operation & exports2.OPERATION.DELETE) === exports2.OPERATION.DELETE) {
+        const previousRefId = $root.refIds.get(previousValue);
+        if (previousRefId !== void 0) {
+          $root.removeRef(previousRefId);
+        }
+        if (operation !== exports2.OPERATION.DELETE_AND_ADD) {
+          ref[$deleteByIndex](index);
+        }
+        value = void 0;
+      }
+      if (operation === exports2.OPERATION.DELETE) ;
+      else if (Schema.is(type2)) {
+        const refId = decode2.number(bytes, it);
+        value = $root.refs.get(refId);
+        if ((operation & exports2.OPERATION.ADD) === exports2.OPERATION.ADD) {
+          const childType = decoder2.getInstanceType(bytes, it, type2);
+          if (!value) {
+            value = decoder2.createInstanceOfType(childType);
+          }
+          $root.addRef(refId, value, value !== previousValue || // increment ref count if value has changed
+          operation === exports2.OPERATION.DELETE_AND_ADD && value === previousValue);
+        }
+      } else if (typeof type2 === "string") {
+        value = decode2[type2](bytes, it);
+      } else {
+        const typeDef = getType(Object.keys(type2)[0]);
+        const refId = decode2.number(bytes, it);
+        const valueRef = $root.refs.has(refId) ? previousValue || $root.refs.get(refId) : new typeDef.constructor();
+        value = valueRef.clone(true);
+        value[$childType] = Object.values(type2)[0];
+        if (previousValue) {
+          let previousRefId = $root.refIds.get(previousValue);
+          if (previousRefId !== void 0 && refId !== previousRefId) {
+            const entries = previousValue.entries();
+            let iter;
+            while ((iter = entries.next()) && !iter.done) {
+              const [key, value2] = iter.value;
+              if (typeof value2 === "object") {
+                previousRefId = $root.refIds.get(value2);
+                $root.removeRef(previousRefId);
+              }
+              allChanges.push({
+                ref: previousValue,
+                refId: previousRefId,
+                op: exports2.OPERATION.DELETE,
+                field: key,
+                value: void 0,
+                previousValue: value2
+              });
+            }
+          }
+        }
+        $root.addRef(refId, value, valueRef !== previousValue || operation === exports2.OPERATION.DELETE_AND_ADD && valueRef === previousValue);
+      }
+      return { value, previousValue };
+    }
+    const decodeSchemaOperation = function(decoder2, bytes, it, ref, allChanges) {
+      const first_byte = bytes[it.offset++];
+      const metadata = ref.constructor[Symbol.metadata];
+      const operation = first_byte >> 6 << 6;
+      const index = first_byte % (operation || 255);
+      const field = metadata[index];
+      if (field === void 0) {
+        console.warn("@colyseus/schema: field not defined at", { index, ref: ref.constructor.name, metadata });
+        return DEFINITION_MISMATCH;
+      }
+      const { value, previousValue } = decodeValue(decoder2, operation, ref, index, field.type, bytes, it, allChanges);
+      if (value !== null && value !== void 0) {
+        ref[field.name] = value;
+      }
+      if (previousValue !== value) {
+        allChanges.push({
+          ref,
+          refId: decoder2.currentRefId,
+          op: operation,
+          field: field.name,
+          value,
+          previousValue
+        });
+      }
+    };
+    const decodeKeyValueOperation = function(decoder2, bytes, it, ref, allChanges) {
+      const operation = bytes[it.offset++];
+      if (operation === exports2.OPERATION.CLEAR) {
+        decoder2.removeChildRefs(ref, allChanges);
+        ref.clear();
+        return;
+      }
+      const index = decode2.number(bytes, it);
+      const type2 = ref[$childType];
+      let dynamicIndex;
+      if ((operation & exports2.OPERATION.ADD) === exports2.OPERATION.ADD) {
+        if (typeof ref["set"] === "function") {
+          dynamicIndex = decode2.string(bytes, it);
+          ref["setIndex"](index, dynamicIndex);
+        } else {
+          dynamicIndex = index;
+        }
+      } else {
+        dynamicIndex = ref["getIndex"](index);
+      }
+      const { value, previousValue } = decodeValue(decoder2, operation, ref, index, type2, bytes, it, allChanges);
+      if (value !== null && value !== void 0) {
+        if (typeof ref["set"] === "function") {
+          ref["$items"].set(dynamicIndex, value);
+        } else if (typeof ref["$setAt"] === "function") {
+          ref["$setAt"](index, value, operation);
+        } else if (typeof ref["add"] === "function") {
+          const index2 = ref.add(value);
+          if (typeof index2 === "number") {
+            ref["setIndex"](index2, index2);
+          }
+        }
+      }
+      if (previousValue !== value) {
+        allChanges.push({
+          ref,
+          refId: decoder2.currentRefId,
+          op: operation,
+          field: "",
+          // FIXME: remove this
+          dynamicIndex,
+          value,
+          previousValue
+        });
+      }
+    };
+    const decodeArray = function(decoder2, bytes, it, ref, allChanges) {
+      let operation = bytes[it.offset++];
+      let index;
+      if (operation === exports2.OPERATION.CLEAR) {
+        decoder2.removeChildRefs(ref, allChanges);
+        ref.clear();
+        return;
+      } else if (operation === exports2.OPERATION.REVERSE) {
+        ref.reverse();
+        return;
+      } else if (operation === exports2.OPERATION.DELETE_BY_REFID) {
+        const refId = decode2.number(bytes, it);
+        const previousValue2 = decoder2.root.refs.get(refId);
+        index = ref.findIndex((value2) => value2 === previousValue2);
+        ref[$deleteByIndex](index);
+        allChanges.push({
+          ref,
+          refId: decoder2.currentRefId,
+          op: exports2.OPERATION.DELETE,
+          field: "",
+          // FIXME: remove this
+          dynamicIndex: index,
+          value: void 0,
+          previousValue: previousValue2
+        });
+        return;
+      } else if (operation === exports2.OPERATION.ADD_BY_REFID) {
+        const refId = decode2.number(bytes, it);
+        const itemByRefId = decoder2.root.refs.get(refId);
+        if (itemByRefId) {
+          index = ref.findIndex((value2) => value2 === itemByRefId);
+        }
+        if (index === -1 || index === void 0) {
+          index = ref.length;
+        }
+      } else {
+        index = decode2.number(bytes, it);
+      }
+      const type2 = ref[$childType];
+      let dynamicIndex = index;
+      const { value, previousValue } = decodeValue(decoder2, operation, ref, index, type2, bytes, it, allChanges);
+      if (value !== null && value !== void 0 && value !== previousValue) {
+        ref["$setAt"](index, value, operation);
+      }
+      if (previousValue !== value) {
+        allChanges.push({
+          ref,
+          refId: decoder2.currentRefId,
+          op: operation,
+          field: "",
+          // FIXME: remove this
+          dynamicIndex,
+          value,
+          previousValue
+        });
+      }
+    };
+    class EncodeSchemaError extends Error {
+    }
+    function assertType(value, type2, klass, field) {
+      let typeofTarget;
+      let allowNull = false;
+      switch (type2) {
+        case "number":
+        case "int8":
+        case "uint8":
+        case "int16":
+        case "uint16":
+        case "int32":
+        case "uint32":
+        case "int64":
+        case "uint64":
+        case "float32":
+        case "float64":
+          typeofTarget = "number";
+          if (isNaN(value)) {
+            console.log(`trying to encode "NaN" in ${klass.constructor.name}#${field}`);
+          }
+          break;
+        case "bigint64":
+        case "biguint64":
+          typeofTarget = "bigint";
+          break;
+        case "string":
+          typeofTarget = "string";
+          allowNull = true;
+          break;
+        case "boolean":
+          return;
+        default:
+          return;
+      }
+      if (typeof value !== typeofTarget && (!allowNull || allowNull && value !== null)) {
+        let foundValue = `'${JSON.stringify(value)}'${value && value.constructor && ` (${value.constructor.name})` || ""}`;
+        throw new EncodeSchemaError(`a '${typeofTarget}' was expected, but ${foundValue} was provided in ${klass.constructor.name}#${field}`);
+      }
+    }
+    function assertInstanceType(value, type2, instance, field) {
+      if (!(value instanceof type2)) {
+        throw new EncodeSchemaError(`a '${type2.name}' was expected, but '${value && value.constructor.name}' was provided in ${instance.constructor.name}#${field}`);
+      }
+    }
+    var _a$4, _b$4;
+    const DEFAULT_SORT = (a, b) => {
+      const A = a.toString();
+      const B = b.toString();
+      if (A < B)
+        return -1;
+      else if (A > B)
+        return 1;
+      else
+        return 0;
+    };
+    const _ArraySchema = class _ArraySchema {
+      /**
+       * Determine if a property must be filtered.
+       * - If returns false, the property is NOT going to be encoded.
+       * - If returns true, the property is going to be encoded.
+       *
+       * Encoding with "filters" happens in two steps:
+       * - First, the encoder iterates over all "not owned" properties and encodes them.
+       * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
+       */
+      static [(_a$4 = $encoder, _b$4 = $decoder, $filter)](ref, index, view2) {
+        var _a3;
+        return !view2 || typeof ref[$childType] === "string" || view2.isChangeTreeVisible((_a3 = ref["tmpItems"][index]) == null ? void 0 : _a3[$changes]);
+      }
+      static is(type2) {
+        return (
+          // type format: ["string"]
+          Array.isArray(type2) || // type format: { array: "string" }
+          type2["array"] !== void 0
+        );
+      }
+      static from(iterable) {
+        return new _ArraySchema(...Array.from(iterable));
+      }
+      constructor(...items) {
+        this.items = [];
+        this.tmpItems = [];
+        this.deletedIndexes = {};
+        this.isMovingItems = false;
+        Object.defineProperty(this, $childType, {
+          value: void 0,
+          enumerable: false,
+          writable: true,
+          configurable: true
+        });
+        const proxy = new Proxy(this, {
+          get: (obj, prop) => {
+            if (typeof prop !== "symbol" && // FIXME: d8 accuses this as low performance
+            !isNaN(prop)) {
+              return this.items[prop];
+            } else {
+              return Reflect.get(obj, prop);
+            }
+          },
+          set: (obj, key, setValue) => {
+            var _a3;
+            if (typeof key !== "symbol" && !isNaN(key)) {
+              if (setValue === void 0 || setValue === null) {
+                obj.$deleteAt(key);
+              } else {
+                if (setValue[$changes]) {
+                  assertInstanceType(setValue, obj[$childType], obj, key);
+                  const previousValue = obj.items[key];
+                  if (!obj.isMovingItems) {
+                    obj.$changeAt(Number(key), setValue);
+                  } else {
+                    if (previousValue !== void 0) {
+                      if (setValue[$changes].isNew) {
+                        obj[$changes].indexedOperation(Number(key), exports2.OPERATION.MOVE_AND_ADD);
+                      } else {
+                        if ((obj[$changes].getChange(Number(key)) & exports2.OPERATION.DELETE) === exports2.OPERATION.DELETE) {
+                          obj[$changes].indexedOperation(Number(key), exports2.OPERATION.DELETE_AND_MOVE);
+                        } else {
+                          obj[$changes].indexedOperation(Number(key), exports2.OPERATION.MOVE);
+                        }
+                      }
+                    } else if (setValue[$changes].isNew) {
+                      obj[$changes].indexedOperation(Number(key), exports2.OPERATION.ADD);
+                    }
+                    setValue[$changes].setParent(this, obj[$changes].root, key);
+                  }
+                  if (previousValue !== void 0) {
+                    (_a3 = previousValue[$changes].root) == null ? void 0 : _a3.remove(previousValue[$changes]);
+                  }
+                } else {
+                  obj.$changeAt(Number(key), setValue);
+                }
+                obj.items[key] = setValue;
+                obj.tmpItems[key] = setValue;
+              }
+              return true;
+            } else {
+              return Reflect.set(obj, key, setValue);
+            }
+          },
+          deleteProperty: (obj, prop) => {
+            if (typeof prop === "number") {
+              obj.$deleteAt(prop);
+            } else {
+              delete obj[prop];
+            }
+            return true;
+          },
+          has: (obj, key) => {
+            if (typeof key !== "symbol" && !isNaN(Number(key))) {
+              return Reflect.has(this.items, key);
+            }
+            return Reflect.has(obj, key);
+          }
+        });
+        this[$changes] = new ChangeTree(proxy);
+        this[$changes].indexes = {};
+        if (items.length > 0) {
+          this.push(...items);
+        }
+        return proxy;
+      }
+      set length(newLength) {
+        if (newLength === 0) {
+          this.clear();
+        } else if (newLength < this.items.length) {
+          this.splice(newLength, this.length - newLength);
+        } else {
+          console.warn("ArraySchema: can't set .length to a higher value than its length.");
+        }
+      }
+      get length() {
+        return this.items.length;
+      }
+      push(...values) {
+        var _a3;
+        let length = this.tmpItems.length;
+        const changeTree = this[$changes];
+        for (let i = 0, l = values.length; i < values.length; i++, length++) {
+          const value = values[i];
+          if (value === void 0 || value === null) {
+            return;
+          } else if (typeof value === "object" && this[$childType]) {
+            assertInstanceType(value, this[$childType], this, i);
+          }
+          changeTree.indexedOperation(length, exports2.OPERATION.ADD, this.items.length);
+          this.items.push(value);
+          this.tmpItems.push(value);
+          (_a3 = value[$changes]) == null ? void 0 : _a3.setParent(this, changeTree.root, length);
+        }
+        return length;
+      }
+      /**
+       * Removes the last element from an array and returns it.
+       */
+      pop() {
+        let index = -1;
+        for (let i = this.tmpItems.length - 1; i >= 0; i--) {
+          if (this.deletedIndexes[i] !== true) {
+            index = i;
+            break;
+          }
+        }
+        if (index < 0) {
+          return void 0;
+        }
+        this[$changes].delete(index, void 0, this.items.length - 1);
+        this.deletedIndexes[index] = true;
+        return this.items.pop();
+      }
+      at(index) {
+        if (index < 0)
+          index += this.length;
+        return this.items[index];
+      }
+      // encoding only
+      $changeAt(index, value) {
+        var _a3;
+        if (value === void 0 || value === null) {
+          console.error("ArraySchema items cannot be null nor undefined; Use `deleteAt(index)` instead.");
+          return;
+        }
+        if (this.items[index] === value) {
+          return;
+        }
+        const operation = this.items[index] !== void 0 ? typeof value === "object" ? exports2.OPERATION.DELETE_AND_ADD : exports2.OPERATION.REPLACE : exports2.OPERATION.ADD;
+        const changeTree = this[$changes];
+        changeTree.change(index, operation);
+        (_a3 = value[$changes]) == null ? void 0 : _a3.setParent(this, changeTree.root, index);
+      }
+      // encoding only
+      $deleteAt(index, operation) {
+        this[$changes].delete(index, operation);
+      }
+      // decoding only
+      $setAt(index, value, operation) {
+        if (index === 0 && operation === exports2.OPERATION.ADD && this.items[index] !== void 0) {
+          this.items.unshift(value);
+        } else if (operation === exports2.OPERATION.DELETE_AND_MOVE) {
+          this.items.splice(index, 1);
+          this.items[index] = value;
+        } else {
+          this.items[index] = value;
+        }
+      }
+      clear() {
+        if (this.items.length === 0) {
+          return;
+        }
+        const changeTree = this[$changes];
+        changeTree.forEachChild((changeTree2, _) => {
+          changeTree2.discard(true);
+          const root = changeTree2.root;
+          if (root !== void 0) {
+            root.removeChangeFromChangeSet("changes", changeTree2);
+            root.removeChangeFromChangeSet("allChanges", changeTree2);
+            root.removeChangeFromChangeSet("allFilteredChanges", changeTree2);
+          }
+        });
+        changeTree.discard(true);
+        changeTree.operation(exports2.OPERATION.CLEAR);
+        this.items.length = 0;
+        this.tmpItems.length = 0;
+      }
+      /**
+       * Combines two or more arrays.
+       * @param items Additional items to add to the end of array1.
+       */
+      // @ts-ignore
+      concat(...items) {
+        return new _ArraySchema(...this.items.concat(...items));
+      }
+      /**
+       * Adds all the elements of an array separated by the specified separator string.
+       * @param separator A string used to separate one element of an array from the next in the resulting String. If omitted, the array elements are separated with a comma.
+       */
+      join(separator) {
+        return this.items.join(separator);
+      }
+      /**
+       * Reverses the elements in an Array.
+       */
+      // @ts-ignore
+      reverse() {
+        this[$changes].operation(exports2.OPERATION.REVERSE);
+        this.items.reverse();
+        this.tmpItems.reverse();
+        return this;
+      }
+      /**
+       * Removes the first element from an array and returns it.
+       */
+      shift() {
+        if (this.items.length === 0) {
+          return void 0;
+        }
+        const changeTree = this[$changes];
+        const index = this.tmpItems.findIndex((item) => item === this.items[0]);
+        const allChangesIndex = this.items.findIndex((item) => item === this.items[0]);
+        changeTree.delete(index, exports2.OPERATION.DELETE, allChangesIndex);
+        changeTree.shiftAllChangeIndexes(-1, allChangesIndex);
+        return this.items.shift();
+      }
+      /**
+       * Returns a section of an array.
+       * @param start The beginning of the specified portion of the array.
+       * @param end The end of the specified portion of the array. This is exclusive of the element at the index 'end'.
+       */
+      slice(start, end) {
+        const sliced = new _ArraySchema();
+        sliced.push(...this.items.slice(start, end));
+        return sliced;
+      }
+      /**
+       * Sorts an array.
+       * @param compareFn Function used to determine the order of the elements. It is expected to return
+       * a negative value if first argument is less than second argument, zero if they're equal and a positive
+       * value otherwise. If omitted, the elements are sorted in ascending, ASCII character order.
+       * ```ts
+       * [11,2,22,1].sort((a, b) => a - b)
+       * ```
+       */
+      sort(compareFn = DEFAULT_SORT) {
+        this.isMovingItems = true;
+        const changeTree = this[$changes];
+        const sortedItems = this.items.sort(compareFn);
+        sortedItems.forEach((_, i) => changeTree.change(i, exports2.OPERATION.REPLACE));
+        this.tmpItems.sort(compareFn);
+        this.isMovingItems = false;
+        return this;
+      }
+      /**
+       * Removes elements from an array and, if necessary, inserts new elements in their place, returning the deleted elements.
+       * @param start The zero-based location in the array from which to start removing elements.
+       * @param deleteCount The number of elements to remove.
+       * @param insertItems Elements to insert into the array in place of the deleted elements.
+       */
+      splice(start, deleteCount, ...insertItems) {
+        var _a3;
+        const changeTree = this[$changes];
+        const itemsLength = this.items.length;
+        const tmpItemsLength = this.tmpItems.length;
+        const insertCount = insertItems.length;
+        const indexes = [];
+        for (let i = 0; i < tmpItemsLength; i++) {
+          if (this.deletedIndexes[i] !== true) {
+            indexes.push(i);
+          }
+        }
+        if (itemsLength > start) {
+          if (deleteCount === void 0) {
+            deleteCount = itemsLength - start;
+          }
+          for (let i = start; i < start + deleteCount; i++) {
+            const index = indexes[i];
+            changeTree.delete(index, exports2.OPERATION.DELETE);
+            this.deletedIndexes[index] = true;
+          }
+        } else {
+          deleteCount = 0;
+        }
+        if (insertCount > 0) {
+          if (insertCount > deleteCount) {
+            console.error("Inserting more elements than deleting during ArraySchema#splice()");
+            throw new Error("ArraySchema#splice(): insertCount must be equal or lower than deleteCount.");
+          }
+          for (let i = 0; i < insertCount; i++) {
+            const addIndex = (indexes[start] ?? itemsLength) + i;
+            changeTree.indexedOperation(addIndex, this.deletedIndexes[addIndex] ? exports2.OPERATION.DELETE_AND_ADD : exports2.OPERATION.ADD);
+            (_a3 = insertItems[i][$changes]) == null ? void 0 : _a3.setParent(this, changeTree.root, addIndex);
+          }
+        }
+        if (deleteCount > insertCount) {
+          changeTree.shiftAllChangeIndexes(-(deleteCount - insertCount), indexes[start + insertCount]);
+        }
+        if (changeTree.filteredChanges !== void 0) {
+          enqueueChangeTree(changeTree.root, changeTree, "filteredChanges");
+        } else {
+          enqueueChangeTree(changeTree.root, changeTree, "changes");
+        }
+        return this.items.splice(start, deleteCount, ...insertItems);
+      }
+      /**
+       * Inserts new elements at the start of an array.
+       * @param items  Elements to insert at the start of the Array.
+       */
+      unshift(...items) {
+        const changeTree = this[$changes];
+        changeTree.shiftChangeIndexes(items.length);
+        if (changeTree.isFiltered) {
+          setOperationAtIndex(changeTree.filteredChanges, this.items.length);
+        } else {
+          setOperationAtIndex(changeTree.allChanges, this.items.length);
+        }
+        items.forEach((_, index) => {
+          changeTree.change(index, exports2.OPERATION.ADD);
+        });
+        this.tmpItems.unshift(...items);
+        return this.items.unshift(...items);
+      }
+      /**
+       * Returns the index of the first occurrence of a value in an array.
+       * @param searchElement The value to locate in the array.
+       * @param fromIndex The array index at which to begin the search. If fromIndex is omitted, the search starts at index 0.
+       */
+      indexOf(searchElement, fromIndex) {
+        return this.items.indexOf(searchElement, fromIndex);
+      }
+      /**
+       * Returns the index of the last occurrence of a specified value in an array.
+       * @param searchElement The value to locate in the array.
+       * @param fromIndex The array index at which to begin the search. If fromIndex is omitted, the search starts at the last index in the array.
+       */
+      lastIndexOf(searchElement, fromIndex = this.length - 1) {
+        return this.items.lastIndexOf(searchElement, fromIndex);
+      }
+      every(callbackfn, thisArg) {
+        return this.items.every(callbackfn, thisArg);
+      }
+      /**
+       * Determines whether the specified callback function returns true for any element of an array.
+       * @param callbackfn A function that accepts up to three arguments. The some method calls
+       * the callbackfn function for each element in the array until the callbackfn returns a value
+       * which is coercible to the Boolean value true, or until the end of the array.
+       * @param thisArg An object to which the this keyword can refer in the callbackfn function.
+       * If thisArg is omitted, undefined is used as the this value.
+       */
+      some(callbackfn, thisArg) {
+        return this.items.some(callbackfn, thisArg);
+      }
+      /**
+       * Performs the specified action for each element in an array.
+       * @param callbackfn  A function that accepts up to three arguments. forEach calls the callbackfn function one time for each element in the array.
+       * @param thisArg  An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+       */
+      forEach(callbackfn, thisArg) {
+        return this.items.forEach(callbackfn, thisArg);
+      }
+      /**
+       * Calls a defined callback function on each element of an array, and returns an array that contains the results.
+       * @param callbackfn A function that accepts up to three arguments. The map method calls the callbackfn function one time for each element in the array.
+       * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+       */
+      map(callbackfn, thisArg) {
+        return this.items.map(callbackfn, thisArg);
+      }
+      filter(callbackfn, thisArg) {
+        return this.items.filter(callbackfn, thisArg);
+      }
+      /**
+       * Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.
+       * @param callbackfn A function that accepts up to four arguments. The reduce method calls the callbackfn function one time for each element in the array.
+       * @param initialValue If initialValue is specified, it is used as the initial value to start the accumulation. The first call to the callbackfn function provides this value as an argument instead of an array value.
+       */
+      reduce(callbackfn, initialValue) {
+        return this.items.reduce(callbackfn, initialValue);
+      }
+      /**
+       * Calls the specified callback function for all the elements in an array, in descending order. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.
+       * @param callbackfn A function that accepts up to four arguments. The reduceRight method calls the callbackfn function one time for each element in the array.
+       * @param initialValue If initialValue is specified, it is used as the initial value to start the accumulation. The first call to the callbackfn function provides this value as an argument instead of an array value.
+       */
+      reduceRight(callbackfn, initialValue) {
+        return this.items.reduceRight(callbackfn, initialValue);
+      }
+      /**
+       * Returns the value of the first element in the array where predicate is true, and undefined
+       * otherwise.
+       * @param predicate find calls predicate once for each element of the array, in ascending
+       * order, until it finds one where predicate returns true. If such an element is found, find
+       * immediately returns that element value. Otherwise, find returns undefined.
+       * @param thisArg If provided, it will be used as the this value for each invocation of
+       * predicate. If it is not provided, undefined is used instead.
+       */
+      find(predicate, thisArg) {
+        return this.items.find(predicate, thisArg);
+      }
+      /**
+       * Returns the index of the first element in the array where predicate is true, and -1
+       * otherwise.
+       * @param predicate find calls predicate once for each element of the array, in ascending
+       * order, until it finds one where predicate returns true. If such an element is found,
+       * findIndex immediately returns that element index. Otherwise, findIndex returns -1.
+       * @param thisArg If provided, it will be used as the this value for each invocation of
+       * predicate. If it is not provided, undefined is used instead.
+       */
+      findIndex(predicate, thisArg) {
+        return this.items.findIndex(predicate, thisArg);
+      }
+      /**
+       * Returns the this object after filling the section identified by start and end with value
+       * @param value value to fill array section with
+       * @param start index to start filling the array at. If start is negative, it is treated as
+       * length+start where length is the length of the array.
+       * @param end index to stop filling the array at. If end is negative, it is treated as
+       * length+end.
+       */
+      fill(value, start, end) {
+        throw new Error("ArraySchema#fill() not implemented");
+      }
+      /**
+       * Returns the this object after copying a section of the array identified by start and end
+       * to the same array starting at position target
+       * @param target If target is negative, it is treated as length+target where length is the
+       * length of the array.
+       * @param start If start is negative, it is treated as length+start. If end is negative, it
+       * is treated as length+end.
+       * @param end If not specified, length of the this object is used as its default value.
+       */
+      copyWithin(target2, start, end) {
+        throw new Error("ArraySchema#copyWithin() not implemented");
+      }
+      /**
+       * Returns a string representation of an array.
+       */
+      toString() {
+        return this.items.toString();
+      }
+      /**
+       * Returns a string representation of an array. The elements are converted to string using their toLocalString methods.
+       */
+      toLocaleString() {
+        return this.items.toLocaleString();
+      }
+      /** Iterator */
+      [Symbol.iterator]() {
+        return this.items[Symbol.iterator]();
+      }
+      static get [Symbol.species]() {
+        return _ArraySchema;
+      }
+      /**
+       * Returns an iterable of key, value pairs for every entry in the array
+       */
+      entries() {
+        return this.items.entries();
+      }
+      /**
+       * Returns an iterable of keys in the array
+       */
+      keys() {
+        return this.items.keys();
+      }
+      /**
+       * Returns an iterable of values in the array
+       */
+      values() {
+        return this.items.values();
+      }
+      /**
+       * Determines whether an array includes a certain element, returning true or false as appropriate.
+       * @param searchElement The element to search for.
+       * @param fromIndex The position in this array at which to begin searching for searchElement.
+       */
+      includes(searchElement, fromIndex) {
+        return this.items.includes(searchElement, fromIndex);
+      }
+      //
+      // ES2022
+      //
+      /**
+       * Calls a defined callback function on each element of an array. Then, flattens the result into
+       * a new array.
+       * This is identical to a map followed by flat with depth 1.
+       *
+       * @param callback A function that accepts up to three arguments. The flatMap method calls the
+       * callback function one time for each element in the array.
+       * @param thisArg An object to which the this keyword can refer in the callback function. If
+       * thisArg is omitted, undefined is used as the this value.
+       */
+      // @ts-ignore
+      flatMap(callback, thisArg) {
+        throw new Error("ArraySchema#flatMap() is not supported.");
+      }
+      /**
+       * Returns a new array with all sub-array elements concatenated into it recursively up to the
+       * specified depth.
+       *
+       * @param depth The maximum recursion depth
+       */
+      // @ts-ignore
+      flat(depth) {
+        throw new Error("ArraySchema#flat() is not supported.");
+      }
+      findLast() {
+        return this.items.findLast.apply(this.items, arguments);
+      }
+      findLastIndex(...args) {
+        return this.items.findLastIndex.apply(this.items, arguments);
+      }
+      //
+      // ES2023
+      //
+      with(index, value) {
+        const copy2 = this.items.slice();
+        if (index < 0)
+          index += this.length;
+        copy2[index] = value;
+        return new _ArraySchema(...copy2);
+      }
+      toReversed() {
+        return this.items.slice().reverse();
+      }
+      toSorted(compareFn) {
+        return this.items.slice().sort(compareFn);
+      }
+      // @ts-ignore
+      toSpliced(start, deleteCount, ...items) {
+        return this.items.toSpliced.apply(copy, arguments);
+      }
+      shuffle() {
+        return this.move((_) => {
+          let currentIndex = this.items.length;
+          while (currentIndex != 0) {
+            let randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [this[currentIndex], this[randomIndex]] = [this[randomIndex], this[currentIndex]];
+          }
+        });
+      }
+      /**
+       * Allows to move items around in the array.
+       *
+       * Example:
+       *     state.cards.move((cards) => {
+       *         [cards[4], cards[3]] = [cards[3], cards[4]];
+       *         [cards[3], cards[2]] = [cards[2], cards[3]];
+       *         [cards[2], cards[0]] = [cards[0], cards[2]];
+       *         [cards[1], cards[1]] = [cards[1], cards[1]];
+       *         [cards[0], cards[0]] = [cards[0], cards[0]];
+       *     })
+       *
+       * @param cb
+       * @returns
+       */
+      move(cb) {
+        this.isMovingItems = true;
+        cb(this);
+        this.isMovingItems = false;
+        return this;
+      }
+      [$getByIndex](index, isEncodeAll = false) {
+        return isEncodeAll ? this.items[index] : this.deletedIndexes[index] ? this.items[index] : this.tmpItems[index] || this.items[index];
+      }
+      [$deleteByIndex](index) {
+        this.items[index] = void 0;
+        this.tmpItems[index] = void 0;
+      }
+      [$onEncodeEnd]() {
+        this.tmpItems = this.items.slice();
+        this.deletedIndexes = {};
+      }
+      [$onDecodeEnd]() {
+        this.items = this.items.filter((item) => item !== void 0);
+        this.tmpItems = this.items.slice();
+      }
+      toArray() {
+        return this.items.slice(0);
+      }
+      toJSON() {
+        return this.toArray().map((value) => {
+          return typeof value["toJSON"] === "function" ? value["toJSON"]() : value;
+        });
+      }
+      //
+      // Decoding utilities
+      //
+      clone(isDecoding) {
+        let cloned;
+        if (isDecoding) {
+          cloned = new _ArraySchema();
+          cloned.push(...this.items);
+        } else {
+          cloned = new _ArraySchema(...this.map((item) => item[$changes] ? item.clone() : item));
+        }
+        return cloned;
+      }
+    };
+    _ArraySchema[_a$4] = encodeArray;
+    _ArraySchema[_b$4] = decodeArray;
+    let ArraySchema = _ArraySchema;
+    registerType("array", { constructor: ArraySchema });
+    var _a$3, _b$3;
+    const _MapSchema = class _MapSchema {
+      /**
+       * Determine if a property must be filtered.
+       * - If returns false, the property is NOT going to be encoded.
+       * - If returns true, the property is going to be encoded.
+       *
+       * Encoding with "filters" happens in two steps:
+       * - First, the encoder iterates over all "not owned" properties and encodes them.
+       * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
+       */
+      static [(_a$3 = $encoder, _b$3 = $decoder, $filter)](ref, index, view2) {
+        return !view2 || typeof ref[$childType] === "string" || view2.isChangeTreeVisible((ref[$getByIndex](index) ?? ref.deletedItems[index])[$changes]);
+      }
+      static is(type2) {
+        return type2["map"] !== void 0;
+      }
+      constructor(initialValues) {
+        this.$items = /* @__PURE__ */ new Map();
+        this.$indexes = /* @__PURE__ */ new Map();
+        this.deletedItems = {};
+        this[$changes] = new ChangeTree(this);
+        this[$changes].indexes = {};
+        if (initialValues) {
+          if (initialValues instanceof Map || initialValues instanceof _MapSchema) {
+            initialValues.forEach((v, k) => this.set(k, v));
+          } else {
+            for (const k in initialValues) {
+              this.set(k, initialValues[k]);
+            }
+          }
+        }
+        Object.defineProperty(this, $childType, {
+          value: void 0,
+          enumerable: false,
+          writable: true,
+          configurable: true
+        });
+      }
+      /** Iterator */
+      [Symbol.iterator]() {
+        return this.$items[Symbol.iterator]();
+      }
+      get [Symbol.toStringTag]() {
+        return this.$items[Symbol.toStringTag];
+      }
+      static get [Symbol.species]() {
+        return _MapSchema;
+      }
+      set(key, value) {
+        var _a3;
+        if (value === void 0 || value === null) {
+          throw new Error(`MapSchema#set('${key}', ${value}): trying to set ${value} value on '${key}'.`);
+        } else if (typeof value === "object" && this[$childType]) {
+          assertInstanceType(value, this[$childType], this, key);
+        }
+        key = key.toString();
+        const changeTree = this[$changes];
+        const isRef = value[$changes] !== void 0;
+        let index;
+        let operation;
+        if (typeof changeTree.indexes[key] !== "undefined") {
+          index = changeTree.indexes[key];
+          operation = exports2.OPERATION.REPLACE;
+          const previousValue = this.$items.get(key);
+          if (previousValue === value) {
+            return;
+          } else if (isRef) {
+            operation = exports2.OPERATION.DELETE_AND_ADD;
+            if (previousValue !== void 0) {
+              (_a3 = previousValue[$changes].root) == null ? void 0 : _a3.remove(previousValue[$changes]);
+            }
+          }
+        } else {
+          index = changeTree.indexes[$numFields] ?? 0;
+          operation = exports2.OPERATION.ADD;
+          this.$indexes.set(index, key);
+          changeTree.indexes[key] = index;
+          changeTree.indexes[$numFields] = index + 1;
+        }
+        this.$items.set(key, value);
+        changeTree.change(index, operation);
+        if (isRef) {
+          value[$changes].setParent(this, changeTree.root, index);
+        }
+        return this;
+      }
+      get(key) {
+        return this.$items.get(key);
+      }
+      delete(key) {
+        const index = this[$changes].indexes[key];
+        this.deletedItems[index] = this[$changes].delete(index);
+        return this.$items.delete(key);
+      }
+      clear() {
+        const changeTree = this[$changes];
+        changeTree.discard(true);
+        changeTree.indexes = {};
+        this.$indexes.clear();
+        this.$items.clear();
+        changeTree.operation(exports2.OPERATION.CLEAR);
+      }
+      has(key) {
+        return this.$items.has(key);
+      }
+      forEach(callbackfn) {
+        this.$items.forEach(callbackfn);
+      }
+      entries() {
+        return this.$items.entries();
+      }
+      keys() {
+        return this.$items.keys();
+      }
+      values() {
+        return this.$items.values();
+      }
+      get size() {
+        return this.$items.size;
+      }
+      setIndex(index, key) {
+        this.$indexes.set(index, key);
+      }
+      getIndex(index) {
+        return this.$indexes.get(index);
+      }
+      [$getByIndex](index) {
+        return this.$items.get(this.$indexes.get(index));
+      }
+      [$deleteByIndex](index) {
+        const key = this.$indexes.get(index);
+        this.$items.delete(key);
+        this.$indexes.delete(index);
+      }
+      [$onEncodeEnd]() {
+        this.deletedItems = {};
+      }
+      toJSON() {
+        const map = {};
+        this.forEach((value, key) => {
+          map[key] = typeof value["toJSON"] === "function" ? value["toJSON"]() : value;
+        });
+        return map;
+      }
+      //
+      // Decoding utilities
+      //
+      // @ts-ignore
+      clone(isDecoding) {
+        let cloned;
+        if (isDecoding) {
+          cloned = Object.assign(new _MapSchema(), this);
+        } else {
+          cloned = new _MapSchema();
+          this.forEach((value, key) => {
+            if (value[$changes]) {
+              cloned.set(key, value["clone"]());
+            } else {
+              cloned.set(key, value);
+            }
+          });
+        }
+        return cloned;
+      }
+    };
+    _MapSchema[_a$3] = encodeKeyValueOperation;
+    _MapSchema[_b$3] = decodeKeyValueOperation;
+    let MapSchema = _MapSchema;
+    registerType("map", { constructor: MapSchema });
+    const DEFAULT_VIEW_TAG = -1;
+    function entity(constructor) {
+      TypeContext.register(constructor);
+      return constructor;
+    }
+    function view(tag = DEFAULT_VIEW_TAG) {
+      return function(target2, fieldName) {
+        var _a3;
+        const constructor = target2.constructor;
+        const parentClass = Object.getPrototypeOf(constructor);
+        const parentMetadata = parentClass[Symbol.metadata];
+        const metadata = constructor[_a3 = Symbol.metadata] ?? (constructor[_a3] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
+        Metadata.setTag(metadata, fieldName, tag);
+      };
+    }
+    function type(type2, options) {
+      return function(target2, field) {
+        const constructor = target2.constructor;
+        if (!type2) {
+          throw new Error(`${constructor.name}: @type() reference provided for "${field}" is undefined. Make sure you don't have any circular dependencies.`);
+        }
+        TypeContext.register(constructor);
+        const parentClass = Object.getPrototypeOf(constructor);
+        const parentMetadata = parentClass[Symbol.metadata];
+        const metadata = Metadata.initialize(constructor);
+        let fieldIndex = metadata[field];
+        if (metadata[fieldIndex] !== void 0) {
+          if (metadata[fieldIndex].deprecated) {
+            return;
+          } else if (metadata[fieldIndex].type !== void 0) {
+            try {
+              throw new Error(`@colyseus/schema: Duplicate '${field}' definition on '${constructor.name}'.
+Check @type() annotation`);
+            } catch (e) {
+              const definitionAtLine = e.stack.split("\n")[4].trim();
+              throw new Error(`${e.message} ${definitionAtLine}`);
+            }
+          }
+        } else {
+          fieldIndex = metadata[$numFields] ?? (parentMetadata && parentMetadata[$numFields]) ?? -1;
+          fieldIndex++;
+        }
+        if (options && options.manual) {
+          Metadata.addField(metadata, fieldIndex, field, type2, {
+            // do not declare getter/setter descriptor
+            enumerable: true,
+            configurable: true,
+            writable: true
+          });
+        } else {
+          const complexTypeKlass = Array.isArray(type2) ? getType("array") : typeof Object.keys(type2)[0] === "string" && getType(Object.keys(type2)[0]);
+          const childType = complexTypeKlass ? Object.values(type2)[0] : type2;
+          Metadata.addField(metadata, fieldIndex, field, type2, getPropertyDescriptor(`_${field}`, fieldIndex, childType, complexTypeKlass));
+        }
+      };
+    }
+    function getPropertyDescriptor(fieldCached, fieldIndex, type2, complexTypeKlass) {
+      return {
+        get: function() {
+          return this[fieldCached];
+        },
+        set: function(value) {
+          var _a3, _b2;
+          const previousValue = this[fieldCached] ?? void 0;
+          if (value === previousValue) {
+            return;
+          }
+          if (value !== void 0 && value !== null) {
+            if (complexTypeKlass) {
+              if (complexTypeKlass.constructor === ArraySchema && !(value instanceof ArraySchema)) {
+                value = new ArraySchema(...value);
+              }
+              if (complexTypeKlass.constructor === MapSchema && !(value instanceof MapSchema)) {
+                value = new MapSchema(value);
+              }
+              value[$childType] = type2;
+            } else if (typeof type2 !== "string") {
+              assertInstanceType(value, type2, this, fieldCached.substring(1));
+            } else {
+              assertType(value, type2, this, fieldCached.substring(1));
+            }
+            const changeTree = this[$changes];
+            if (previousValue !== void 0 && previousValue[$changes]) {
+              (_a3 = changeTree.root) == null ? void 0 : _a3.remove(previousValue[$changes]);
+              this.constructor[$track](changeTree, fieldIndex, exports2.OPERATION.DELETE_AND_ADD);
+            } else {
+              this.constructor[$track](changeTree, fieldIndex, exports2.OPERATION.ADD);
+            }
+            (_b2 = value[$changes]) == null ? void 0 : _b2.setParent(this, changeTree.root, fieldIndex);
+          } else if (previousValue !== void 0) {
+            this[$changes].delete(fieldIndex);
+          }
+          this[fieldCached] = value;
+        },
+        enumerable: true,
+        configurable: true
+      };
+    }
+    function deprecated(throws = true) {
+      return function(klass, field) {
+        var _a3;
+        const constructor = klass.constructor;
+        const parentClass = Object.getPrototypeOf(constructor);
+        const parentMetadata = parentClass[Symbol.metadata];
+        const metadata = constructor[_a3 = Symbol.metadata] ?? (constructor[_a3] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
+        const fieldIndex = metadata[field];
+        metadata[fieldIndex].deprecated = true;
+        if (throws) {
+          metadata[$descriptors] ?? (metadata[$descriptors] = {});
+          metadata[$descriptors][field] = {
+            get: function() {
+              throw new Error(`${field} is deprecated.`);
+            },
+            set: function(value) {
+            },
+            enumerable: false,
+            configurable: true
+          };
+        }
+        Object.defineProperty(metadata, fieldIndex, {
+          value: metadata[fieldIndex],
+          enumerable: false,
+          configurable: true
+        });
+      };
+    }
+    function defineTypes(target2, fields, options) {
+      for (let field in fields) {
+        type(fields[field], options)(target2.prototype, field);
+      }
+      return target2;
+    }
+    function schema2(fields, name, inherits = Schema) {
+      const defaultValues = {};
+      const viewTagFields = {};
+      for (let fieldName in fields) {
+        const field = fields[fieldName];
+        if (typeof field === "object") {
+          if (field["default"] !== void 0) {
+            defaultValues[fieldName] = field["default"];
+          }
+          if (field["view"] !== void 0) {
+            viewTagFields[fieldName] = typeof field["view"] === "boolean" ? DEFAULT_VIEW_TAG : field["view"];
+          }
+        }
+      }
+      const klass = Metadata.setFields(class extends inherits {
+        constructor(...args) {
+          args[0] = Object.assign({}, defaultValues, args[0]);
+          super(...args);
+        }
+      }, fields);
+      for (let fieldName in viewTagFields) {
+        view(viewTagFields[fieldName])(klass.prototype, fieldName);
+      }
+      if (name) {
+        Object.defineProperty(klass, "name", { value: name });
+      }
+      klass.extends = (fields2, name2) => schema2(fields2, name2, klass);
+      return klass;
+    }
+    function getIndent(level) {
+      return new Array(level).fill(0).map((_, i) => i === level - 1 ? `└─ ` : `   `).join("");
+    }
+    function dumpChanges(schema3) {
+      const $root = schema3[$changes].root;
+      const dump = {
+        ops: {},
+        refs: []
+      };
+      $root.changes.forEach((changeTree) => {
+        if (changeTree === void 0) {
+          return;
+        }
+        const changes = changeTree.indexedOperations;
+        dump.refs.push(`refId#${changeTree.refId}`);
+        for (const index in changes) {
+          const op = changes[index];
+          const opName = exports2.OPERATION[op];
+          if (!dump.ops[opName]) {
+            dump.ops[opName] = 0;
+          }
+          dump.ops[exports2.OPERATION[op]]++;
+        }
+      });
+      return dump;
+    }
+    var _a$2, _b$2;
+    const _Schema = class _Schema {
+      /**
+       * Assign the property descriptors required to track changes on this instance.
+       * @param instance
+       */
+      static initialize(instance) {
+        var _a3;
+        Object.defineProperty(instance, $changes, {
+          value: new ChangeTree(instance),
+          enumerable: false,
+          writable: true
+        });
+        Object.defineProperties(instance, ((_a3 = instance.constructor[Symbol.metadata]) == null ? void 0 : _a3[$descriptors]) || {});
+      }
+      static is(type2) {
+        return typeof type2[Symbol.metadata] === "object";
+      }
+      /**
+       * Track property changes
+       */
+      static [(_a$2 = $encoder, _b$2 = $decoder, $track)](changeTree, index, operation = exports2.OPERATION.ADD) {
+        changeTree.change(index, operation);
+      }
+      /**
+       * Determine if a property must be filtered.
+       * - If returns false, the property is NOT going to be encoded.
+       * - If returns true, the property is going to be encoded.
+       *
+       * Encoding with "filters" happens in two steps:
+       * - First, the encoder iterates over all "not owned" properties and encodes them.
+       * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
+       */
+      static [$filter](ref, index, view2) {
+        var _a3, _b2;
+        const metadata = ref.constructor[Symbol.metadata];
+        const tag = (_a3 = metadata[index]) == null ? void 0 : _a3.tag;
+        if (view2 === void 0) {
+          return tag === void 0;
+        } else if (tag === void 0) {
+          return true;
+        } else if (tag === DEFAULT_VIEW_TAG) {
+          return view2.isChangeTreeVisible(ref[$changes]);
+        } else {
+          const tags = (_b2 = view2.tags) == null ? void 0 : _b2.get(ref[$changes]);
+          return tags && tags.has(tag);
+        }
+      }
+      // allow inherited classes to have a constructor
+      constructor(...args) {
+        _Schema.initialize(this);
+        if (args[0]) {
+          Object.assign(this, args[0]);
+        }
+      }
+      assign(props) {
+        Object.assign(this, props);
+        return this;
+      }
+      /**
+       * (Server-side): Flag a property to be encoded for the next patch.
+       * @param instance Schema instance
+       * @param property string representing the property name, or number representing the index of the property.
+       * @param operation OPERATION to perform (detected automatically)
+       */
+      setDirty(property, operation) {
+        const metadata = this.constructor[Symbol.metadata];
+        this[$changes].change(metadata[metadata[property]].index, operation);
+      }
+      clone() {
+        var _a3;
+        const cloned = new this.constructor();
+        const metadata = this.constructor[Symbol.metadata];
+        for (const fieldIndex in metadata) {
+          const field = metadata[fieldIndex].name;
+          if (typeof this[field] === "object" && typeof ((_a3 = this[field]) == null ? void 0 : _a3.clone) === "function") {
+            cloned[field] = this[field].clone();
+          } else {
+            cloned[field] = this[field];
+          }
+        }
+        return cloned;
+      }
+      toJSON() {
+        const obj = {};
+        const metadata = this.constructor[Symbol.metadata];
+        for (const index in metadata) {
+          const field = metadata[index];
+          const fieldName = field.name;
+          if (!field.deprecated && this[fieldName] !== null && typeof this[fieldName] !== "undefined") {
+            obj[fieldName] = typeof this[fieldName]["toJSON"] === "function" ? this[fieldName]["toJSON"]() : this[fieldName];
+          }
+        }
+        return obj;
+      }
+      discardAllChanges() {
+        this[$changes].discardAll();
+      }
+      [$getByIndex](index) {
+        const metadata = this.constructor[Symbol.metadata];
+        return this[metadata[index].name];
+      }
+      [$deleteByIndex](index) {
+        const metadata = this.constructor[Symbol.metadata];
+        this[metadata[index].name] = void 0;
+      }
+      /**
+       * Inspect the `refId` of all Schema instances in the tree. Optionally display the contents of the instance.
+       *
+       * @param ref Schema instance
+       * @param showContents display JSON contents of the instance
+       * @returns
+       */
+      static debugRefIds(ref, showContents = false, level = 0) {
+        const contents = showContents ? ` - ${JSON.stringify(ref.toJSON())}` : "";
+        const changeTree = ref[$changes];
+        const refId = changeTree.refId;
+        let output = "";
+        output += `${getIndent(level)}${ref.constructor.name} (refId: ${refId})${contents}
+`;
+        changeTree.forEachChild((childChangeTree) => output += this.debugRefIds(childChangeTree.ref, showContents, level + 1));
+        return output;
+      }
+      /**
+       * Return a string representation of the changes on a Schema instance.
+       * The list of changes is cleared after each encode.
+       *
+       * @param instance Schema instance
+       * @param isEncodeAll Return "full encode" instead of current change set.
+       * @returns
+       */
+      static debugChanges(instance, isEncodeAll = false) {
+        const changeTree = instance[$changes];
+        const changeSet = isEncodeAll ? changeTree.allChanges : changeTree.changes;
+        const changeSetName = isEncodeAll ? "allChanges" : "changes";
+        let output = `${instance.constructor.name} (${changeTree.refId}) -> .${changeSetName}:
+`;
+        function dumpChangeSet(changeSet2) {
+          changeSet2.operations.filter((op) => op).forEach((index) => {
+            const operation = changeTree.indexedOperations[index];
+            console.log({ index, operation });
+            output += `- [${index}]: ${exports2.OPERATION[operation]} (${JSON.stringify(changeTree.getValue(Number(index), isEncodeAll))})
+`;
+          });
+        }
+        dumpChangeSet(changeSet);
+        if (!isEncodeAll && changeTree.filteredChanges && changeTree.filteredChanges.operations.filter((op) => op).length > 0) {
+          output += `${instance.constructor.name} (${changeTree.refId}) -> .filteredChanges:
+`;
+          dumpChangeSet(changeTree.filteredChanges);
+        }
+        if (isEncodeAll && changeTree.allFilteredChanges && changeTree.allFilteredChanges.operations.filter((op) => op).length > 0) {
+          output += `${instance.constructor.name} (${changeTree.refId}) -> .allFilteredChanges:
+`;
+          dumpChangeSet(changeTree.allFilteredChanges);
+        }
+        return output;
+      }
+      static debugChangesDeep(ref, changeSetName = "changes") {
+        var _a3, _b2;
+        let output = "";
+        const rootChangeTree = ref[$changes];
+        const root = rootChangeTree.root;
+        const changeTrees = /* @__PURE__ */ new Map();
+        const instanceRefIds = [];
+        let totalOperations = 0;
+        for (const [refId, changes] of Object.entries(root[changeSetName])) {
+          const changeTree = root.changeTrees[refId];
+          let includeChangeTree = false;
+          let parentChangeTrees = [];
+          let parentChangeTree = (_a3 = changeTree.parent) == null ? void 0 : _a3[$changes];
+          if (changeTree === rootChangeTree) {
+            includeChangeTree = true;
+          } else {
+            while (parentChangeTree !== void 0) {
+              parentChangeTrees.push(parentChangeTree);
+              if (parentChangeTree.ref === ref) {
+                includeChangeTree = true;
+                break;
+              }
+              parentChangeTree = (_b2 = parentChangeTree.parent) == null ? void 0 : _b2[$changes];
+            }
+          }
+          if (includeChangeTree) {
+            instanceRefIds.push(changeTree.refId);
+            totalOperations += Object.keys(changes).length;
+            changeTrees.set(changeTree, parentChangeTrees.reverse());
+          }
+        }
+        output += "---\n";
+        output += `root refId: ${rootChangeTree.refId}
+`;
+        output += `Total instances: ${instanceRefIds.length} (refIds: ${instanceRefIds.join(", ")})
+`;
+        output += `Total changes: ${totalOperations}
+`;
+        output += "---\n";
+        const visitedParents = /* @__PURE__ */ new WeakSet();
+        for (const [changeTree, parentChangeTrees] of changeTrees.entries()) {
+          parentChangeTrees.forEach((parentChangeTree, level2) => {
+            if (!visitedParents.has(parentChangeTree)) {
+              output += `${getIndent(level2)}${parentChangeTree.ref.constructor.name} (refId: ${parentChangeTree.refId})
+`;
+              visitedParents.add(parentChangeTree);
+            }
+          });
+          const changes = changeTree.indexedOperations;
+          const level = parentChangeTrees.length;
+          const indent = getIndent(level);
+          const parentIndex = level > 0 ? `(${changeTree.parentIndex}) ` : "";
+          output += `${indent}${parentIndex}${changeTree.ref.constructor.name} (refId: ${changeTree.refId}) - changes: ${Object.keys(changes).length}
+`;
+          for (const index in changes) {
+            const operation = changes[index];
+            output += `${getIndent(level + 1)}${exports2.OPERATION[operation]}: ${index}
+`;
+          }
+        }
+        return `${output}`;
+      }
+    };
+    _Schema[_a$2] = encodeSchemaOperation;
+    _Schema[_b$2] = decodeSchemaOperation;
+    let Schema = _Schema;
+    var _a$1, _b$1;
+    const _CollectionSchema = class _CollectionSchema {
+      /**
+       * Determine if a property must be filtered.
+       * - If returns false, the property is NOT going to be encoded.
+       * - If returns true, the property is going to be encoded.
+       *
+       * Encoding with "filters" happens in two steps:
+       * - First, the encoder iterates over all "not owned" properties and encodes them.
+       * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
+       */
+      static [(_a$1 = $encoder, _b$1 = $decoder, $filter)](ref, index, view2) {
+        return !view2 || typeof ref[$childType] === "string" || view2.isChangeTreeVisible((ref[$getByIndex](index) ?? ref.deletedItems[index])[$changes]);
+      }
+      static is(type2) {
+        return type2["collection"] !== void 0;
+      }
+      constructor(initialValues) {
+        this.$items = /* @__PURE__ */ new Map();
+        this.$indexes = /* @__PURE__ */ new Map();
+        this.deletedItems = {};
+        this.$refId = 0;
+        this[$changes] = new ChangeTree(this);
+        this[$changes].indexes = {};
+        if (initialValues) {
+          initialValues.forEach((v) => this.add(v));
+        }
+        Object.defineProperty(this, $childType, {
+          value: void 0,
+          enumerable: false,
+          writable: true,
+          configurable: true
+        });
+      }
+      add(value) {
+        const index = this.$refId++;
+        const isRef = value[$changes] !== void 0;
+        if (isRef) {
+          value[$changes].setParent(this, this[$changes].root, index);
+        }
+        this[$changes].indexes[index] = index;
+        this.$indexes.set(index, index);
+        this.$items.set(index, value);
+        this[$changes].change(index);
+        return index;
+      }
+      at(index) {
+        const key = Array.from(this.$items.keys())[index];
+        return this.$items.get(key);
+      }
+      entries() {
+        return this.$items.entries();
+      }
+      delete(item) {
+        const entries = this.$items.entries();
+        let index;
+        let entry;
+        while (entry = entries.next()) {
+          if (entry.done) {
+            break;
+          }
+          if (item === entry.value[1]) {
+            index = entry.value[0];
+            break;
+          }
+        }
+        if (index === void 0) {
+          return false;
+        }
+        this.deletedItems[index] = this[$changes].delete(index);
+        this.$indexes.delete(index);
+        return this.$items.delete(index);
+      }
+      clear() {
+        const changeTree = this[$changes];
+        changeTree.discard(true);
+        changeTree.indexes = {};
+        this.$indexes.clear();
+        this.$items.clear();
+        changeTree.operation(exports2.OPERATION.CLEAR);
+      }
+      has(value) {
+        return Array.from(this.$items.values()).some((v) => v === value);
+      }
+      forEach(callbackfn) {
+        this.$items.forEach((value, key, _) => callbackfn(value, key, this));
+      }
+      values() {
+        return this.$items.values();
+      }
+      get size() {
+        return this.$items.size;
+      }
+      /** Iterator */
+      [Symbol.iterator]() {
+        return this.$items.values();
+      }
+      setIndex(index, key) {
+        this.$indexes.set(index, key);
+      }
+      getIndex(index) {
+        return this.$indexes.get(index);
+      }
+      [$getByIndex](index) {
+        return this.$items.get(this.$indexes.get(index));
+      }
+      [$deleteByIndex](index) {
+        const key = this.$indexes.get(index);
+        this.$items.delete(key);
+        this.$indexes.delete(index);
+      }
+      [$onEncodeEnd]() {
+        this.deletedItems = {};
+      }
+      toArray() {
+        return Array.from(this.$items.values());
+      }
+      toJSON() {
+        const values = [];
+        this.forEach((value, key) => {
+          values.push(typeof value["toJSON"] === "function" ? value["toJSON"]() : value);
+        });
+        return values;
+      }
+      //
+      // Decoding utilities
+      //
+      clone(isDecoding) {
+        let cloned;
+        if (isDecoding) {
+          cloned = Object.assign(new _CollectionSchema(), this);
+        } else {
+          cloned = new _CollectionSchema();
+          this.forEach((value) => {
+            if (value[$changes]) {
+              cloned.add(value["clone"]());
+            } else {
+              cloned.add(value);
+            }
+          });
+        }
+        return cloned;
+      }
+    };
+    _CollectionSchema[_a$1] = encodeKeyValueOperation;
+    _CollectionSchema[_b$1] = decodeKeyValueOperation;
+    let CollectionSchema = _CollectionSchema;
+    registerType("collection", { constructor: CollectionSchema });
+    var _a2, _b;
+    const _SetSchema = class _SetSchema {
+      /**
+       * Determine if a property must be filtered.
+       * - If returns false, the property is NOT going to be encoded.
+       * - If returns true, the property is going to be encoded.
+       *
+       * Encoding with "filters" happens in two steps:
+       * - First, the encoder iterates over all "not owned" properties and encodes them.
+       * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
+       */
+      static [(_a2 = $encoder, _b = $decoder, $filter)](ref, index, view2) {
+        return !view2 || typeof ref[$childType] === "string" || view2.visible.has((ref[$getByIndex](index) ?? ref.deletedItems[index])[$changes]);
+      }
+      static is(type2) {
+        return type2["set"] !== void 0;
+      }
+      constructor(initialValues) {
+        this.$items = /* @__PURE__ */ new Map();
+        this.$indexes = /* @__PURE__ */ new Map();
+        this.deletedItems = {};
+        this.$refId = 0;
+        this[$changes] = new ChangeTree(this);
+        this[$changes].indexes = {};
+        if (initialValues) {
+          initialValues.forEach((v) => this.add(v));
+        }
+        Object.defineProperty(this, $childType, {
+          value: void 0,
+          enumerable: false,
+          writable: true,
+          configurable: true
+        });
+      }
+      add(value) {
+        var _a3;
+        if (this.has(value)) {
+          return false;
+        }
+        const index = this.$refId++;
+        if (value[$changes] !== void 0) {
+          value[$changes].setParent(this, this[$changes].root, index);
+        }
+        const operation = ((_a3 = this[$changes].indexes[index]) == null ? void 0 : _a3.op) ?? exports2.OPERATION.ADD;
+        this[$changes].indexes[index] = index;
+        this.$indexes.set(index, index);
+        this.$items.set(index, value);
+        this[$changes].change(index, operation);
+        return index;
+      }
+      entries() {
+        return this.$items.entries();
+      }
+      delete(item) {
+        const entries = this.$items.entries();
+        let index;
+        let entry;
+        while (entry = entries.next()) {
+          if (entry.done) {
+            break;
+          }
+          if (item === entry.value[1]) {
+            index = entry.value[0];
+            break;
+          }
+        }
+        if (index === void 0) {
+          return false;
+        }
+        this.deletedItems[index] = this[$changes].delete(index);
+        this.$indexes.delete(index);
+        return this.$items.delete(index);
+      }
+      clear() {
+        const changeTree = this[$changes];
+        changeTree.discard(true);
+        changeTree.indexes = {};
+        this.$indexes.clear();
+        this.$items.clear();
+        changeTree.operation(exports2.OPERATION.CLEAR);
+      }
+      has(value) {
+        const values = this.$items.values();
+        let has = false;
+        let entry;
+        while (entry = values.next()) {
+          if (entry.done) {
+            break;
+          }
+          if (value === entry.value) {
+            has = true;
+            break;
+          }
+        }
+        return has;
+      }
+      forEach(callbackfn) {
+        this.$items.forEach((value, key, _) => callbackfn(value, key, this));
+      }
+      values() {
+        return this.$items.values();
+      }
+      get size() {
+        return this.$items.size;
+      }
+      /** Iterator */
+      [Symbol.iterator]() {
+        return this.$items.values();
+      }
+      setIndex(index, key) {
+        this.$indexes.set(index, key);
+      }
+      getIndex(index) {
+        return this.$indexes.get(index);
+      }
+      [$getByIndex](index) {
+        return this.$items.get(this.$indexes.get(index));
+      }
+      [$deleteByIndex](index) {
+        const key = this.$indexes.get(index);
+        this.$items.delete(key);
+        this.$indexes.delete(index);
+      }
+      [$onEncodeEnd]() {
+        this.deletedItems = {};
+      }
+      toArray() {
+        return Array.from(this.$items.values());
+      }
+      toJSON() {
+        const values = [];
+        this.forEach((value, key) => {
+          values.push(typeof value["toJSON"] === "function" ? value["toJSON"]() : value);
+        });
+        return values;
+      }
+      //
+      // Decoding utilities
+      //
+      clone(isDecoding) {
+        let cloned;
+        if (isDecoding) {
+          cloned = Object.assign(new _SetSchema(), this);
+        } else {
+          cloned = new _SetSchema();
+          this.forEach((value) => {
+            if (value[$changes]) {
+              cloned.add(value["clone"]());
+            } else {
+              cloned.add(value);
+            }
+          });
+        }
+        return cloned;
+      }
+    };
+    _SetSchema[_a2] = encodeKeyValueOperation;
+    _SetSchema[_b] = decodeKeyValueOperation;
+    let SetSchema = _SetSchema;
+    registerType("set", { constructor: SetSchema });
+    function __decorate2(decorators, target2, key, desc) {
+      var c = arguments.length, r = c < 3 ? target2 : desc, d;
+      if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target2, key, desc);
+      else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target2, key, r) : d(target2, key)) || r;
+      return c > 3 && r && Object.defineProperty(target2, key, r), r;
+    }
+    typeof SuppressedError === "function" ? SuppressedError : function(error, suppressed, message) {
+      var e = new Error(message);
+      return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+    };
+    class Root {
+      constructor(types) {
+        this.types = types;
+        this.nextUniqueId = 0;
+        this.refCount = {};
+        this.changeTrees = {};
+        this.allChanges = [];
+        this.allFilteredChanges = [];
+        this.changes = [];
+        this.filteredChanges = [];
+      }
+      getNextUniqueId() {
+        return this.nextUniqueId++;
+      }
+      add(changeTree) {
+        changeTree.ensureRefId();
+        const isNewChangeTree = this.changeTrees[changeTree.refId] === void 0;
+        if (isNewChangeTree) {
+          this.changeTrees[changeTree.refId] = changeTree;
+        }
+        const previousRefCount = this.refCount[changeTree.refId];
+        if (previousRefCount === 0) {
+          const ops = changeTree.allChanges.operations;
+          let len = ops.length;
+          while (len--) {
+            changeTree.indexedOperations[ops[len]] = exports2.OPERATION.ADD;
+            setOperationAtIndex(changeTree.changes, len);
+          }
+        }
+        this.refCount[changeTree.refId] = (previousRefCount || 0) + 1;
+        return isNewChangeTree;
+      }
+      remove(changeTree) {
+        const refCount = this.refCount[changeTree.refId] - 1;
+        if (refCount <= 0) {
+          changeTree.root = void 0;
+          delete this.changeTrees[changeTree.refId];
+          this.removeChangeFromChangeSet("allChanges", changeTree);
+          this.removeChangeFromChangeSet("changes", changeTree);
+          if (changeTree.filteredChanges) {
+            this.removeChangeFromChangeSet("allFilteredChanges", changeTree);
+            this.removeChangeFromChangeSet("filteredChanges", changeTree);
+          }
+          this.refCount[changeTree.refId] = 0;
+        } else {
+          this.refCount[changeTree.refId] = refCount;
+          if (changeTree.filteredChanges !== void 0) {
+            this.removeChangeFromChangeSet("filteredChanges", changeTree);
+            enqueueChangeTree(this, changeTree, "filteredChanges");
+          } else {
+            this.removeChangeFromChangeSet("changes", changeTree);
+            enqueueChangeTree(this, changeTree, "changes");
+          }
+        }
+        changeTree.forEachChild((child, _) => this.remove(child));
+        return refCount;
+      }
+      removeChangeFromChangeSet(changeSetName, changeTree) {
+        const changeSet = this[changeSetName];
+        const changeSetIndex = changeSet.indexOf(changeTree);
+        if (changeSetIndex !== -1) {
+          changeTree[changeSetName].queueRootIndex = -1;
+          changeSet[changeSetIndex] = void 0;
+          return true;
+        }
+      }
+      clear() {
+        this.changes.length = 0;
+      }
+    }
+    const _Encoder = class _Encoder {
+      // 8KB
+      constructor(state) {
+        this.sharedBuffer = Buffer.allocUnsafe(_Encoder.BUFFER_SIZE);
+        this.context = TypeContext.cache(state.constructor);
+        this.root = new Root(this.context);
+        this.setState(state);
+      }
+      setState(state) {
+        this.state = state;
+        this.state[$changes].setRoot(this.root);
+      }
+      encode(it = { offset: 0 }, view2, buffer = this.sharedBuffer, changeSetName = "changes", isEncodeAll = changeSetName === "allChanges", initialOffset = it.offset) {
+        const hasView = view2 !== void 0;
+        const rootChangeTree = this.state[$changes];
+        const changeTrees = this.root[changeSetName];
+        for (let i = 0, numChangeTrees = changeTrees.length; i < numChangeTrees; i++) {
+          const changeTree = changeTrees[i];
+          if (!changeTree) {
+            continue;
+          }
+          if (hasView) {
+            if (!view2.isChangeTreeVisible(changeTree)) {
+              view2.invisible.add(changeTree);
+              continue;
+            }
+            view2.invisible.delete(changeTree);
+          }
+          const changeSet = changeTree[changeSetName];
+          const ref = changeTree.ref;
+          const numChanges = changeSet.operations.length;
+          if (numChanges === 0) {
+            continue;
+          }
+          const ctor = ref.constructor;
+          const encoder = ctor[$encoder];
+          const filter = ctor[$filter];
+          const metadata = ctor[Symbol.metadata];
+          if (hasView || it.offset > initialOffset || changeTree !== rootChangeTree) {
+            buffer[it.offset++] = SWITCH_TO_STRUCTURE & 255;
+            encode2.number(buffer, changeTree.refId, it);
+          }
+          for (let j = 0; j < numChanges; j++) {
+            const fieldIndex = changeSet.operations[j];
+            const operation = fieldIndex < 0 ? Math.abs(fieldIndex) : isEncodeAll ? exports2.OPERATION.ADD : changeTree.indexedOperations[fieldIndex];
+            if (fieldIndex === void 0 || operation === void 0 || filter && !filter(ref, fieldIndex, view2)) {
+              continue;
+            }
+            encoder(this, buffer, changeTree, fieldIndex, operation, it, isEncodeAll, hasView, metadata);
+          }
+        }
+        if (it.offset > buffer.byteLength) {
+          const newSize = Math.ceil(it.offset / (Buffer.poolSize ?? 8 * 1024)) * (Buffer.poolSize ?? 8 * 1024);
+          console.warn(`@colyseus/schema buffer overflow. Encoded state is higher than default BUFFER_SIZE. Use the following to increase default BUFFER_SIZE:
+
+    import { Encoder } from "@colyseus/schema";
+    Encoder.BUFFER_SIZE = ${Math.round(newSize / 1024)} * 1024; // ${Math.round(newSize / 1024)} KB
+`);
+          buffer = Buffer.alloc(newSize, buffer);
+          if (buffer === this.sharedBuffer) {
+            this.sharedBuffer = buffer;
+          }
+          return this.encode({ offset: initialOffset }, view2, buffer, changeSetName, isEncodeAll);
+        } else {
+          return buffer.subarray(0, it.offset);
+        }
+      }
+      encodeAll(it = { offset: 0 }, buffer = this.sharedBuffer) {
+        return this.encode(it, void 0, buffer, "allChanges", true);
+      }
+      encodeAllView(view2, sharedOffset, it, bytes = this.sharedBuffer) {
+        const viewOffset = it.offset;
+        this.encode(it, view2, bytes, "allFilteredChanges", true, viewOffset);
+        return Buffer.concat([
+          bytes.subarray(0, sharedOffset),
+          bytes.subarray(viewOffset, it.offset)
+        ]);
+      }
+      debugChanges(field) {
+        const rootChangeSet = typeof field === "string" ? this.root[field] : field;
+        rootChangeSet.forEach((changeTree) => {
+          const changeSet = changeTree[field];
+          const metadata = changeTree.ref.constructor[Symbol.metadata];
+          console.log("->", { ref: changeTree.ref.constructor.name, refId: changeTree.refId, changes: Object.keys(changeSet).length });
+          for (const index in changeSet) {
+            const op = changeSet[index];
+            console.log("  ->", {
+              index,
+              field: metadata == null ? void 0 : metadata[index],
+              op: exports2.OPERATION[op]
+            });
+          }
+        });
+      }
+      encodeView(view2, sharedOffset, it, bytes = this.sharedBuffer) {
+        const viewOffset = it.offset;
+        for (const [refId, changes] of view2.changes) {
+          const changeTree = this.root.changeTrees[refId];
+          if (changeTree === void 0) {
+            view2.changes.delete(refId);
+            continue;
+          }
+          const keys = Object.keys(changes);
+          if (keys.length === 0) {
+            continue;
+          }
+          const ref = changeTree.ref;
+          const ctor = ref.constructor;
+          const encoder = ctor[$encoder];
+          const metadata = ctor[Symbol.metadata];
+          bytes[it.offset++] = SWITCH_TO_STRUCTURE & 255;
+          encode2.number(bytes, changeTree.refId, it);
+          for (let i = 0, numChanges = keys.length; i < numChanges; i++) {
+            const index = Number(keys[i]);
+            const value = changeTree.ref[$getByIndex](index);
+            const operation = value !== void 0 && changes[index] || exports2.OPERATION.DELETE;
+            encoder(this, bytes, changeTree, index, operation, it, false, true, metadata);
+          }
+        }
+        view2.changes.clear();
+        this.encode(it, view2, bytes, "filteredChanges", false, viewOffset);
+        return Buffer.concat([
+          bytes.subarray(0, sharedOffset),
+          bytes.subarray(viewOffset, it.offset)
+        ]);
+      }
+      discardChanges() {
+        var _a3, _b2;
+        let length = this.root.changes.length;
+        if (length > 0) {
+          while (length--) {
+            (_a3 = this.root.changes[length]) == null ? void 0 : _a3.endEncode("changes");
+          }
+          this.root.changes.length = 0;
+        }
+        length = this.root.filteredChanges.length;
+        if (length > 0) {
+          while (length--) {
+            (_b2 = this.root.filteredChanges[length]) == null ? void 0 : _b2.endEncode("filteredChanges");
+          }
+          this.root.filteredChanges.length = 0;
+        }
+      }
+      tryEncodeTypeId(bytes, baseType, targetType, it) {
+        const baseTypeId = this.context.getTypeId(baseType);
+        const targetTypeId = this.context.getTypeId(targetType);
+        if (targetTypeId === void 0) {
+          console.warn(`@colyseus/schema WARNING: Class "${targetType.name}" is not registered on TypeRegistry - Please either tag the class with @entity or define a @type() field.`);
+          return;
+        }
+        if (baseTypeId !== targetTypeId) {
+          bytes[it.offset++] = TYPE_ID & 255;
+          encode2.number(bytes, targetTypeId, it);
+        }
+      }
+      get hasChanges() {
+        return this.root.changes.length > 0 || this.root.filteredChanges.length > 0;
+      }
+    };
+    _Encoder.BUFFER_SIZE = typeof Buffer !== "undefined" && Buffer.poolSize || 8 * 1024;
+    let Encoder2 = _Encoder;
+    function spliceOne(arr, index) {
+      if (index === -1 || index >= arr.length) {
+        return false;
+      }
+      const len = arr.length - 1;
+      for (let i = index; i < len; i++) {
+        arr[i] = arr[i + 1];
+      }
+      arr.length = len;
+      return true;
+    }
+    class DecodingWarning extends Error {
+      constructor(message) {
+        super(message);
+        this.name = "DecodingWarning";
+      }
+    }
+    class ReferenceTracker {
+      constructor() {
+        this.refs = /* @__PURE__ */ new Map();
+        this.refIds = /* @__PURE__ */ new WeakMap();
+        this.refCounts = {};
+        this.deletedRefs = /* @__PURE__ */ new Set();
+        this.callbacks = {};
+        this.nextUniqueId = 0;
+      }
+      getNextUniqueId() {
+        return this.nextUniqueId++;
+      }
+      // for decoding
+      addRef(refId, ref, incrementCount = true) {
+        this.refs.set(refId, ref);
+        this.refIds.set(ref, refId);
+        if (incrementCount) {
+          this.refCounts[refId] = (this.refCounts[refId] || 0) + 1;
+        }
+        if (this.deletedRefs.has(refId)) {
+          this.deletedRefs.delete(refId);
+        }
+      }
+      // for decoding
+      removeRef(refId) {
+        const refCount = this.refCounts[refId];
+        if (refCount === void 0) {
+          try {
+            throw new DecodingWarning("trying to remove refId that doesn't exist: " + refId);
+          } catch (e) {
+            console.warn(e);
+          }
+          return;
+        }
+        if (refCount === 0) {
+          try {
+            const ref = this.refs.get(refId);
+            throw new DecodingWarning(`trying to remove refId '${refId}' with 0 refCount (${ref.constructor.name}: ${JSON.stringify(ref)})`);
+          } catch (e) {
+            console.warn(e);
+          }
+          return;
+        }
+        if ((this.refCounts[refId] = refCount - 1) <= 0) {
+          this.deletedRefs.add(refId);
+        }
+      }
+      clearRefs() {
+        this.refs.clear();
+        this.deletedRefs.clear();
+        this.callbacks = {};
+        this.refCounts = {};
+      }
+      // for decoding
+      garbageCollectDeletedRefs() {
+        this.deletedRefs.forEach((refId) => {
+          if (this.refCounts[refId] > 0) {
+            return;
+          }
+          const ref = this.refs.get(refId);
+          if (ref.constructor[Symbol.metadata] !== void 0) {
+            const metadata = ref.constructor[Symbol.metadata];
+            for (const index in metadata) {
+              const field = metadata[index].name;
+              const childRefId = typeof ref[field] === "object" && this.refIds.get(ref[field]);
+              if (childRefId && !this.deletedRefs.has(childRefId)) {
+                this.removeRef(childRefId);
+              }
+            }
+          } else {
+            if (typeof ref[$childType] === "function") {
+              Array.from(ref.values()).forEach((child) => {
+                const childRefId = this.refIds.get(child);
+                if (!this.deletedRefs.has(childRefId)) {
+                  this.removeRef(childRefId);
+                }
+              });
+            }
+          }
+          this.refs.delete(refId);
+          delete this.refCounts[refId];
+          delete this.callbacks[refId];
+        });
+        this.deletedRefs.clear();
+      }
+      addCallback(refId, fieldOrOperation, callback) {
+        if (refId === void 0) {
+          const name = typeof fieldOrOperation === "number" ? exports2.OPERATION[fieldOrOperation] : fieldOrOperation;
+          throw new Error(`Can't addCallback on '${name}' (refId is undefined)`);
+        }
+        if (!this.callbacks[refId]) {
+          this.callbacks[refId] = {};
+        }
+        if (!this.callbacks[refId][fieldOrOperation]) {
+          this.callbacks[refId][fieldOrOperation] = [];
+        }
+        this.callbacks[refId][fieldOrOperation].push(callback);
+        return () => this.removeCallback(refId, fieldOrOperation, callback);
+      }
+      removeCallback(refId, field, callback) {
+        var _a3, _b2, _c;
+        const index = (_c = (_b2 = (_a3 = this.callbacks) == null ? void 0 : _a3[refId]) == null ? void 0 : _b2[field]) == null ? void 0 : _c.indexOf(callback);
+        if (index !== -1) {
+          spliceOne(this.callbacks[refId][field], index);
+        }
+      }
+    }
+    class Decoder2 {
+      constructor(root, context) {
+        this.currentRefId = 0;
+        this.setState(root);
+        this.context = context || new TypeContext(root.constructor);
+      }
+      setState(root) {
+        this.state = root;
+        this.root = new ReferenceTracker();
+        this.root.addRef(0, root);
+      }
+      decode(bytes, it = { offset: 0 }, ref = this.state) {
+        var _a3, _b2, _c;
+        const allChanges = [];
+        const $root = this.root;
+        const totalBytes = bytes.byteLength;
+        let decoder2 = ref["constructor"][$decoder];
+        this.currentRefId = 0;
+        while (it.offset < totalBytes) {
+          if (bytes[it.offset] == SWITCH_TO_STRUCTURE) {
+            it.offset++;
+            this.currentRefId = decode2.number(bytes, it);
+            const nextRef = $root.refs.get(this.currentRefId);
+            if (!nextRef) {
+              throw new Error(`"refId" not found: ${this.currentRefId}`);
+            }
+            (_a3 = ref[$onDecodeEnd]) == null ? void 0 : _a3.call(ref);
+            ref = nextRef;
+            decoder2 = ref.constructor[$decoder];
+            continue;
+          }
+          const result = decoder2(this, bytes, it, ref, allChanges);
+          if (result === DEFINITION_MISMATCH) {
+            console.warn("@colyseus/schema: definition mismatch");
+            const nextIterator = { offset: it.offset };
+            while (it.offset < totalBytes) {
+              if (bytes[it.offset] === SWITCH_TO_STRUCTURE) {
+                nextIterator.offset = it.offset + 1;
+                if ($root.refs.has(decode2.number(bytes, nextIterator))) {
+                  break;
+                }
+              }
+              it.offset++;
+            }
+            continue;
+          }
+        }
+        (_b2 = ref[$onDecodeEnd]) == null ? void 0 : _b2.call(ref);
+        (_c = this.triggerChanges) == null ? void 0 : _c.call(this, allChanges);
+        $root.garbageCollectDeletedRefs();
+        return allChanges;
+      }
+      getInstanceType(bytes, it, defaultType) {
+        let type2;
+        if (bytes[it.offset] === TYPE_ID) {
+          it.offset++;
+          const type_id = decode2.number(bytes, it);
+          type2 = this.context.get(type_id);
+        }
+        return type2 || defaultType;
+      }
+      createInstanceOfType(type2) {
+        return new type2();
+      }
+      removeChildRefs(ref, allChanges) {
+        const needRemoveRef = typeof ref[$childType] !== "string";
+        const refId = this.root.refIds.get(ref);
+        ref.forEach((value, key) => {
+          allChanges.push({
+            ref,
+            refId,
+            op: exports2.OPERATION.DELETE,
+            field: key,
+            value: void 0,
+            previousValue: value
+          });
+          if (needRemoveRef) {
+            this.root.removeRef(this.root.refIds.get(value));
+          }
+        });
+      }
+    }
+    class ReflectionField extends Schema {
+    }
+    __decorate2([
+      type("string")
+    ], ReflectionField.prototype, "name", void 0);
+    __decorate2([
+      type("string")
+    ], ReflectionField.prototype, "type", void 0);
+    __decorate2([
+      type("number")
+    ], ReflectionField.prototype, "referencedType", void 0);
+    class ReflectionType extends Schema {
+      constructor() {
+        super(...arguments);
+        this.fields = new ArraySchema();
+      }
+    }
+    __decorate2([
+      type("number")
+    ], ReflectionType.prototype, "id", void 0);
+    __decorate2([
+      type("number")
+    ], ReflectionType.prototype, "extendsId", void 0);
+    __decorate2([
+      type([ReflectionField])
+    ], ReflectionType.prototype, "fields", void 0);
+    class Reflection extends Schema {
+      constructor() {
+        super(...arguments);
+        this.types = new ArraySchema();
+      }
+      /**
+       * Encodes the TypeContext of an Encoder into a buffer.
+       *
+       * @param encoder Encoder instance
+       * @param it
+       * @returns
+       */
+      static encode(encoder, it = { offset: 0 }) {
+        const context = encoder.context;
+        const reflection = new Reflection();
+        const reflectionEncoder = new Encoder2(reflection);
+        const rootType = context.schemas.get(encoder.state.constructor);
+        if (rootType > 0) {
+          reflection.rootType = rootType;
+        }
+        const includedTypeIds = /* @__PURE__ */ new Set();
+        const pendingReflectionTypes = {};
+        const addType = (type2) => {
+          if (type2.extendsId === void 0 || includedTypeIds.has(type2.extendsId)) {
+            includedTypeIds.add(type2.id);
+            reflection.types.push(type2);
+            const deps = pendingReflectionTypes[type2.id];
+            if (deps !== void 0) {
+              delete pendingReflectionTypes[type2.id];
+              deps.forEach((childType) => addType(childType));
+            }
+          } else {
+            if (pendingReflectionTypes[type2.extendsId] === void 0) {
+              pendingReflectionTypes[type2.extendsId] = [];
+            }
+            pendingReflectionTypes[type2.extendsId].push(type2);
+          }
+        };
+        context.schemas.forEach((typeid, klass) => {
+          const type2 = new ReflectionType();
+          type2.id = Number(typeid);
+          const inheritFrom = Object.getPrototypeOf(klass);
+          if (inheritFrom !== Schema) {
+            type2.extendsId = context.schemas.get(inheritFrom);
+          }
+          const metadata = klass[Symbol.metadata];
+          if (metadata !== inheritFrom[Symbol.metadata]) {
+            for (const fieldIndex in metadata) {
+              const index = Number(fieldIndex);
+              const fieldName = metadata[index].name;
+              if (!Object.prototype.hasOwnProperty.call(metadata, fieldName)) {
+                continue;
+              }
+              const reflectionField = new ReflectionField();
+              reflectionField.name = fieldName;
+              let fieldType;
+              const field = metadata[index];
+              if (typeof field.type === "string") {
+                fieldType = field.type;
+              } else {
+                let childTypeSchema;
+                if (Schema.is(field.type)) {
+                  fieldType = "ref";
+                  childTypeSchema = field.type;
+                } else {
+                  fieldType = Object.keys(field.type)[0];
+                  if (typeof field.type[fieldType] === "string") {
+                    fieldType += ":" + field.type[fieldType];
+                  } else {
+                    childTypeSchema = field.type[fieldType];
+                  }
+                }
+                reflectionField.referencedType = childTypeSchema ? context.getTypeId(childTypeSchema) : -1;
+              }
+              reflectionField.type = fieldType;
+              type2.fields.push(reflectionField);
+            }
+          }
+          addType(type2);
+        });
+        for (const typeid in pendingReflectionTypes) {
+          pendingReflectionTypes[typeid].forEach((type2) => reflection.types.push(type2));
+        }
+        const buf = reflectionEncoder.encodeAll(it);
+        return Buffer.from(buf, 0, it.offset);
+      }
+      /**
+       * Decodes the TypeContext from a buffer into a Decoder instance.
+       *
+       * @param bytes Reflection.encode() output
+       * @param it
+       * @returns Decoder instance
+       */
+      static decode(bytes, it) {
+        const reflection = new Reflection();
+        const reflectionDecoder = new Decoder2(reflection);
+        reflectionDecoder.decode(bytes, it);
+        const typeContext = new TypeContext();
+        reflection.types.forEach((reflectionType) => {
+          const parentClass = typeContext.get(reflectionType.extendsId) ?? Schema;
+          const schema3 = class _ extends parentClass {
+          };
+          TypeContext.register(schema3);
+          typeContext.add(schema3, reflectionType.id);
+        }, {});
+        const addFields = (metadata, reflectionType, parentFieldIndex) => {
+          reflectionType.fields.forEach((field, i) => {
+            const fieldIndex = parentFieldIndex + i;
+            if (field.referencedType !== void 0) {
+              let fieldType = field.type;
+              let refType = typeContext.get(field.referencedType);
+              if (!refType) {
+                const typeInfo = field.type.split(":");
+                fieldType = typeInfo[0];
+                refType = typeInfo[1];
+              }
+              if (fieldType === "ref") {
+                Metadata.addField(metadata, fieldIndex, field.name, refType);
+              } else {
+                Metadata.addField(metadata, fieldIndex, field.name, { [fieldType]: refType });
+              }
+            } else {
+              Metadata.addField(metadata, fieldIndex, field.name, field.type);
+            }
+          });
+        };
+        reflection.types.forEach((reflectionType) => {
+          const schema3 = typeContext.get(reflectionType.id);
+          const metadata = Metadata.initialize(schema3);
+          const inheritedTypes = [];
+          let parentType = reflectionType;
+          do {
+            inheritedTypes.push(parentType);
+            parentType = reflection.types.find((t) => t.id === parentType.extendsId);
+          } while (parentType);
+          let parentFieldIndex = 0;
+          inheritedTypes.reverse().forEach((reflectionType2) => {
+            addFields(metadata, reflectionType2, parentFieldIndex);
+            parentFieldIndex += reflectionType2.fields.length;
+          });
+        });
+        const state = new (typeContext.get(reflection.rootType || 0))();
+        return new Decoder2(state, typeContext);
+      }
+    }
+    __decorate2([
+      type([ReflectionType])
+    ], Reflection.prototype, "types", void 0);
+    __decorate2([
+      type("number")
+    ], Reflection.prototype, "rootType", void 0);
+    function getDecoderStateCallbacks(decoder2) {
+      const $root = decoder2.root;
+      const callbacks = $root.callbacks;
+      const onAddCalls = /* @__PURE__ */ new WeakMap();
+      let currentOnAddCallback;
+      decoder2.triggerChanges = function(allChanges) {
+        var _a3;
+        const uniqueRefIds = /* @__PURE__ */ new Set();
+        for (let i = 0, l = allChanges.length; i < l; i++) {
+          const change = allChanges[i];
+          const refId = change.refId;
+          const ref = change.ref;
+          const $callbacks = callbacks[refId];
+          if (!$callbacks) {
+            continue;
+          }
+          if ((change.op & exports2.OPERATION.DELETE) === exports2.OPERATION.DELETE && change.previousValue instanceof Schema) {
+            const deleteCallbacks = (_a3 = callbacks[$root.refIds.get(change.previousValue)]) == null ? void 0 : _a3[exports2.OPERATION.DELETE];
+            for (let i2 = (deleteCallbacks == null ? void 0 : deleteCallbacks.length) - 1; i2 >= 0; i2--) {
+              deleteCallbacks[i2]();
+            }
+          }
+          if (ref instanceof Schema) {
+            if (!uniqueRefIds.has(refId)) {
+              const replaceCallbacks = $callbacks == null ? void 0 : $callbacks[exports2.OPERATION.REPLACE];
+              for (let i2 = (replaceCallbacks == null ? void 0 : replaceCallbacks.length) - 1; i2 >= 0; i2--) {
+                replaceCallbacks[i2]();
+              }
+            }
+            if ($callbacks.hasOwnProperty(change.field)) {
+              const fieldCallbacks = $callbacks[change.field];
+              for (let i2 = (fieldCallbacks == null ? void 0 : fieldCallbacks.length) - 1; i2 >= 0; i2--) {
+                fieldCallbacks[i2](change.value, change.previousValue);
+              }
+            }
+          } else {
+            if ((change.op & exports2.OPERATION.DELETE) === exports2.OPERATION.DELETE) {
+              if (change.previousValue !== void 0) {
+                const deleteCallbacks = $callbacks[exports2.OPERATION.DELETE];
+                for (let i2 = (deleteCallbacks == null ? void 0 : deleteCallbacks.length) - 1; i2 >= 0; i2--) {
+                  deleteCallbacks[i2](change.previousValue, change.dynamicIndex ?? change.field);
+                }
+              }
+              if ((change.op & exports2.OPERATION.ADD) === exports2.OPERATION.ADD) {
+                const addCallbacks = $callbacks[exports2.OPERATION.ADD];
+                for (let i2 = (addCallbacks == null ? void 0 : addCallbacks.length) - 1; i2 >= 0; i2--) {
+                  addCallbacks[i2](change.value, change.dynamicIndex ?? change.field);
+                }
+              }
+            } else if ((change.op & exports2.OPERATION.ADD) === exports2.OPERATION.ADD && change.previousValue !== change.value) {
+              const addCallbacks = $callbacks[exports2.OPERATION.ADD];
+              for (let i2 = (addCallbacks == null ? void 0 : addCallbacks.length) - 1; i2 >= 0; i2--) {
+                addCallbacks[i2](change.value, change.dynamicIndex ?? change.field);
+              }
+            }
+            if (change.value !== change.previousValue && // FIXME: see "should not encode item if added and removed at the same patch" test case.
+            // some "ADD" + "DELETE" operations on same patch are being encoded as "DELETE"
+            (change.value !== void 0 || change.previousValue !== void 0)) {
+              const replaceCallbacks = $callbacks[exports2.OPERATION.REPLACE];
+              for (let i2 = (replaceCallbacks == null ? void 0 : replaceCallbacks.length) - 1; i2 >= 0; i2--) {
+                replaceCallbacks[i2](change.value, change.dynamicIndex ?? change.field);
+              }
+            }
+          }
+          uniqueRefIds.add(refId);
+        }
+      };
+      function getProxy(metadataOrType, context) {
+        var _a3;
+        let metadata = ((_a3 = context.instance) == null ? void 0 : _a3.constructor[Symbol.metadata]) || metadataOrType;
+        let isCollection = context.instance && typeof context.instance["forEach"] === "function" || metadataOrType && typeof metadataOrType[Symbol.metadata] === "undefined";
+        if (metadata && !isCollection) {
+          const onAddListen = function(ref, prop, callback, immediate) {
+            if (immediate && context.instance[prop] !== void 0 && !onAddCalls.has(currentOnAddCallback)) {
+              callback(context.instance[prop], void 0);
+            }
+            return $root.addCallback($root.refIds.get(ref), prop, callback);
+          };
+          return new Proxy({
+            listen: function listen(prop, callback, immediate = true) {
+              if (context.instance) {
+                return onAddListen(context.instance, prop, callback, immediate);
+              } else {
+                let detachCallback = () => {
+                };
+                context.onInstanceAvailable((ref, existing) => {
+                  detachCallback = onAddListen(ref, prop, callback, immediate && existing && !onAddCalls.has(currentOnAddCallback));
+                });
+                return () => detachCallback();
+              }
+            },
+            onChange: function onChange(callback) {
+              return $root.addCallback($root.refIds.get(context.instance), exports2.OPERATION.REPLACE, callback);
+            },
+            //
+            // TODO: refactor `bindTo()` implementation.
+            // There is room for improvement.
+            //
+            bindTo: function bindTo(targetObject, properties) {
+              if (!properties) {
+                properties = Object.keys(metadata).map((index) => metadata[index].name);
+              }
+              return $root.addCallback($root.refIds.get(context.instance), exports2.OPERATION.REPLACE, () => {
+                properties.forEach((prop) => targetObject[prop] = context.instance[prop]);
+              });
+            }
+          }, {
+            get(target2, prop) {
+              var _a4;
+              const metadataField = metadata[metadata[prop]];
+              if (metadataField) {
+                const instance = (_a4 = context.instance) == null ? void 0 : _a4[prop];
+                const onInstanceAvailable = (callback) => {
+                  const unbind = $(context.instance).listen(prop, (value, _) => {
+                    callback(value, false);
+                    unbind == null ? void 0 : unbind();
+                  }, false);
+                  if ($root.refIds.get(instance) !== void 0) {
+                    callback(instance, true);
+                  }
+                };
+                return getProxy(metadataField.type, {
+                  // make sure refId is available, otherwise need to wait for the instance to be available.
+                  instance: $root.refIds.get(instance) && instance,
+                  parentInstance: context.instance,
+                  onInstanceAvailable
+                });
+              } else {
+                return target2[prop];
+              }
+            },
+            has(target2, prop) {
+              return metadata[prop] !== void 0;
+            },
+            set(_, _1, _2) {
+              throw new Error("not allowed");
+            },
+            deleteProperty(_, _1) {
+              throw new Error("not allowed");
+            }
+          });
+        } else {
+          const onAdd = function(ref, callback, immediate) {
+            if (immediate) {
+              ref.forEach((v, k) => callback(v, k));
+            }
+            return $root.addCallback($root.refIds.get(ref), exports2.OPERATION.ADD, (value, key) => {
+              onAddCalls.set(callback, true);
+              currentOnAddCallback = callback;
+              callback(value, key);
+              onAddCalls.delete(callback);
+              currentOnAddCallback = void 0;
+            });
+          };
+          const onRemove = function(ref, callback) {
+            return $root.addCallback($root.refIds.get(ref), exports2.OPERATION.DELETE, callback);
+          };
+          const onChange = function(ref, callback) {
+            return $root.addCallback($root.refIds.get(ref), exports2.OPERATION.REPLACE, callback);
+          };
+          return new Proxy({
+            onAdd: function(callback, immediate = true) {
+              if (context.instance) {
+                return onAdd(context.instance, callback, immediate && !onAddCalls.has(currentOnAddCallback));
+              } else if (context.onInstanceAvailable) {
+                let detachCallback = () => {
+                };
+                context.onInstanceAvailable((ref, existing) => {
+                  detachCallback = onAdd(ref, callback, immediate && existing && !onAddCalls.has(currentOnAddCallback));
+                });
+                return () => detachCallback();
+              }
+            },
+            onRemove: function(callback) {
+              if (context.instance) {
+                return onRemove(context.instance, callback);
+              } else if (context.onInstanceAvailable) {
+                let detachCallback = () => {
+                };
+                context.onInstanceAvailable((ref) => {
+                  detachCallback = onRemove(ref, callback);
+                });
+                return () => detachCallback();
+              }
+            },
+            onChange: function(callback) {
+              if (context.instance) {
+                return onChange(context.instance, callback);
+              } else if (context.onInstanceAvailable) {
+                let detachCallback = () => {
+                };
+                context.onInstanceAvailable((ref) => {
+                  detachCallback = onChange(ref, callback);
+                });
+                return () => detachCallback();
+              }
+            }
+          }, {
+            get(target2, prop) {
+              if (!target2[prop]) {
+                throw new Error(`Can't access '${prop}' through callback proxy. access the instance directly.`);
+              }
+              return target2[prop];
+            },
+            has(target2, prop) {
+              return target2[prop] !== void 0;
+            },
+            set(_, _1, _2) {
+              throw new Error("not allowed");
+            },
+            deleteProperty(_, _1) {
+              throw new Error("not allowed");
+            }
+          });
+        }
+      }
+      function $(instance) {
+        return getProxy(void 0, { instance });
+      }
+      return $;
+    }
+    function getRawChangesCallback(decoder2, callback) {
+      decoder2.triggerChanges = callback;
+    }
+    class StateView {
+      constructor(iterable = false) {
+        this.iterable = iterable;
+        this.visible = /* @__PURE__ */ new WeakSet();
+        this.invisible = /* @__PURE__ */ new WeakSet();
+        this.changes = /* @__PURE__ */ new Map();
+        if (iterable) {
+          this.items = [];
+        }
+      }
+      // TODO: allow to set multiple tags at once
+      add(obj, tag = DEFAULT_VIEW_TAG, checkIncludeParent = true) {
+        var _a3, _b2;
+        const changeTree = obj == null ? void 0 : obj[$changes];
+        if (!changeTree) {
+          console.warn("StateView#add(), invalid object:", obj);
+          return this;
+        } else if (!changeTree.parent && changeTree.refId !== 0) {
+          throw new Error(`Cannot add a detached instance to the StateView. Make sure to assign the "${changeTree.ref.constructor.name}" instance to the state before calling view.add()`);
+        }
+        const metadata = obj.constructor[Symbol.metadata];
+        this.visible.add(changeTree);
+        if (this.iterable && checkIncludeParent) {
+          this.items.push(obj);
+        }
+        if (checkIncludeParent && changeTree.parent) {
+          this.addParentOf(changeTree, tag);
+        }
+        let changes = this.changes.get(changeTree.refId);
+        if (changes === void 0) {
+          changes = {};
+          this.changes.set(changeTree.refId, changes);
+        }
+        if (tag !== DEFAULT_VIEW_TAG) {
+          if (!this.tags) {
+            this.tags = /* @__PURE__ */ new WeakMap();
+          }
+          let tags;
+          if (!this.tags.has(changeTree)) {
+            tags = /* @__PURE__ */ new Set();
+            this.tags.set(changeTree, tags);
+          } else {
+            tags = this.tags.get(changeTree);
+          }
+          tags.add(tag);
+          (_b2 = (_a3 = metadata == null ? void 0 : metadata[$fieldIndexesByViewTag]) == null ? void 0 : _a3[tag]) == null ? void 0 : _b2.forEach((index) => {
+            if (changeTree.getChange(index) !== exports2.OPERATION.DELETE) {
+              changes[index] = exports2.OPERATION.ADD;
+            }
+          });
+        } else {
+          const isInvisible = this.invisible.has(changeTree);
+          const changeSet = changeTree.filteredChanges !== void 0 ? changeTree.allFilteredChanges : changeTree.allChanges;
+          for (let i = 0, len = changeSet.operations.length; i < len; i++) {
+            const index = changeSet.operations[i];
+            if (index === void 0) {
+              continue;
+            }
+            const op = changeTree.indexedOperations[index] ?? exports2.OPERATION.ADD;
+            const tagAtIndex = metadata == null ? void 0 : metadata[index].tag;
+            if (!changeTree.isNew && // new structures will be added as part of .encode() call, no need to force it to .encodeView()
+            (isInvisible || // if "invisible", include all
+            tagAtIndex === void 0 || // "all change" with no tag
+            tagAtIndex === tag) && op !== exports2.OPERATION.DELETE) {
+              changes[index] = op;
+            }
+          }
+        }
+        changeTree.forEachChild((change, index) => {
+          if (metadata && metadata[index].tag !== void 0 && metadata[index].tag !== tag) {
+            return;
+          }
+          this.add(change.ref, tag, false);
+        });
+        return this;
+      }
+      addParentOf(childChangeTree, tag) {
+        var _a3;
+        const changeTree = childChangeTree.parent[$changes];
+        const parentIndex = childChangeTree.parentIndex;
+        if (!this.visible.has(changeTree)) {
+          this.visible.add(changeTree);
+          const parentChangeTree = (_a3 = changeTree.parent) == null ? void 0 : _a3[$changes];
+          if (parentChangeTree && parentChangeTree.filteredChanges !== void 0) {
+            this.addParentOf(changeTree, tag);
+          }
+        }
+        if (changeTree.getChange(parentIndex) !== exports2.OPERATION.DELETE) {
+          let changes = this.changes.get(changeTree.refId);
+          if (changes === void 0) {
+            changes = {};
+            this.changes.set(changeTree.refId, changes);
+          }
+          if (!this.tags) {
+            this.tags = /* @__PURE__ */ new WeakMap();
+          }
+          let tags;
+          if (!this.tags.has(changeTree)) {
+            tags = /* @__PURE__ */ new Set();
+            this.tags.set(changeTree, tags);
+          } else {
+            tags = this.tags.get(changeTree);
+          }
+          tags.add(tag);
+          changes[parentIndex] = exports2.OPERATION.ADD;
+        }
+      }
+      remove(obj, tag = DEFAULT_VIEW_TAG, _isClear = false) {
+        var _a3;
+        const changeTree = obj[$changes];
+        if (!changeTree) {
+          console.warn("StateView#remove(), invalid object:", obj);
+          return this;
+        }
+        this.visible.delete(changeTree);
+        if (this.iterable && !_isClear) {
+          spliceOne(this.items, this.items.indexOf(obj));
+        }
+        const ref = changeTree.ref;
+        const metadata = ref.constructor[Symbol.metadata];
+        let changes = this.changes.get(changeTree.refId);
+        if (changes === void 0) {
+          changes = {};
+          this.changes.set(changeTree.refId, changes);
+        }
+        if (tag === DEFAULT_VIEW_TAG) {
+          const parent = changeTree.parent;
+          if (!Metadata.isValidInstance(parent) && changeTree.isFiltered) {
+            const parentChangeTree = parent[$changes];
+            let changes2 = this.changes.get(parentChangeTree.refId);
+            if (changes2 === void 0) {
+              changes2 = {};
+              this.changes.set(parentChangeTree.refId, changes2);
+            }
+            changes2[changeTree.parentIndex] = exports2.OPERATION.DELETE;
+          } else {
+            (_a3 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a3.forEach((index) => changes[index] = exports2.OPERATION.DELETE);
+          }
+        } else {
+          metadata == null ? void 0 : metadata[$fieldIndexesByViewTag][tag].forEach((index) => changes[index] = exports2.OPERATION.DELETE);
+        }
+        if (this.tags && this.tags.has(changeTree)) {
+          const tags = this.tags.get(changeTree);
+          if (tag === void 0) {
+            this.tags.delete(changeTree);
+          } else {
+            tags.delete(tag);
+            if (tags.size === 0) {
+              this.tags.delete(changeTree);
+            }
+          }
+        }
+        return this;
+      }
+      has(obj) {
+        return this.visible.has(obj[$changes]);
+      }
+      hasTag(ob, tag = DEFAULT_VIEW_TAG) {
+        var _a3;
+        const tags = (_a3 = this.tags) == null ? void 0 : _a3.get(ob[$changes]);
+        return (tags == null ? void 0 : tags.has(tag)) ?? false;
+      }
+      clear() {
+        if (!this.iterable) {
+          throw new Error("StateView#clear() is only available for iterable StateView's. Use StateView(iterable: true) constructor.");
+        }
+        for (let i = 0, l = this.items.length; i < l; i++) {
+          this.remove(this.items[i], DEFAULT_VIEW_TAG, true);
+        }
+        this.items.length = 0;
+      }
+      isChangeTreeVisible(changeTree) {
+        let isVisible = this.visible.has(changeTree);
+        if (!isVisible && changeTree.isVisibilitySharedWithParent) {
+          if (this.visible.has(changeTree.parent[$changes])) {
+            this.visible.add(changeTree);
+            isVisible = true;
+          }
+        }
+        return isVisible;
+      }
+    }
+    registerType("map", { constructor: MapSchema });
+    registerType("array", { constructor: ArraySchema });
+    registerType("set", { constructor: SetSchema });
+    registerType("collection", { constructor: CollectionSchema });
+    exports2.$changes = $changes;
+    exports2.$childType = $childType;
+    exports2.$decoder = $decoder;
+    exports2.$deleteByIndex = $deleteByIndex;
+    exports2.$encoder = $encoder;
+    exports2.$filter = $filter;
+    exports2.$getByIndex = $getByIndex;
+    exports2.$track = $track;
+    exports2.ArraySchema = ArraySchema;
+    exports2.ChangeTree = ChangeTree;
+    exports2.CollectionSchema = CollectionSchema;
+    exports2.Decoder = Decoder2;
+    exports2.Encoder = Encoder2;
+    exports2.MapSchema = MapSchema;
+    exports2.Metadata = Metadata;
+    exports2.Reflection = Reflection;
+    exports2.ReflectionField = ReflectionField;
+    exports2.ReflectionType = ReflectionType;
+    exports2.Schema = Schema;
+    exports2.SetSchema = SetSchema;
+    exports2.StateView = StateView;
+    exports2.TypeContext = TypeContext;
+    exports2.decode = decode2;
+    exports2.decodeKeyValueOperation = decodeKeyValueOperation;
+    exports2.decodeSchemaOperation = decodeSchemaOperation;
+    exports2.defineCustomTypes = defineCustomTypes;
+    exports2.defineTypes = defineTypes;
+    exports2.deprecated = deprecated;
+    exports2.dumpChanges = dumpChanges;
+    exports2.encode = encode2;
+    exports2.encodeArray = encodeArray;
+    exports2.encodeKeyValueOperation = encodeKeyValueOperation;
+    exports2.encodeSchemaOperation = encodeSchemaOperation;
+    exports2.entity = entity;
+    exports2.getDecoderStateCallbacks = getDecoderStateCallbacks;
+    exports2.getRawChangesCallback = getRawChangesCallback;
+    exports2.registerType = registerType;
+    exports2.schema = schema2;
+    exports2.type = type;
+    exports2.view = view;
+  });
+})(umd, umd.exports);
+var umdExports = umd.exports;
+var __defProp2 = Object.defineProperty;
+var __decorateClass = (decorators, target2, key, kind) => {
+  var result = void 0;
+  for (var i = decorators.length - 1, decorator; i >= 0; i--)
+    if (decorator = decorators[i])
+      result = decorator(target2, key, result) || result;
+  if (result) __defProp2(target2, key, result);
+  return result;
+};
+const _CardInstanceSchema = class _CardInstanceSchema2 extends umdExports.Schema {
+  constructor() {
+    super(...arguments);
+    this.instanceId = "";
+    this.cardId = "";
+    this.name = "";
+    this.attack = 0;
+    this.speed = 0;
+    this.health = 0;
+    this.currentHp = 0;
+    this.brewCost = 0;
+    this.description = "";
+    this.isLegend = false;
+  }
+  // Helper to create from client-like data
+  static fromCardData(data, instanceId) {
+    const card = new _CardInstanceSchema2();
+    card.instanceId = instanceId;
+    card.cardId = data.id;
+    card.name = data.name;
+    card.attack = data.attack;
+    card.speed = data.speed;
+    card.health = data.health;
+    card.currentHp = data.health;
+    card.brewCost = data.brewCost;
+    card.description = data.description;
+    card.isLegend = data.isLegend;
+    return card;
+  }
+};
+__decorateClass([
+  umdExports.type("string")
+], _CardInstanceSchema.prototype, "instanceId");
+__decorateClass([
+  umdExports.type("string")
+], _CardInstanceSchema.prototype, "cardId");
+__decorateClass([
+  umdExports.type("string")
+], _CardInstanceSchema.prototype, "name");
+__decorateClass([
+  umdExports.type("number")
+], _CardInstanceSchema.prototype, "attack");
+__decorateClass([
+  umdExports.type("number")
+], _CardInstanceSchema.prototype, "speed");
+__decorateClass([
+  umdExports.type("number")
+], _CardInstanceSchema.prototype, "health");
+__decorateClass([
+  umdExports.type("number")
+], _CardInstanceSchema.prototype, "currentHp");
+__decorateClass([
+  umdExports.type("number")
+], _CardInstanceSchema.prototype, "brewCost");
+__decorateClass([
+  umdExports.type("string")
+], _CardInstanceSchema.prototype, "description");
+__decorateClass([
+  umdExports.type("boolean")
+], _CardInstanceSchema.prototype, "isLegend");
+let CardInstanceSchema = _CardInstanceSchema;
+class PlayerState extends umdExports.Schema {
+  constructor() {
+    super(...arguments);
+    this.sessionId = "";
+    this.username = "Player";
+    this.health = 100;
+    this.brews = 5;
+    this.shopRefreshCost = 1;
+    this.hand = new umdExports.MapSchema();
+    this.battlefield = new umdExports.MapSchema();
+    this.isReady = false;
+    this.shopOfferIds = new umdExports.ArraySchema();
+  }
+  // IDs of cards offered in the shop this phase
+}
+__decorateClass([
+  umdExports.type("string")
+], PlayerState.prototype, "sessionId");
+__decorateClass([
+  umdExports.type("string")
+], PlayerState.prototype, "username");
+__decorateClass([
+  umdExports.type("number")
+], PlayerState.prototype, "health");
+__decorateClass([
+  umdExports.type("number")
+], PlayerState.prototype, "brews");
+__decorateClass([
+  umdExports.type("number")
+], PlayerState.prototype, "shopRefreshCost");
+__decorateClass([
+  umdExports.type({ map: CardInstanceSchema })
+], PlayerState.prototype, "hand");
+__decorateClass([
+  umdExports.type({ map: CardInstanceSchema })
+], PlayerState.prototype, "battlefield");
+__decorateClass([
+  umdExports.type("boolean")
+], PlayerState.prototype, "isReady");
+__decorateClass([
+  umdExports.type(["string"])
+], PlayerState.prototype, "shopOfferIds");
+class GameState extends umdExports.Schema {
+  constructor() {
+    super(...arguments);
+    this.players = new umdExports.MapSchema();
+    this.currentDay = 0;
+    this.currentPhase = "Lobby";
+    this.battleTimer = 0;
+  }
+  // Countdown in seconds
+}
+__decorateClass([
+  umdExports.type({ map: PlayerState })
+], GameState.prototype, "players");
+__decorateClass([
+  umdExports.type("number")
+], GameState.prototype, "currentDay");
+__decorateClass([
+  umdExports.type("string")
+], GameState.prototype, "currentPhase");
+__decorateClass([
+  umdExports.type("number")
+], GameState.prototype, "battleTimer");
+console.log("Server schema classes (GameState, PlayerState, CardInstanceSchema) imported for Colyseus runtime:", { GameState, PlayerState, CardInstanceSchema });
 let colyseusRoom = null;
 let colyseusClient = null;
 let globalCardDataCache = /* @__PURE__ */ new Map();
