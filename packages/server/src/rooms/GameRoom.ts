@@ -71,7 +71,8 @@ export class GameRoom extends Room<GameState> {
     );
   }
   onCreate(options: any): void | Promise<any> {
-    console.log("GameRoom created!");
+    console.log("GameRoom onCreate: Method called.");
+    console.log("GameRoom onCreate: Received options:", JSON.stringify(options));
     this.setState(new GameState());
     this.state.currentPhase = Phase.Lobby;
     this.state.currentDay = 0;
@@ -542,7 +543,10 @@ export class GameRoom extends Room<GameState> {
   }
 
   onJoin(client: Client, options?: any, auth?: any): void | Promise<any> {
-    console.log(`Client joined: ${client.sessionId}`);
+    console.log(`GameRoom onJoin: Client joined: ${client.sessionId}`);
+    console.log(`GameRoom onJoin: Received options for ${client.sessionId}:`, JSON.stringify(options));
+    console.log(`GameRoom onJoin: Received auth for ${client.sessionId}:`, JSON.stringify(auth));
+
     // Log the received options to check for username
     console.log(
       `Received options for ${client.sessionId}:`,

@@ -93,7 +93,8 @@ class GameRoom extends colyseus_1.Room {
         console.log(`Generated shop offers for ${player.username}: [${player.shopOfferIds.join(", ")}] (Day: ${this.state.currentDay})`);
     }
     onCreate(options) {
-        console.log("GameRoom created!");
+        console.log("GameRoom onCreate: Method called.");
+        console.log("GameRoom onCreate: Received options:", JSON.stringify(options));
         this.setState(new GameState_1.GameState());
         this.state.currentPhase = GameState_1.Phase.Lobby;
         this.state.currentDay = 0;
@@ -374,7 +375,9 @@ class GameRoom extends colyseus_1.Room {
         });
     }
     onJoin(client, options, auth) {
-        console.log(`Client joined: ${client.sessionId}`);
+        console.log(`GameRoom onJoin: Client joined: ${client.sessionId}`);
+        console.log(`GameRoom onJoin: Received options for ${client.sessionId}:`, JSON.stringify(options));
+        console.log(`GameRoom onJoin: Received auth for ${client.sessionId}:`, JSON.stringify(auth));
         // Log the received options to check for username
         console.log(`Received options for ${client.sessionId}:`, JSON.stringify(options));
         const newPlayer = new GameState_1.PlayerState();

@@ -22091,9 +22091,14 @@ __name(loadAllCardData, "loadAllCardData");
 async function connectColyseus(accessToken, username) {
   const protocol = location.protocol === "https:" ? "wss" : "ws";
   const url = `${protocol}://${location.host}/.proxy/`;
+  console.log(`Colyseus Client: Attempting to connect to WebSocket base URL: ${url}`);
   colyseusClient = new cjs.Client(url);
   try {
-    console.log("Attempting to join or create Colyseus room (channelId filter temporarily removed for diagnostics)");
+    console.log("Colyseus Client: Attempting to join or create Colyseus room 'game' (channelId filter temporarily removed for diagnostics)...");
+    console.log("Colyseus Client: Options for joinOrCreate:", {
+      accessToken,
+      username
+    });
     colyseusRoom = await colyseusClient.joinOrCreate("game", {
       accessToken,
       // Pass token for potential server-side validation/use
@@ -22119,16 +22124,18 @@ async function connectColyseus(accessToken, username) {
   } catch (e) {
     console.error("Failed to connect to Colyseus:", e);
     if (e instanceof ProgressEvent) {
-      console.error("Connection failed: Network error (ProgressEvent). Potential causes:");
+      console.error("Colyseus Client: Connection failed: Network error (ProgressEvent). Potential causes:");
       console.error("- Colyseus server might not be running or accessible at the target URL:", url);
       console.error("- WebSocket connection blocked by firewall or proxy.");
       console.error("- Incorrect WebSocket proxy configuration on the deployment server (if applicable).");
+      console.error("- Full ProgressEvent object:", e);
       alert(`Failed to connect to game server: Network Error. Please ensure the server is running and accessible.`);
     } else if (e instanceof Error) {
-      console.error("Connection failed due to error:", e.message);
+      console.error("Colyseus Client: Connection failed due to error:", e.message);
+      console.error("Colyseus Client: Full error object:", e);
       alert(`Failed to connect to game server: ${e.message}`);
     } else {
-      console.error("Connection failed due to unknown error:", e);
+      console.error("Colyseus Client: Connection failed due to unknown error:", e);
       alert(`Failed to connect to game server: An unknown error occurred.`);
     }
     colyseusRoom = null;
