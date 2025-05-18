@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 export default defineConfig(({ mode }) => ({
   envDir: "../../",
   build: {
+    minify: false,
     rollupOptions: {
       output: {
         manualChunks: {
