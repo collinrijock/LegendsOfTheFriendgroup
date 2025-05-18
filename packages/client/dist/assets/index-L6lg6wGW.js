@@ -24913,10 +24913,30 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
       }
     );
     cardContainer.on("dragend", (pointer) => {
+      if (!this.scene.isActive()) {
+        if (cardContainer.active) {
+          cardContainer.setAlpha(1);
+          const originalX = cardContainer.getData("originalX");
+          const originalY = cardContainer.getData("originalY");
+          if (typeof originalX === "number" && typeof originalY === "number") {
+            cardContainer.x = originalX;
+            cardContainer.y = originalY;
+          }
+        }
+        if (cardContainer.getData("isDragging")) {
+          cardContainer.setData("isDragging", false);
+        }
+        if (this.brewGainText && this.brewGainText.active) {
+          this.brewGainText.setAlpha(0);
+        }
+        return;
+      }
       if (!cardContainer.getData("isDragging")) return;
       cardContainer.setAlpha(1);
       cardContainer.setData("isDragging", false);
-      this.brewGainText.setAlpha(0);
+      if (this.brewGainText && this.brewGainText.active) {
+        this.brewGainText.setAlpha(0);
+      }
       const instanceId = cardContainer.getData("instanceId");
       const originalArea = cardContainer.getData("originalAreaOnDragStart");
       const originalSlotKey = cardContainer.getData(
@@ -24927,14 +24947,19 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
         const myPlayer = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(
           colyseusRoom == null ? void 0 : colyseusRoom.sessionId
         );
-        let cardSchema;
-        if (originalArea === "hand" && (myPlayer == null ? void 0 : myPlayer.hand.has(originalSlotKey))) {
-          cardSchema = myPlayer.hand.get(originalSlotKey);
-        } else if (originalArea === "battlefield" && (myPlayer == null ? void 0 : myPlayer.battlefield.has(originalSlotKey))) {
-          cardSchema = myPlayer.battlefield.get(originalSlotKey);
+        let cardSchemaToSell;
+        if (myPlayer && ownerSessionId === myPlayer.sessionId) {
+          if (originalArea === "hand" && myPlayer.hand.has(originalSlotKey)) {
+            cardSchemaToSell = myPlayer.hand.get(originalSlotKey);
+          } else if (originalArea === "battlefield" && myPlayer.battlefield.has(originalSlotKey)) {
+            cardSchemaToSell = myPlayer.battlefield.get(originalSlotKey);
+          }
         }
-        if (cardSchema && cardSchema.instanceId === instanceId) {
-          const sellValue = Math.max(1, Math.floor(cardSchema.brewCost / 2));
+        if (cardSchemaToSell && cardSchemaToSell.instanceId === instanceId) {
+          const sellValue = Math.max(
+            1,
+            Math.floor(cardSchemaToSell.brewCost / 2)
+          );
           colyseusRoom == null ? void 0 : colyseusRoom.send("sellCard", {
             instanceId,
             area: originalArea,
@@ -24942,19 +24967,16 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
           });
           this.showBrewGain(sellValue);
           return;
+        } else {
+          console.warn(
+            `BoardView: Sell attempt failed. Card schema not found, instanceId mismatch, or not owned by local player. Instance: ${instanceId}, OriginalArea: ${originalArea}, OriginalSlot: ${originalSlotKey}, Owner: ${ownerSessionId}`
+          );
         }
-        const ownerId = cardContainer.getData("ownerSessionId");
-        const player = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(ownerId);
-        if (player) {
-          if (originalArea === "hand") {
-            cardSchema = player.hand.get(originalSlotKey);
-          } else {
-            cardSchema = player.battlefield.get(originalSlotKey);
-          }
-        }
-        let dropped = false;
-        let newAreaForServer;
-        let newSlotKeyForServer;
+      }
+      let dropped = false;
+      let newAreaForServer;
+      let newSlotKeyForServer;
+      if (!dropped) {
         for (let i = 0; i < 5; i++) {
           const targetSlotKey = String(i);
           const slotPos = this.getSlotPixelPosition(true, "hand", i);
@@ -24982,9 +25004,7 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
                     canDropInHandSlot = true;
                   }
                 } else if (this.currentPhase === Phase.Preparation) {
-                  if (originalArea === "hand") {
-                    canDropInHandSlot = true;
-                  }
+                  canDropInHandSlot = true;
                 }
                 if (canDropInHandSlot) {
                   cardContainer.x = slotPos.x;
@@ -25001,24 +25021,34 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
                     cardContainer
                   );
                   if (areaChanged) {
-                    const myPlayer2 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(ownerSessionId);
-                    let cardSchema2;
-                    if (myPlayer2) {
-                      cardSchema2 = myPlayer2.hand.get(targetSlotKey);
-                      if (!cardSchema2) {
-                        if (originalArea === "battlefield") {
-                          cardSchema2 = myPlayer2.battlefield.get(originalSlotKey);
-                        } else {
-                          cardSchema2 = myPlayer2.hand.get(originalSlotKey);
-                        }
-                      }
+                    let schemaToUse;
+                    const playerState = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(ownerSessionId);
+                    if (playerState) {
+                      const findSchema = /* @__PURE__ */ __name((id, pState) => {
+                        let found;
+                        pState.hand.forEach((c) => {
+                          if (c.instanceId === id) found = c;
+                        });
+                        if (found) return found;
+                        pState.battlefield.forEach((c) => {
+                          if (c.instanceId === id) found = c;
+                        });
+                        return found;
+                      }, "findSchema");
+                      schemaToUse = findSchema(instanceId, playerState);
                     }
-                    if (cardSchema2 && cardSchema2.instanceId === instanceId) {
+                    if (schemaToUse) {
                       this.updateCardVisual(
                         ownerSessionId,
                         "hand",
+                        // newArea is "hand"
                         targetSlotKey,
-                        cardSchema2
+                        // newSlotKey
+                        schemaToUse
+                      );
+                    } else {
+                      console.warn(
+                        `BoardView: dragend (to hand) - Could not find card schema for instanceId ${instanceId} to update visual on area change.`
                       );
                     }
                   }
@@ -25032,89 +25062,109 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
                       toSlotKey: targetSlotKey
                     });
                   }
+                  break;
                 }
               }
-              if (dropped) break;
             }
           }
         }
-        if (!dropped && this.currentPhase === Phase.Preparation) {
-          for (let i = 0; i < 5; i++) {
-            const targetSlotKey = String(i);
-            const slotPos = this.getSlotPixelPosition(true, "battlefield", i);
-            if (slotPos) {
-              const dropZone = new Phaser.Geom.Rectangle(
-                slotPos.x - FULL_CARD_WIDTH / 2,
-                slotPos.y - FULL_CARD_HEIGHT / 2,
-                FULL_CARD_WIDTH,
-                FULL_CARD_HEIGHT
-              );
-              if (Phaser.Geom.Rectangle.Contains(
-                dropZone,
-                cardContainer.x,
-                cardContainer.y
+      }
+      if (!dropped && this.currentPhase === Phase.Preparation) {
+        for (let i = 0; i < 5; i++) {
+          const targetSlotKey = String(i);
+          const slotPos = this.getSlotPixelPosition(true, "battlefield", i);
+          if (slotPos) {
+            const dropZone = new Phaser.Geom.Rectangle(
+              slotPos.x - MINION_CARD_WIDTH / 2,
+              slotPos.y - MINION_CARD_HEIGHT / 2,
+              MINION_CARD_WIDTH,
+              MINION_CARD_HEIGHT
+            );
+            if (Phaser.Geom.Rectangle.Contains(
+              dropZone,
+              cardContainer.x,
+              cardContainer.y
+            )) {
+              if (this.isSlotEmpty(
+                ownerSessionId,
+                "battlefield",
+                targetSlotKey,
+                instanceId
               )) {
-                if (this.isSlotEmpty(
+                cardContainer.x = slotPos.x;
+                cardContainer.y = slotPos.y;
+                const areaChanged = originalArea !== "battlefield";
+                cardContainer.setData("area", "battlefield");
+                cardContainer.setData("slotKey", targetSlotKey);
+                this.updateVisualMaps(
                   ownerSessionId,
+                  originalArea,
+                  originalSlotKey,
                   "battlefield",
                   targetSlotKey,
-                  instanceId
-                )) {
-                  cardContainer.x = slotPos.x;
-                  cardContainer.y = slotPos.y;
-                  const areaChanged = originalArea !== "battlefield";
-                  cardContainer.setData("area", "battlefield");
-                  cardContainer.setData("slotKey", targetSlotKey);
-                  this.updateVisualMaps(
-                    ownerSessionId,
-                    originalArea,
-                    originalSlotKey,
-                    "battlefield",
-                    targetSlotKey,
-                    cardContainer
-                  );
-                  if (areaChanged) {
-                    const myPlayer2 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(ownerSessionId);
-                    const cardSchema2 = (myPlayer2 == null ? void 0 : myPlayer2.battlefield.get(targetSlotKey)) || (myPlayer2 == null ? void 0 : myPlayer2.hand.get(originalSlotKey));
-                    if (cardSchema2 && cardSchema2.instanceId === instanceId) {
-                      this.updateCardVisual(
-                        ownerSessionId,
-                        "battlefield",
-                        targetSlotKey,
-                        cardSchema2
-                      );
-                    }
+                  cardContainer
+                );
+                if (areaChanged) {
+                  let schemaToUse;
+                  const playerState = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(ownerSessionId);
+                  if (playerState) {
+                    const findSchema = /* @__PURE__ */ __name((id, pState) => {
+                      let found;
+                      pState.hand.forEach((c) => {
+                        if (c.instanceId === id) found = c;
+                      });
+                      if (found) return found;
+                      pState.battlefield.forEach((c) => {
+                        if (c.instanceId === id) found = c;
+                      });
+                      return found;
+                    }, "findSchema");
+                    schemaToUse = findSchema(instanceId, playerState);
                   }
-                  dropped = true;
-                  newAreaForServer = "battlefield";
-                  newSlotKeyForServer = targetSlotKey;
+                  if (schemaToUse) {
+                    this.updateCardVisual(
+                      ownerSessionId,
+                      "battlefield",
+                      // newArea is "battlefield"
+                      targetSlotKey,
+                      // newSlotKey
+                      schemaToUse
+                    );
+                  } else {
+                    console.warn(
+                      `BoardView: dragend (to battlefield) - Could not find card schema for instanceId ${instanceId} to update visual on area change.`
+                    );
+                  }
                 }
+                dropped = true;
+                newAreaForServer = "battlefield";
+                newSlotKeyForServer = targetSlotKey;
                 break;
               }
             }
           }
         }
-        if (!dropped) {
-          cardContainer.x = cardContainer.getData("originalX");
-          cardContainer.y = cardContainer.getData("originalY");
-          cardContainer.setData("area", originalArea);
-          cardContainer.setData("slotKey", originalSlotKey);
-        } else {
-          if (this.currentPhase === Phase.Preparation && newAreaForServer && newSlotKeyForServer) {
-            if (originalArea !== newAreaForServer || originalSlotKey !== newSlotKeyForServer) {
-              colyseusRoom == null ? void 0 : colyseusRoom.send("updatePrepLayout", {
-                instanceId,
-                newArea: newAreaForServer,
-                newSlotKey: newSlotKeyForServer
-              });
-            }
+      }
+      if (!dropped) {
+        cardContainer.x = cardContainer.getData("originalX");
+        cardContainer.y = cardContainer.getData("originalY");
+        cardContainer.setData("area", originalArea);
+        cardContainer.setData("slotKey", originalSlotKey);
+      } else {
+        if (this.currentPhase === Phase.Preparation && newAreaForServer && newSlotKeyForServer) {
+          if (originalArea !== newAreaForServer || originalSlotKey !== newSlotKeyForServer) {
+            colyseusRoom == null ? void 0 : colyseusRoom.send("updatePrepLayout", {
+              instanceId,
+              newArea: newAreaForServer,
+              newSlotKey: newSlotKeyForServer
+            });
           }
         }
-        if (this.currentPhase === Phase.Preparation) {
-          const prepScene = this.scene.get("Preparation");
-          if (prepScene && prepScene.scene.isActive() && prepScene.updateStartButtonState) {
-            prepScene.updateStartButtonState();
-          }
+      }
+      if (this.currentPhase === Phase.Preparation) {
+        const prepScene = this.scene.get("Preparation");
+        if (prepScene && prepScene.scene.isActive() && prepScene.updateStartButtonState) {
+          prepScene.updateStartButtonState();
         }
       }
     });

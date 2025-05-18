@@ -1278,14 +1278,40 @@ export class BoardView extends Scene {
     );
 
     cardContainer.on("dragend", (pointer: Phaser.Input.Pointer) => {
+      // Guard for inactive scene
+      if (!this.scene.isActive()) {
+        if (cardContainer.active) {
+          // Check if cardContainer itself is still active
+          cardContainer.setAlpha(1.0); // Reset visual state if possible
+          // Attempt to place it back at original position if data exists
+          const originalX = cardContainer.getData("originalX");
+          const originalY = cardContainer.getData("originalY");
+          if (typeof originalX === "number" && typeof originalY === "number") {
+            cardContainer.x = originalX;
+            cardContainer.y = originalY;
+          }
+        }
+        if (cardContainer.getData("isDragging")) {
+          // Only reset if it was dragging
+          cardContainer.setData("isDragging", false);
+        }
+        if (this.brewGainText && this.brewGainText.active) {
+          // Check brewGainText exists and is active
+          this.brewGainText.setAlpha(0);
+        }
+        return;
+      }
+
       if (!cardContainer.getData("isDragging")) return;
 
       cardContainer.setAlpha(1.0);
       cardContainer.setData("isDragging", false);
-      this.brewGainText.setAlpha(0); // Hide preview text on drag end
+      if (this.brewGainText && this.brewGainText.active) {
+        // Check brewGainText exists and is active
+        this.brewGainText.setAlpha(0); // Hide preview text on drag end
+      }
 
       const instanceId = cardContainer.getData("instanceId") as string;
-      // Use the area and slotKey stored at the beginning of the drag for updating visual maps
       const originalArea = cardContainer.getData("originalAreaOnDragStart") as
         | "hand"
         | "battlefield";
@@ -1294,64 +1320,59 @@ export class BoardView extends Scene {
       ) as string;
       const ownerSessionId = cardContainer.getData("ownerSessionId") as string;
 
-      // Check if card is dropped on sell zone
+      // --- Sell Logic ---
       if (
         (this.currentPhase === Phase.Shop ||
           this.currentPhase === Phase.Preparation) &&
         this.sellZone.visible &&
         this.isDroppedOnSellZone(cardContainer)
       ) {
-        // Get card information from the server state to calculate value
         const myPlayer = colyseusRoom?.state.players.get(
-          colyseusRoom?.sessionId
+          colyseusRoom?.sessionId // Should be ownerSessionId if we allow selling opponent's cards (which we don't)
+          // For now, assume only local player can sell their own cards.
         ) as ClientPlayerState | undefined;
-        let cardSchema: ClientCardInstance | undefined;
+        let cardSchemaToSell: ClientCardInstance | undefined;
 
-        // Find the card schema based on area and slotKey
-        if (originalArea === "hand" && myPlayer?.hand.has(originalSlotKey)) {
-          cardSchema = myPlayer.hand.get(originalSlotKey);
-        } else if (
-          originalArea === "battlefield" &&
-          myPlayer?.battlefield.has(originalSlotKey)
-        ) {
-          cardSchema = myPlayer.battlefield.get(originalSlotKey);
+        // Ensure we are trying to sell a card owned by the local player (who is doing the dragging)
+        if (myPlayer && ownerSessionId === myPlayer.sessionId) {
+          if (originalArea === "hand" && myPlayer.hand.has(originalSlotKey)) {
+            cardSchemaToSell = myPlayer.hand.get(originalSlotKey);
+          } else if (
+            originalArea === "battlefield" &&
+            myPlayer.battlefield.has(originalSlotKey)
+          ) {
+            cardSchemaToSell = myPlayer.battlefield.get(originalSlotKey);
+          }
         }
 
-        if (cardSchema && cardSchema.instanceId === instanceId) {
-          // Calculate sell value (half the brew cost, minimum 1)
-          const sellValue = Math.max(1, Math.floor(cardSchema.brewCost / 2));
-
-          // Send sell request to server
+        if (cardSchemaToSell && cardSchemaToSell.instanceId === instanceId) {
+          const sellValue = Math.max(
+            1,
+            Math.floor(cardSchemaToSell.brewCost / 2)
+          );
           colyseusRoom?.send("sellCard", {
             instanceId: instanceId,
             area: originalArea,
             slotKey: originalSlotKey,
           });
-
-          // Show brew gain animation
           this.showBrewGain(sellValue);
-
           return; // Exit the handler after selling
+        } else {
+          console.warn(
+            `BoardView: Sell attempt failed. Card schema not found, instanceId mismatch, or not owned by local player. Instance: ${instanceId}, OriginalArea: ${originalArea}, OriginalSlot: ${originalSlotKey}, Owner: ${ownerSessionId}`
+          );
+          // Card will snap back due to !dropped
         }
-        const ownerId = cardContainer.getData("ownerSessionId") as string;
+      }
 
-        const player = colyseusRoom?.state.players.get(ownerId) as
-          | ClientPlayerState
-          | undefined;
+      // Declare `dropped` and related variables *after* sell logic.
+      let dropped = false;
+      let newAreaForServer: "hand" | "battlefield" | undefined;
+      let newSlotKeyForServer: string | undefined;
 
-        if (player) {
-          if (originalArea === "hand") {
-            cardSchema = player.hand.get(originalSlotKey);
-          } else {
-            cardSchema = player.battlefield.get(originalSlotKey);
-          }
-        }
-
-        let dropped = false;
-        let newAreaForServer: "hand" | "battlefield" | undefined;
-        let newSlotKeyForServer: string | undefined;
-
-        // Check drop on local player's hand slots
+      // Check drop on local player's hand slots
+      if (!dropped) {
+        // Check if not already dropped (e.g. by successful sell)
         for (let i = 0; i < 5; i++) {
           const targetSlotKey = String(i);
           const slotPos = this.getSlotPixelPosition(true, "hand", i); // true for local player
@@ -1377,27 +1398,21 @@ export class BoardView extends Scene {
                   instanceId
                 )
               ) {
-                // MODIFICATION START: Check if drop to hand is allowed
                 let canDropInHandSlot = false;
                 if (this.currentPhase === Phase.Shop) {
-                  // In Shop phase, cards can be moved within the hand.
+                  // In Shop phase, only cards originating from the hand can be moved within the hand.
                   if (originalArea === "hand") {
                     canDropInHandSlot = true;
                   }
                 } else if (this.currentPhase === Phase.Preparation) {
-                  // In Preparation phase, only cards originating from the hand can be dropped into a hand slot.
-                  if (originalArea === "hand") {
-                    canDropInHandSlot = true;
-                  }
+                  // In Preparation phase, any card (from hand or battlefield) can be moved to an empty hand slot.
+                  canDropInHandSlot = true;
                 }
-                // MODIFICATION END
 
                 if (canDropInHandSlot) {
-                  // Use the new condition
                   cardContainer.x = slotPos.x;
                   cardContainer.y = slotPos.y;
 
-                  // Change area attribute
                   const areaChanged = originalArea !== "hand";
                   cardContainer.setData("area", "hand");
                   cardContainer.setData("slotKey", targetSlotKey);
@@ -1412,33 +1427,40 @@ export class BoardView extends Scene {
                   );
 
                   if (areaChanged) {
-                    const myPlayer =
+                    let schemaToUse: ClientCardInstance | undefined;
+                    const playerState =
                       colyseusRoom?.state.players.get(ownerSessionId);
-                    // Try to find the schema from its new potential location first, then original
-                    let cardSchema: CardInstanceSchema | undefined;
-                    if (myPlayer) {
-                      cardSchema = myPlayer.hand.get(targetSlotKey);
-                      if (!cardSchema) {
-                        if (originalArea === "battlefield") {
-                          cardSchema =
-                            myPlayer.battlefield.get(originalSlotKey);
-                        } else {
-                          // originalArea must be 'hand' if not 'battlefield'
-                          cardSchema = myPlayer.hand.get(originalSlotKey);
-                        }
-                      }
+                    if (playerState) {
+                      const findSchema = (
+                        id: string,
+                        pState: ClientPlayerState
+                      ): ClientCardInstance | undefined => {
+                        let found: ClientCardInstance | undefined;
+                        pState.hand.forEach((c) => {
+                          if (c.instanceId === id) found = c;
+                        });
+                        if (found) return found;
+                        pState.battlefield.forEach((c) => {
+                          if (c.instanceId === id) found = c;
+                        });
+                        return found;
+                      };
+                      schemaToUse = findSchema(instanceId, playerState);
                     }
 
-                    if (cardSchema && cardSchema.instanceId === instanceId) {
+                    if (schemaToUse) {
                       this.updateCardVisual(
                         ownerSessionId,
-                        "hand",
-                        targetSlotKey,
-                        cardSchema
+                        "hand", // newArea is "hand"
+                        targetSlotKey, // newSlotKey
+                        schemaToUse
+                      );
+                    } else {
+                      console.warn(
+                        `BoardView: dragend (to hand) - Could not find card schema for instanceId ${instanceId} to update visual on area change.`
                       );
                     }
                   }
-
                   dropped = true;
                   newAreaForServer = "hand";
                   newSlotKeyForServer = targetSlotKey;
@@ -1454,126 +1476,138 @@ export class BoardView extends Scene {
                       toSlotKey: targetSlotKey,
                     });
                   }
+                  break; // Break from hand slot loop
                 }
               }
-              if (dropped) break; // Break if successfully dropped in any hand slot
             }
           }
         }
+      }
 
-        // Check drop on local player's battlefield slots (only if in Preparation phase)
-        if (!dropped && this.currentPhase === Phase.Preparation) {
-          for (let i = 0; i < 5; i++) {
-            const targetSlotKey = String(i);
-            const slotPos = this.getSlotPixelPosition(true, "battlefield", i); // true for local player
-            if (slotPos) {
-              const dropZone = new Phaser.Geom.Rectangle(
-                slotPos.x - FULL_CARD_WIDTH / 2,
-                slotPos.y - FULL_CARD_HEIGHT / 2,
-                FULL_CARD_WIDTH,
-                FULL_CARD_HEIGHT
-              );
+      // Check drop on local player's battlefield slots (only if in Preparation phase)
+      if (!dropped && this.currentPhase === Phase.Preparation) {
+        for (let i = 0; i < 5; i++) {
+          const targetSlotKey = String(i);
+          const slotPos = this.getSlotPixelPosition(true, "battlefield", i); // true for local player
+          if (slotPos) {
+            const dropZone = new Phaser.Geom.Rectangle(
+              slotPos.x - MINION_CARD_WIDTH / 2,
+              slotPos.y - MINION_CARD_HEIGHT / 2,
+              MINION_CARD_WIDTH,
+              MINION_CARD_HEIGHT
+            );
+            if (
+              Phaser.Geom.Rectangle.Contains(
+                dropZone,
+                cardContainer.x,
+                cardContainer.y
+              )
+            ) {
               if (
-                Phaser.Geom.Rectangle.Contains(
-                  dropZone,
-                  cardContainer.x,
-                  cardContainer.y
+                this.isSlotEmpty(
+                  ownerSessionId,
+                  "battlefield",
+                  targetSlotKey,
+                  instanceId
                 )
               ) {
-                if (
-                  this.isSlotEmpty(
-                    ownerSessionId,
-                    "battlefield",
-                    targetSlotKey,
-                    instanceId
-                  )
-                ) {
-                  // Valid drop on battlefield
-                  cardContainer.x = slotPos.x;
-                  cardContainer.y = slotPos.y;
+                cardContainer.x = slotPos.x;
+                cardContainer.y = slotPos.y;
 
-                  // Change area attribute
-                  const areaChanged = originalArea !== "battlefield";
-                  cardContainer.setData("area", "battlefield");
-                  cardContainer.setData("slotKey", targetSlotKey);
+                const areaChanged = originalArea !== "battlefield";
+                cardContainer.setData("area", "battlefield");
+                cardContainer.setData("slotKey", targetSlotKey);
 
-                  this.updateVisualMaps(
-                    ownerSessionId,
-                    originalArea,
-                    originalSlotKey,
-                    "battlefield",
-                    targetSlotKey,
-                    cardContainer
-                  );
+                this.updateVisualMaps(
+                  ownerSessionId,
+                  originalArea,
+                  originalSlotKey,
+                  "battlefield",
+                  targetSlotKey,
+                  cardContainer
+                );
 
-                  // If area has changed, recreate the card visual to update appearance
-                  if (areaChanged) {
-                    // Get the card data from the server state
-                    const myPlayer =
-                      colyseusRoom?.state.players.get(ownerSessionId);
-                    const cardSchema =
-                      myPlayer?.battlefield.get(targetSlotKey) ||
-                      myPlayer?.hand.get(originalSlotKey);
-
-                    if (cardSchema && cardSchema.instanceId === instanceId) {
-                      // Recreate the card with the correct appearance for its new area
-                      this.updateCardVisual(
-                        ownerSessionId,
-                        "battlefield",
-                        targetSlotKey,
-                        cardSchema
-                      );
-                    }
+                if (areaChanged) {
+                  let schemaToUse: ClientCardInstance | undefined;
+                  const playerState =
+                    colyseusRoom?.state.players.get(ownerSessionId);
+                  if (playerState) {
+                    const findSchema = (
+                      id: string,
+                      pState: ClientPlayerState
+                    ): ClientCardInstance | undefined => {
+                      let found: ClientCardInstance | undefined;
+                      pState.hand.forEach((c) => {
+                        if (c.instanceId === id) found = c;
+                      });
+                      if (found) return found;
+                      pState.battlefield.forEach((c) => {
+                        if (c.instanceId === id) found = c;
+                      });
+                      return found;
+                    };
+                    schemaToUse = findSchema(instanceId, playerState);
                   }
 
-                  dropped = true;
-                  newAreaForServer = "battlefield";
-                  newSlotKeyForServer = targetSlotKey;
-                  // Preparation.ts will read the final layout for its own send, this is for real-time sync
+                  if (schemaToUse) {
+                    this.updateCardVisual(
+                      ownerSessionId,
+                      "battlefield", // newArea is "battlefield"
+                      targetSlotKey, // newSlotKey
+                      schemaToUse
+                    );
+                  } else {
+                    console.warn(
+                      `BoardView: dragend (to battlefield) - Could not find card schema for instanceId ${instanceId} to update visual on area change.`
+                    );
+                  }
                 }
-                break;
+                dropped = true;
+                newAreaForServer = "battlefield";
+                newSlotKeyForServer = targetSlotKey;
+                break; // Break from battlefield slot loop
               }
             }
           }
         }
+      }
 
-        if (!dropped) {
-          cardContainer.x = cardContainer.getData("originalX");
-          cardContainer.y = cardContainer.getData("originalY");
-          // Reset area and slotKey to original if not dropped successfully
-          cardContainer.setData("area", originalArea);
-          cardContainer.setData("slotKey", originalSlotKey);
-        } else {
-          // If dropped successfully and in Preparation phase, send update to server
+      if (!dropped) {
+        cardContainer.x = cardContainer.getData("originalX");
+        cardContainer.y = cardContainer.getData("originalY");
+        // Reset area and slotKey to original if not dropped successfully
+        cardContainer.setData("area", originalArea);
+        cardContainer.setData("slotKey", originalSlotKey);
+      } else {
+        // If dropped successfully and in Preparation phase, send update to server
+        if (
+          this.currentPhase === Phase.Preparation &&
+          newAreaForServer &&
+          newSlotKeyForServer
+        ) {
+          // Only send if it actually moved to a new logical slot
           if (
-            this.currentPhase === Phase.Preparation &&
-            newAreaForServer &&
-            newSlotKeyForServer
+            originalArea !== newAreaForServer ||
+            originalSlotKey !== newSlotKeyForServer
           ) {
-            // Only send if it actually moved to a new logical slot
-            if (
-              originalArea !== newAreaForServer ||
-              originalSlotKey !== newSlotKeyForServer
-            ) {
-              colyseusRoom?.send("updatePrepLayout", {
-                instanceId,
-                newArea: newAreaForServer,
-                newSlotKey: newSlotKeyForServer,
-              });
-            }
+            colyseusRoom?.send("updatePrepLayout", {
+              instanceId,
+              newArea: newAreaForServer,
+              newSlotKey: newSlotKeyForServer,
+            });
           }
         }
+      }
 
-        // Notify Preparation scene if it's active and phase is Prep, so it can update button state
-        if (this.currentPhase === Phase.Preparation) {
-          const prepScene = this.scene.get("Preparation");
-          if (
-            prepScene &&
-            prepScene.scene.isActive() &&
-            (prepScene as any).updateStartButtonState
-          ) {
-            (prepScene as any).updateStartButtonState();
-          }
+      // Notify Preparation scene if it's active and phase is Prep, so it can update button state
+      if (this.currentPhase === Phase.Preparation) {
+        const prepScene = this.scene.get("Preparation");
+        if (
+          prepScene &&
+          prepScene.scene.isActive() &&
+          (prepScene as any).updateStartButtonState
+        ) {
+          (prepScene as any).updateStartButtonState();
         }
       }
     });
