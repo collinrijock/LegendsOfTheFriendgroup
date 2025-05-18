@@ -3,6 +3,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig(({ mode }) => ({
   envDir: "../../",
+  esbuild: {
+    keepNames: true,
+  },
   build: {
     minify: false,
     rollupOptions: {
