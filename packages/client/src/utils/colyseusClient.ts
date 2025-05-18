@@ -1,5 +1,6 @@
 import { Client } from "colyseus.js";
 import { Room } from "colyseus.js";
+
 // Import GameState schema if needed for type hints
 // import { GameState } from "../../../server/src/schemas/GameState"; // Adjust path if needed
 
