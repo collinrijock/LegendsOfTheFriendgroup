@@ -6,13 +6,11 @@ export default defineConfig(({ mode }) => ({
   build: {
     minify: 'terser',
     terserOptions: {
-      mangle: {
-        // preserve your class & function names
-        keep_classnames: true,
-        keep_fnames: true,
-      },
-      // you can also disable compression if you want
+      mangle: false ,
+      // Keep compression disabled as per the existing configuration
       compress: false,
+      keep_classnames: true, // Preserve class names
+      keep_fnames: true,     // Preserve function names
     },
   },
 
