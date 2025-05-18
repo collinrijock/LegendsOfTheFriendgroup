@@ -58,7 +58,8 @@ const initiateDiscordSDK = async () => {
         auth = mockAuthData;
         console.log("Mock Authentication successful:", auth);
         // Connect to Colyseus after mock authentication
-        await connectColyseus(auth.access_token, auth.user.username);
+        // Pass mockChannelId here
+        await connectColyseus(auth.access_token, auth.user.username, mockChannelId);
         return mockAuthData; // Return the auth data
       },
       // Add mock for authorize if needed for local testing flow
@@ -151,7 +152,12 @@ const authorizeDiscordUser = async () => {
       step = "connectColyseus";
       console.log("Connecting to Colyseus...");
       try {
-          await connectColyseus(auth.access_token, auth.user.username);
+          // Ensure discordSdk.channelId is available and not null
+          if (!discordSdk.channelId) {
+            console.error("Colyseus connection failed: discordSdk.channelId is null or undefined.");
+            throw new Error("discordSdk.channelId is not available.");
+          }
+          await connectColyseus(auth.access_token, auth.user.username, discordSdk.channelId);
           console.log("Colyseus connection successful.");
       } catch (colyseusError) {
           console.error("Colyseus connection failed:", colyseusError);
