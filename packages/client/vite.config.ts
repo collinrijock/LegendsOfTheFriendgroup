@@ -5,9 +5,12 @@ export default defineConfig(({ mode }) => ({
   envDir: "../../",
   esbuild: {
     keepNames: true,
+    minifyIdentifiers: false,
+    minifySyntax: false,
+    minifyWhitespace: false,
   },
   build: {
-    minify: false,
+    minify: 'esbuild', // Use esbuild for minification
     rollupOptions: {
       output: {
         manualChunks: {

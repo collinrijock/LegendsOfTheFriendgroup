@@ -2,7 +2,6 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __name = (target2, value) => __defProp(target2, "name", { value, configurable: true });
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-var _a, _b, _c, _d, _e, _f, _g;
 import { P as Phaser$1, c as commonjsGlobal$1, g as getAugmentedNamespace, p as phaserExports } from "./phaser-CdQw7D6z.js";
 (/* @__PURE__ */ __name(function polyfill() {
   const relList = document.createElement("link").relList;
@@ -804,16 +803,13 @@ function __classPrivateFieldSet$1(receiver, state, value, kind, f) {
   return state.set(receiver, value), value;
 }
 __name(__classPrivateFieldSet$1, "__classPrivateFieldSet$1");
-typeof SuppressedError === "function" ? SuppressedError : function(error, suppressed, message) {
-  var e = new Error(message);
-  return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
-};
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message === null || message === void 0 ? void 0 : message.message;
 })(errorUtil || (errorUtil = {}));
-var _ZodEnum_cache, _ZodNativeEnum_cache;
+var _ZodEnum_cache;
+var _ZodNativeEnum_cache;
 const _ParseInputLazyPath = class _ParseInputLazyPath {
   constructor(parent, value, path, key) {
     this._cachedPath = [];
@@ -864,17 +860,17 @@ function processCreateParams(params) {
   if (errorMap2)
     return { errorMap: errorMap2, description };
   const customMap = /* @__PURE__ */ __name((iss, ctx) => {
-    var _a3, _b2;
+    var _a9, _b;
     const { message } = params;
     if (iss.code === "invalid_enum_value") {
       return { message: message !== null && message !== void 0 ? message : ctx.defaultError };
     }
     if (typeof ctx.data === "undefined") {
-      return { message: (_a3 = message !== null && message !== void 0 ? message : required_error) !== null && _a3 !== void 0 ? _a3 : ctx.defaultError };
+      return { message: (_a9 = message !== null && message !== void 0 ? message : required_error) !== null && _a9 !== void 0 ? _a9 : ctx.defaultError };
     }
     if (iss.code !== "invalid_type")
       return { message: ctx.defaultError };
-    return { message: (_b2 = message !== null && message !== void 0 ? message : invalid_type_error) !== null && _b2 !== void 0 ? _b2 : ctx.defaultError };
+    return { message: (_b = message !== null && message !== void 0 ? message : invalid_type_error) !== null && _b !== void 0 ? _b : ctx.defaultError };
   }, "customMap");
   return { errorMap: customMap, description };
 }
@@ -955,11 +951,11 @@ const _ZodType = class _ZodType {
     throw result.error;
   }
   safeParse(data, params) {
-    var _a3;
+    var _a9;
     const ctx = {
       common: {
         issues: [],
-        async: (_a3 = params === null || params === void 0 ? void 0 : params.async) !== null && _a3 !== void 0 ? _a3 : false,
+        async: (_a9 = params === null || params === void 0 ? void 0 : params.async) !== null && _a9 !== void 0 ? _a9 : false,
         contextualErrorMap: params === null || params === void 0 ? void 0 : params.errorMap
       },
       path: (params === null || params === void 0 ? void 0 : params.path) || [],
@@ -1318,7 +1314,7 @@ const _ZodString = class _ZodString extends ZodType {
       } else if (check.kind === "url") {
         try {
           new URL(input.data);
-        } catch (_a3) {
+        } catch (_a9) {
           ctx = this._getOrReturnCtx(input, ctx);
           addIssueToContext(ctx, {
             validation: "url",
@@ -1488,7 +1484,7 @@ const _ZodString = class _ZodString extends ZodType {
     return this._addCheck({ kind: "ip", ...errorUtil.errToObj(options) });
   }
   datetime(options) {
-    var _a3, _b2;
+    var _a9, _b;
     if (typeof options === "string") {
       return this._addCheck({
         kind: "datetime",
@@ -1501,8 +1497,8 @@ const _ZodString = class _ZodString extends ZodType {
     return this._addCheck({
       kind: "datetime",
       precision: typeof (options === null || options === void 0 ? void 0 : options.precision) === "undefined" ? null : options === null || options === void 0 ? void 0 : options.precision,
-      offset: (_a3 = options === null || options === void 0 ? void 0 : options.offset) !== null && _a3 !== void 0 ? _a3 : false,
-      local: (_b2 = options === null || options === void 0 ? void 0 : options.local) !== null && _b2 !== void 0 ? _b2 : false,
+      offset: (_a9 = options === null || options === void 0 ? void 0 : options.offset) !== null && _a9 !== void 0 ? _a9 : false,
+      local: (_b = options === null || options === void 0 ? void 0 : options.local) !== null && _b !== void 0 ? _b : false,
       ...errorUtil.errToObj(options === null || options === void 0 ? void 0 : options.message)
     });
   }
@@ -1667,11 +1663,11 @@ const _ZodString = class _ZodString extends ZodType {
 __name(_ZodString, "ZodString");
 let ZodString = _ZodString;
 ZodString.create = (params) => {
-  var _a3;
+  var _a9;
   return new ZodString({
     checks: [],
     typeName: ZodFirstPartyTypeKind.ZodString,
-    coerce: (_a3 = params === null || params === void 0 ? void 0 : params.coerce) !== null && _a3 !== void 0 ? _a3 : false,
+    coerce: (_a9 = params === null || params === void 0 ? void 0 : params.coerce) !== null && _a9 !== void 0 ? _a9 : false,
     ...processCreateParams(params)
   });
 };
@@ -2077,11 +2073,11 @@ const _ZodBigInt = class _ZodBigInt extends ZodType {
 __name(_ZodBigInt, "ZodBigInt");
 let ZodBigInt = _ZodBigInt;
 ZodBigInt.create = (params) => {
-  var _a3;
+  var _a9;
   return new ZodBigInt({
     checks: [],
     typeName: ZodFirstPartyTypeKind.ZodBigInt,
-    coerce: (_a3 = params === null || params === void 0 ? void 0 : params.coerce) !== null && _a3 !== void 0 ? _a3 : false,
+    coerce: (_a9 = params === null || params === void 0 ? void 0 : params.coerce) !== null && _a9 !== void 0 ? _a9 : false,
     ...processCreateParams(params)
   });
 };
@@ -2608,11 +2604,11 @@ const _ZodObject = class _ZodObject extends ZodType {
       unknownKeys: "strict",
       ...message !== void 0 ? {
         errorMap: /* @__PURE__ */ __name((issue, ctx) => {
-          var _a3, _b2, _c2, _d2;
-          const defaultError = (_c2 = (_b2 = (_a3 = this._def).errorMap) === null || _b2 === void 0 ? void 0 : _b2.call(_a3, issue, ctx).message) !== null && _c2 !== void 0 ? _c2 : ctx.defaultError;
+          var _a9, _b, _c, _d;
+          const defaultError = (_c = (_b = (_a9 = this._def).errorMap) === null || _b === void 0 ? void 0 : _b.call(_a9, issue, ctx).message) !== null && _c !== void 0 ? _c : ctx.defaultError;
           if (issue.code === "unrecognized_keys")
             return {
-              message: (_d2 = errorUtil.errToObj(message).message) !== null && _d2 !== void 0 ? _d2 : defaultError
+              message: (_d = errorUtil.errToObj(message).message) !== null && _d !== void 0 ? _d : defaultError
             };
           return {
             message: defaultError
@@ -4122,10 +4118,10 @@ ZodReadonly.create = (type, params) => {
 function custom(check, params = {}, fatal) {
   if (check)
     return ZodAny.create().superRefine((data, ctx) => {
-      var _a3, _b2;
+      var _a9, _b;
       if (!check(data)) {
         const p = typeof params === "function" ? params(data) : typeof params === "string" ? { message: params } : params;
-        const _fatal = (_b2 = (_a3 = p.fatal) !== null && _a3 !== void 0 ? _a3 : fatal) !== null && _b2 !== void 0 ? _b2 : true;
+        const _fatal = (_b = (_a9 = p.fatal) !== null && _a9 !== void 0 ? _a9 : fatal) !== null && _b !== void 0 ? _b : true;
         const p2 = typeof p === "string" ? { message: p } : p;
         ctx.addIssue({ code: "custom", ...p2, fatal: _fatal });
       }
@@ -5651,7 +5647,7 @@ function checkBrowserSupportsBigInt() {
   try {
     BigInt;
     return true;
-  } catch (_a3) {
+  } catch (_a9) {
     return false;
   }
 }
@@ -5921,8 +5917,8 @@ const UNKNOWN_VERSION_NUMBER = -1;
 const HANDSHAKE_SDK_VERSION_MINIMUM_MOBILE_VERSION = 250;
 function zodCoerceUnhandledValue(inputObject) {
   return preprocessType((arg) => {
-    var _a3;
-    const [objectKey] = (_a3 = Object.entries(inputObject).find(([, value]) => value === arg)) !== null && _a3 !== void 0 ? _a3 : [];
+    var _a9;
+    const [objectKey] = (_a9 = Object.entries(inputObject).find(([, value]) => value === arg)) !== null && _a9 !== void 0 ? _a9 : [];
     if (arg != null && objectKey === void 0) {
       return inputObject.UNHANDLED;
     }
@@ -7141,19 +7137,19 @@ function getAllowedOrigins() {
 }
 __name(getAllowedOrigins, "getAllowedOrigins");
 function getRPCServerSource() {
-  var _a3;
-  return [(_a3 = window.parent.opener) !== null && _a3 !== void 0 ? _a3 : window.parent, !!document.referrer ? document.referrer : "*"];
+  var _a9;
+  return [(_a9 = window.parent.opener) !== null && _a9 !== void 0 ? _a9 : window.parent, !!document.referrer ? document.referrer : "*"];
 }
 __name(getRPCServerSource, "getRPCServerSource");
 const _DiscordSDK = class _DiscordSDK {
   getTransfer(payload) {
-    var _a3;
+    var _a9;
     switch (payload.cmd) {
       case Commands.SUBSCRIBE:
       case Commands.UNSUBSCRIBE:
         return void 0;
       default:
-        return (_a3 = payload.transfer) !== null && _a3 !== void 0 ? _a3 : void 0;
+        return (_a9 = payload.transfer) !== null && _a9 !== void 0 ? _a9 : void 0;
     }
   }
   constructor(clientId2, configuration) {
@@ -7164,11 +7160,11 @@ const _DiscordSDK = class _DiscordSDK {
     this.eventBus = new EventEmitter$1();
     this.pendingCommands = /* @__PURE__ */ new Map();
     this.sendCommand = (payload) => {
-      var _a3;
+      var _a9;
       if (this.source == null)
         throw new Error("Attempting to send message before initialization");
       const nonce = v4();
-      (_a3 = this.source) === null || _a3 === void 0 ? void 0 : _a3.postMessage([Opcodes.FRAME, Object.assign(Object.assign({}, payload), { nonce })], this.sourceOrigin, this.getTransfer(payload));
+      (_a9 = this.source) === null || _a9 === void 0 ? void 0 : _a9.postMessage([Opcodes.FRAME, Object.assign(Object.assign({}, payload), { nonce })], this.sourceOrigin, this.getTransfer(payload));
       const promise = new Promise((resolve, reject) => {
         this.pendingCommands.set(nonce, { resolve, reject });
       });
@@ -7242,10 +7238,10 @@ const _DiscordSDK = class _DiscordSDK {
     this.handshake();
   }
   close(code, message) {
-    var _a3;
+    var _a9;
     window.removeEventListener("message", this.handleMessage);
     const nonce = v4();
-    (_a3 = this.source) === null || _a3 === void 0 ? void 0 : _a3.postMessage([Opcodes.CLOSE, { code, message, nonce }], this.sourceOrigin);
+    (_a9 = this.source) === null || _a9 === void 0 ? void 0 : _a9.postMessage([Opcodes.CLOSE, { code, message, nonce }], this.sourceOrigin);
   }
   async subscribe(event, listener, ...rest) {
     const [subscribeArgs] = rest;
@@ -7284,14 +7280,14 @@ const _DiscordSDK = class _DiscordSDK {
     if (this.mobileAppVersion && this.mobileAppVersion.includes(".")) {
       try {
         return parseInt(this.mobileAppVersion.split(".")[0]);
-      } catch (_a3) {
+      } catch (_a9) {
         return UNKNOWN_VERSION_NUMBER;
       }
     }
     return UNKNOWN_VERSION_NUMBER;
   }
   handshake() {
-    var _a3;
+    var _a9;
     const handshakePayload = {
       v: 1,
       encoding: "json",
@@ -7302,7 +7298,7 @@ const _DiscordSDK = class _DiscordSDK {
     if (this.platform === Platform.DESKTOP || majorMobileVersion >= HANDSHAKE_SDK_VERSION_MINIMUM_MOBILE_VERSION) {
       handshakePayload["sdk_version"] = this.sdkVersion;
     }
-    (_a3 = this.source) === null || _a3 === void 0 ? void 0 : _a3.postMessage([Opcodes.HANDSHAKE, handshakePayload], this.sourceOrigin);
+    (_a9 = this.source) === null || _a9 === void 0 ? void 0 : _a9.postMessage([Opcodes.HANDSHAKE, handshakePayload], this.sourceOrigin);
   }
   addOnReadyListener() {
     this.eventBus.once(Events.READY, () => {
@@ -7329,7 +7325,7 @@ const _DiscordSDK = class _DiscordSDK {
   handleHandshake() {
   }
   handleFrame(payload) {
-    var _a3, _b2;
+    var _a9, _b;
     let parsed;
     try {
       parsed = parseIncomingPayload(payload);
@@ -7343,7 +7339,7 @@ const _DiscordSDK = class _DiscordSDK {
     } else {
       if (parsed.evt === ERROR) {
         if (parsed.nonce != null) {
-          (_a3 = this.pendingCommands.get(parsed.nonce)) === null || _a3 === void 0 ? void 0 : _a3.reject(parsed.data);
+          (_a9 = this.pendingCommands.get(parsed.nonce)) === null || _a9 === void 0 ? void 0 : _a9.reject(parsed.data);
           this.pendingCommands.delete(parsed.nonce);
           return;
         }
@@ -7353,7 +7349,7 @@ const _DiscordSDK = class _DiscordSDK {
         console.error("Missing nonce", payload);
         return;
       }
-      (_b2 = this.pendingCommands.get(parsed.nonce)) === null || _b2 === void 0 ? void 0 : _b2.resolve(parsed);
+      (_b = this.pendingCommands.get(parsed.nonce)) === null || _b === void 0 ? void 0 : _b.resolve(parsed);
       this.pendingCommands.delete(parsed.nonce);
     }
   }
@@ -7363,7 +7359,8 @@ const _DiscordSDK = class _DiscordSDK {
 };
 __name(_DiscordSDK, "DiscordSDK");
 let DiscordSDK = _DiscordSDK;
-var MAX_DIGITS = 1e9, defaults = {
+var MAX_DIGITS = 1e9;
+var defaults = {
   // These values must be integers within the stated ranges (inclusive).
   // Most of these values can be changed during run-time using `Decimal.config`.
   // The maximum number of significant digits of the result of a calculation or base conversion.
@@ -7399,7 +7396,21 @@ var MAX_DIGITS = 1e9, defaults = {
   // The natural logarithm of 10.
   // 115 digits
   LN10: "2.302585092994045684017991454684364207601101488628772976033327900967572609677352480235997205089598298341967784042286"
-}, Decimal, external = true, decimalError = "[DecimalError] ", invalidArgument = decimalError + "Invalid argument: ", exponentOutOfRange = decimalError + "Exponent out of range: ", mathfloor = Math.floor, mathpow = Math.pow, isDecimal = /^(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i, ONE, BASE = 1e7, LOG_BASE = 7, MAX_SAFE_INTEGER = 9007199254740991, MAX_E = mathfloor(MAX_SAFE_INTEGER / LOG_BASE), P = {};
+};
+var Decimal;
+var external = true;
+var decimalError = "[DecimalError] ";
+var invalidArgument = decimalError + "Invalid argument: ";
+var exponentOutOfRange = decimalError + "Exponent out of range: ";
+var mathfloor = Math.floor;
+var mathpow = Math.pow;
+var isDecimal = /^(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i;
+var ONE;
+var BASE = 1e7;
+var LOG_BASE = 7;
+var MAX_SAFE_INTEGER = 9007199254740991;
+var MAX_E = mathfloor(MAX_SAFE_INTEGER / LOG_BASE);
+var P = {};
 P.absoluteValue = P.abs = function() {
   var x = new this.constructor(this);
   if (x.s) x.s = 1;
@@ -9720,10 +9731,6 @@ const commandsMockDefault = {
   }), "initiateImageUpload"),
   getInstanceConnectedParticipants: /* @__PURE__ */ __name(() => Promise.resolve({ participants: [] }), "getInstanceConnectedParticipants")
 };
-typeof SuppressedError === "function" ? SuppressedError : function(error, suppressed, message) {
-  var e = new Error(message);
-  return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
-};
 var cjs = {};
 if (!ArrayBuffer.isView) {
   ArrayBuffer.isView = (a) => {
@@ -10864,14 +10871,14 @@ var umd$1 = { exports: {} };
         return this.schemas.get(klass);
       }
       discoverTypes(klass, parentType, parentIndex, parentHasViewTag) {
-        var _a4, _b3;
+        var _a10, _b2;
         if (parentHasViewTag) {
           this.registerFilteredByParent(klass, parentType, parentIndex);
         }
         if (!this.add(klass)) {
           return;
         }
-        (_a4 = _TypeContext.inheritedTypes.get(klass)) == null ? void 0 : _a4.forEach((child) => {
+        (_a10 = _TypeContext.inheritedTypes.get(klass)) == null ? void 0 : _a10.forEach((child) => {
           this.discoverTypes(child, parentType, parentIndex, parentHasViewTag);
         });
         let parent = klass;
@@ -10879,7 +10886,7 @@ var umd$1 = { exports: {} };
         parent !== Function.prototype) {
           this.discoverTypes(parent);
         }
-        const metadata = klass[_b3 = Symbol.metadata] ?? (klass[_b3] = {});
+        const metadata = klass[_b2 = Symbol.metadata] ?? (klass[_b2] = {});
         if (metadata[$viewFieldIndexes]) {
           this.hasFilters = true;
         }
@@ -11130,8 +11137,8 @@ Schema instances may only have up to 64 fields.`);
         return fields;
       },
       hasViewTagAtIndex(metadata, index) {
-        var _a4;
-        return (_a4 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a4.includes(index);
+        var _a10;
+        return (_a10 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a10.includes(index);
       }
     };
     function createChangeSet() {
@@ -11148,11 +11155,11 @@ Schema instances may only have up to 64 fields.`);
     }
     __name(setOperationAtIndex, "setOperationAtIndex");
     function deleteOperationAtIndex(changeSet, index) {
-      var _a4;
+      var _a10;
       let operationsIndex = changeSet.indexes[index];
       if (operationsIndex === void 0) {
         operationsIndex = Object.values(changeSet.indexes).at(-1);
-        index = (_a4 = Object.entries(changeSet.indexes).find(([_, value]) => value === operationsIndex)) == null ? void 0 : _a4[0];
+        index = (_a10 = Object.entries(changeSet.indexes).find(([_, value]) => value === operationsIndex)) == null ? void 0 : _a10[0];
       }
       changeSet.operations[operationsIndex] = void 0;
       delete changeSet.indexes[index];
@@ -11181,15 +11188,15 @@ Schema instances may only have up to 64 fields.`);
         }
       }
       setRoot(root) {
-        var _a4;
+        var _a10;
         this.root = root;
         this.checkIsFiltered(this.parent, this.parentIndex);
         const metadata = this.ref.constructor[Symbol.metadata];
         if (metadata) {
-          (_a4 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a4.forEach((index) => {
-            var _a5;
+          (_a10 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a10.forEach((index) => {
+            var _a11;
             const field = metadata[index];
-            const changeTree = (_a5 = this.ref[field.name]) == null ? void 0 : _a5[$changes];
+            const changeTree = (_a11 = this.ref[field.name]) == null ? void 0 : _a11[$changes];
             if (changeTree) {
               if (changeTree.root !== root) {
                 changeTree.setRoot(root);
@@ -11210,7 +11217,7 @@ Schema instances may only have up to 64 fields.`);
         }
       }
       setParent(parent, root, parentIndex) {
-        var _a4;
+        var _a10;
         this.parent = parent;
         this.parentIndex = parentIndex;
         if (!root) {
@@ -11224,10 +11231,10 @@ Schema instances may only have up to 64 fields.`);
         }
         const metadata = this.ref.constructor[Symbol.metadata];
         if (metadata) {
-          (_a4 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a4.forEach((index) => {
-            var _a5;
+          (_a10 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a10.forEach((index) => {
+            var _a11;
             const field = metadata[index];
-            const changeTree = (_a5 = this.ref[field.name]) == null ? void 0 : _a5[$changes];
+            const changeTree = (_a11 = this.ref[field.name]) == null ? void 0 : _a11[$changes];
             if (changeTree && changeTree.root !== root) {
               changeTree.setParent(this.ref, root, index);
             }
@@ -11242,10 +11249,10 @@ Schema instances may only have up to 64 fields.`);
         }
       }
       forEachChild(callback) {
-        var _a4;
+        var _a10;
         const metadata = this.ref.constructor[Symbol.metadata];
         if (metadata) {
-          (_a4 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a4.forEach((index) => {
+          (_a10 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a10.forEach((index) => {
             const field = metadata[index];
             const value = this.ref[field.name];
             if (value) {
@@ -11268,9 +11275,9 @@ Schema instances may only have up to 64 fields.`);
         }
       }
       change(index, operation = exports2.OPERATION.ADD) {
-        var _a4;
+        var _a10;
         const metadata = this.ref.constructor[Symbol.metadata];
-        const isFiltered = this.isFiltered || ((_a4 = metadata == null ? void 0 : metadata[index]) == null ? void 0 : _a4.tag) !== void 0;
+        const isFiltered = this.isFiltered || ((_a10 = metadata == null ? void 0 : metadata[index]) == null ? void 0 : _a10.tag) !== void 0;
         const changeSet = isFiltered ? this.filteredChanges : this.changes;
         const previousOperation = this.indexedOperations[index];
         if (!previousOperation || previousOperation === exports2.OPERATION.DELETE) {
@@ -11353,7 +11360,7 @@ Schema instances may only have up to 64 fields.`);
         return this.ref[$getByIndex](index, isEncodeAll);
       }
       delete(index, operation, allChangesIndex = index) {
-        var _a4;
+        var _a10;
         if (index === void 0) {
           try {
             throw new Error(`@colyseus/schema ${this.ref.constructor.name}: trying to delete non-existing index '${index}'`);
@@ -11368,7 +11375,7 @@ Schema instances may only have up to 64 fields.`);
         deleteOperationAtIndex(this.allChanges, allChangesIndex);
         const previousValue = this.getValue(index);
         if (previousValue && previousValue[$changes]) {
-          (_a4 = this.root) == null ? void 0 : _a4.remove(previousValue[$changes]);
+          (_a10 = this.root) == null ? void 0 : _a10.remove(previousValue[$changes]);
         }
         if (this.filteredChanges !== void 0) {
           deleteOperationAtIndex(this.allFilteredChanges, allChangesIndex);
@@ -11379,17 +11386,17 @@ Schema instances may only have up to 64 fields.`);
         return previousValue;
       }
       endEncode(changeSetName) {
-        var _a4, _b3;
+        var _a10, _b2;
         this.indexedOperations = {};
         this[changeSetName].indexes = {};
         this[changeSetName].operations.length = 0;
         this[changeSetName].queueRootIndex = void 0;
-        (_b3 = (_a4 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b3.call(_a4);
+        (_b2 = (_a10 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b2.call(_a10);
         this.isNew = false;
       }
       discard(discardAll = false) {
-        var _a4, _b3;
-        (_b3 = (_a4 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b3.call(_a4);
+        var _a10, _b2;
+        (_b2 = (_a10 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b2.call(_a10);
         this.indexedOperations = {};
         this.changes.indexes = {};
         this.changes.operations.length = 0;
@@ -11489,9 +11496,9 @@ Schema instances may only have up to 64 fields.`);
     __name(_ChangeTree, "ChangeTree");
     let ChangeTree = _ChangeTree;
     function encodeValue(encoder, bytes, type2, value, operation, it) {
-      var _a4;
+      var _a10;
       if (typeof type2 === "string") {
-        (_a4 = encode2[type2]) == null ? void 0 : _a4.call(encode2, bytes, value, it);
+        (_a10 = encode2[type2]) == null ? void 0 : _a10.call(encode2, bytes, value, it);
       } else if (type2[Symbol.metadata] !== void 0) {
         encode2.number(bytes, value[$changes].refId, it);
         if ((operation & exports2.OPERATION.ADD) === exports2.OPERATION.ADD) {
@@ -11818,8 +11825,8 @@ Schema instances may only have up to 64 fields.`);
        * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
        */
       static [(_a$4 = $encoder, _b$4 = $decoder, $filter)](ref, index, view2) {
-        var _a4;
-        return !view2 || typeof ref[$childType] === "string" || view2.isChangeTreeVisible((_a4 = ref["tmpItems"][index]) == null ? void 0 : _a4[$changes]);
+        var _a10;
+        return !view2 || typeof ref[$childType] === "string" || view2.isChangeTreeVisible((_a10 = ref["tmpItems"][index]) == null ? void 0 : _a10[$changes]);
       }
       static is(type2) {
         return (
@@ -11852,7 +11859,7 @@ Schema instances may only have up to 64 fields.`);
             }
           }, "get"),
           set: /* @__PURE__ */ __name((obj, key, setValue) => {
-            var _a4;
+            var _a10;
             if (typeof key !== "symbol" && !isNaN(key)) {
               if (setValue === void 0 || setValue === null) {
                 obj.$deleteAt(key);
@@ -11879,7 +11886,7 @@ Schema instances may only have up to 64 fields.`);
                     setValue[$changes].setParent(this, obj[$changes].root, key);
                   }
                   if (previousValue !== void 0) {
-                    (_a4 = previousValue[$changes].root) == null ? void 0 : _a4.remove(previousValue[$changes]);
+                    (_a10 = previousValue[$changes].root) == null ? void 0 : _a10.remove(previousValue[$changes]);
                   }
                 } else {
                   obj.$changeAt(Number(key), setValue);
@@ -11927,7 +11934,7 @@ Schema instances may only have up to 64 fields.`);
         return this.items.length;
       }
       push(...values) {
-        var _a4;
+        var _a10;
         let length = this.tmpItems.length;
         const changeTree = this[$changes];
         for (let i = 0, l = values.length; i < l; i++, length++) {
@@ -11940,7 +11947,7 @@ Schema instances may only have up to 64 fields.`);
           changeTree.indexedOperation(length, exports2.OPERATION.ADD, this.items.length);
           this.items.push(value);
           this.tmpItems.push(value);
-          (_a4 = value[$changes]) == null ? void 0 : _a4.setParent(this, changeTree.root, length);
+          (_a10 = value[$changes]) == null ? void 0 : _a10.setParent(this, changeTree.root, length);
         }
         return length;
       }
@@ -11969,7 +11976,7 @@ Schema instances may only have up to 64 fields.`);
       }
       // encoding only
       $changeAt(index, value) {
-        var _a4;
+        var _a10;
         if (value === void 0 || value === null) {
           console.error("ArraySchema items cannot be null nor undefined; Use `deleteAt(index)` instead.");
           return;
@@ -11980,7 +11987,7 @@ Schema instances may only have up to 64 fields.`);
         const operation = this.items[index] !== void 0 ? typeof value === "object" ? exports2.OPERATION.DELETE_AND_ADD : exports2.OPERATION.REPLACE : exports2.OPERATION.ADD;
         const changeTree = this[$changes];
         changeTree.change(index, operation);
-        (_a4 = value[$changes]) == null ? void 0 : _a4.setParent(this, changeTree.root, index);
+        (_a10 = value[$changes]) == null ? void 0 : _a10.setParent(this, changeTree.root, index);
       }
       // encoding only
       $deleteAt(index, operation) {
@@ -12003,8 +12010,8 @@ Schema instances may only have up to 64 fields.`);
         }
         const changeTree = this[$changes];
         changeTree.forEachChild((childChangeTree, _) => {
-          var _a4;
-          (_a4 = changeTree.root) == null ? void 0 : _a4.remove(childChangeTree);
+          var _a10;
+          (_a10 = changeTree.root) == null ? void 0 : _a10.remove(childChangeTree);
         });
         changeTree.discard(true);
         changeTree.operation(exports2.OPERATION.CLEAR);
@@ -12085,7 +12092,7 @@ Schema instances may only have up to 64 fields.`);
        * @param insertItems Elements to insert into the array in place of the deleted elements.
        */
       splice(start, deleteCount, ...insertItems) {
-        var _a4;
+        var _a10;
         const changeTree = this[$changes];
         const itemsLength = this.items.length;
         const tmpItemsLength = this.tmpItems.length;
@@ -12116,7 +12123,7 @@ Schema instances may only have up to 64 fields.`);
           for (let i = 0; i < insertCount; i++) {
             const addIndex = (indexes[start] ?? itemsLength) + i;
             changeTree.indexedOperation(addIndex, this.deletedIndexes[addIndex] ? exports2.OPERATION.DELETE_AND_ADD : exports2.OPERATION.ADD);
-            (_a4 = insertItems[i][$changes]) == null ? void 0 : _a4.setParent(this, changeTree.root, addIndex);
+            (_a10 = insertItems[i][$changes]) == null ? void 0 : _a10.setParent(this, changeTree.root, addIndex);
           }
         }
         if (deleteCount > insertCount) {
@@ -12480,7 +12487,7 @@ Schema instances may only have up to 64 fields.`);
         return _MapSchema;
       }
       set(key, value) {
-        var _a4;
+        var _a10;
         if (value === void 0 || value === null) {
           throw new Error(`MapSchema#set('${key}', ${value}): trying to set ${value} value on '${key}'.`);
         } else if (typeof value === "object" && this[$childType]) {
@@ -12500,7 +12507,7 @@ Schema instances may only have up to 64 fields.`);
           } else if (isRef) {
             operation = exports2.OPERATION.DELETE_AND_ADD;
             if (previousValue !== void 0) {
-              (_a4 = previousValue[$changes].root) == null ? void 0 : _a4.remove(previousValue[$changes]);
+              (_a10 = previousValue[$changes].root) == null ? void 0 : _a10.remove(previousValue[$changes]);
             }
           }
         } else {
@@ -12530,8 +12537,8 @@ Schema instances may only have up to 64 fields.`);
         changeTree.discard(true);
         changeTree.indexes = {};
         changeTree.forEachChild((childChangeTree, _) => {
-          var _a4;
-          (_a4 = changeTree.root) == null ? void 0 : _a4.remove(childChangeTree);
+          var _a10;
+          (_a10 = changeTree.root) == null ? void 0 : _a10.remove(childChangeTree);
         });
         this.$indexes.clear();
         this.$items.clear();
@@ -12613,11 +12620,11 @@ Schema instances may only have up to 64 fields.`);
     __name(entity, "entity");
     function view(tag = DEFAULT_VIEW_TAG) {
       return function(target2, fieldName) {
-        var _a4;
+        var _a10;
         const constructor = target2.constructor;
         const parentClass = Object.getPrototypeOf(constructor);
         const parentMetadata = parentClass[Symbol.metadata];
-        const metadata = constructor[_a4 = Symbol.metadata] ?? (constructor[_a4] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
+        const metadata = constructor[_a10 = Symbol.metadata] ?? (constructor[_a10] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
         Metadata.setTag(metadata, fieldName, tag);
       };
     }
@@ -12670,7 +12677,7 @@ Check @type() annotation`);
           return this[fieldCached];
         }, "get"),
         set: /* @__PURE__ */ __name(function(value) {
-          var _a4, _b3;
+          var _a10, _b2;
           const previousValue = this[fieldCached] ?? void 0;
           if (value === previousValue) {
             return;
@@ -12691,12 +12698,12 @@ Check @type() annotation`);
             }
             const changeTree = this[$changes];
             if (previousValue !== void 0 && previousValue[$changes]) {
-              (_a4 = changeTree.root) == null ? void 0 : _a4.remove(previousValue[$changes]);
+              (_a10 = changeTree.root) == null ? void 0 : _a10.remove(previousValue[$changes]);
               this.constructor[$track](changeTree, fieldIndex, exports2.OPERATION.DELETE_AND_ADD);
             } else {
               this.constructor[$track](changeTree, fieldIndex, exports2.OPERATION.ADD);
             }
-            (_b3 = value[$changes]) == null ? void 0 : _b3.setParent(this, changeTree.root, fieldIndex);
+            (_b2 = value[$changes]) == null ? void 0 : _b2.setParent(this, changeTree.root, fieldIndex);
           } else if (previousValue !== void 0) {
             this[$changes].delete(fieldIndex);
           }
@@ -12709,11 +12716,11 @@ Check @type() annotation`);
     __name(getPropertyDescriptor, "getPropertyDescriptor");
     function deprecated(throws = true) {
       return function(klass, field) {
-        var _a4;
+        var _a10;
         const constructor = klass.constructor;
         const parentClass = Object.getPrototypeOf(constructor);
         const parentMetadata = parentClass[Symbol.metadata];
-        const metadata = constructor[_a4 = Symbol.metadata] ?? (constructor[_a4] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
+        const metadata = constructor[_a10 = Symbol.metadata] ?? (constructor[_a10] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
         const fieldIndex = metadata[field];
         metadata[fieldIndex].deprecated = true;
         if (throws) {
@@ -12808,13 +12815,13 @@ Check @type() annotation`);
        * @param instance
        */
       static initialize(instance) {
-        var _a4;
+        var _a10;
         Object.defineProperty(instance, $changes, {
           value: new ChangeTree(instance),
           enumerable: false,
           writable: true
         });
-        Object.defineProperties(instance, ((_a4 = instance.constructor[Symbol.metadata]) == null ? void 0 : _a4[$descriptors]) || {});
+        Object.defineProperties(instance, ((_a10 = instance.constructor[Symbol.metadata]) == null ? void 0 : _a10[$descriptors]) || {});
       }
       static is(type2) {
         return typeof type2[Symbol.metadata] === "object";
@@ -12835,9 +12842,9 @@ Check @type() annotation`);
        * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
        */
       static [$filter](ref, index, view2) {
-        var _a4, _b3;
+        var _a10, _b2;
         const metadata = ref.constructor[Symbol.metadata];
-        const tag = (_a4 = metadata[index]) == null ? void 0 : _a4.tag;
+        const tag = (_a10 = metadata[index]) == null ? void 0 : _a10.tag;
         if (view2 === void 0) {
           return tag === void 0;
         } else if (tag === void 0) {
@@ -12845,7 +12852,7 @@ Check @type() annotation`);
         } else if (tag === DEFAULT_VIEW_TAG) {
           return view2.isChangeTreeVisible(ref[$changes]);
         } else {
-          const tags = (_b3 = view2.tags) == null ? void 0 : _b3.get(ref[$changes]);
+          const tags = (_b2 = view2.tags) == null ? void 0 : _b2.get(ref[$changes]);
           return tags && tags.has(tag);
         }
       }
@@ -12871,12 +12878,12 @@ Check @type() annotation`);
         this[$changes].change(metadata[metadata[property]].index, operation);
       }
       clone() {
-        var _a4;
+        var _a10;
         const cloned = new this.constructor();
         const metadata = this.constructor[Symbol.metadata];
         for (const fieldIndex in metadata) {
           const field = metadata[fieldIndex].name;
-          if (typeof this[field] === "object" && typeof ((_a4 = this[field]) == null ? void 0 : _a4.clone) === "function") {
+          if (typeof this[field] === "object" && typeof ((_a10 = this[field]) == null ? void 0 : _a10.clone) === "function") {
             cloned[field] = this[field].clone();
           } else {
             cloned[field] = this[field];
@@ -12919,11 +12926,11 @@ Check @type() annotation`);
        * @returns
        */
       static debugRefIds(ref, showContents = false, level = 0) {
-        var _a4, _b3;
+        var _a10, _b2;
         const contents = showContents ? ` - ${JSON.stringify(ref.toJSON())}` : "";
         const changeTree = ref[$changes];
         const refId = changeTree.refId;
-        const refCount = ((_b3 = (_a4 = changeTree.root) == null ? void 0 : _a4.refCount) == null ? void 0 : _b3[refId]) > 1 ? ` [×${changeTree.root.refCount[refId]}]` : "";
+        const refCount = ((_b2 = (_a10 = changeTree.root) == null ? void 0 : _a10.refCount) == null ? void 0 : _b2[refId]) > 1 ? ` [×${changeTree.root.refCount[refId]}]` : "";
         let output = `${getIndent(level)}${ref.constructor.name} (refId: ${refId})${refCount}${contents}
 `;
         changeTree.forEachChild((childChangeTree) => output += this.debugRefIds(childChangeTree.ref, showContents, level + 1));
@@ -12966,7 +12973,7 @@ Check @type() annotation`);
         return output;
       }
       static debugChangesDeep(ref, changeSetName = "changes") {
-        var _a4, _b3;
+        var _a10, _b2;
         let output = "";
         const rootChangeTree = ref[$changes];
         const root = rootChangeTree.root;
@@ -12977,7 +12984,7 @@ Check @type() annotation`);
           const changeTree = root.changeTrees[refId];
           let includeChangeTree = false;
           let parentChangeTrees = [];
-          let parentChangeTree = (_a4 = changeTree.parent) == null ? void 0 : _a4[$changes];
+          let parentChangeTree = (_a10 = changeTree.parent) == null ? void 0 : _a10[$changes];
           if (changeTree === rootChangeTree) {
             includeChangeTree = true;
           } else {
@@ -12987,7 +12994,7 @@ Check @type() annotation`);
                 includeChangeTree = true;
                 break;
               }
-              parentChangeTree = (_b3 = parentChangeTree.parent) == null ? void 0 : _b3[$changes];
+              parentChangeTree = (_b2 = parentChangeTree.parent) == null ? void 0 : _b2[$changes];
             }
           }
           if (includeChangeTree) {
@@ -13110,8 +13117,8 @@ Check @type() annotation`);
         changeTree.discard(true);
         changeTree.indexes = {};
         changeTree.forEachChild((childChangeTree, _) => {
-          var _a4;
-          (_a4 = changeTree.root) == null ? void 0 : _a4.remove(childChangeTree);
+          var _a10;
+          (_a10 = changeTree.root) == null ? void 0 : _a10.remove(childChangeTree);
         });
         this.$indexes.clear();
         this.$items.clear();
@@ -13185,7 +13192,7 @@ Check @type() annotation`);
     _CollectionSchema[_b$1] = decodeKeyValueOperation;
     let CollectionSchema = _CollectionSchema;
     registerType("collection", { constructor: CollectionSchema });
-    var _a3, _b2;
+    var _a9, _b;
     const _SetSchema = class _SetSchema {
       /**
        * Determine if a property must be filtered.
@@ -13196,7 +13203,7 @@ Check @type() annotation`);
        * - First, the encoder iterates over all "not owned" properties and encodes them.
        * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
        */
-      static [(_a3 = $encoder, _b2 = $decoder, $filter)](ref, index, view2) {
+      static [(_a9 = $encoder, _b = $decoder, $filter)](ref, index, view2) {
         return !view2 || typeof ref[$childType] === "string" || view2.visible.has((ref[$getByIndex](index) ?? ref.deletedItems[index])[$changes]);
       }
       static is(type2) {
@@ -13220,7 +13227,7 @@ Check @type() annotation`);
         });
       }
       add(value) {
-        var _a4;
+        var _a10;
         if (this.has(value)) {
           return false;
         }
@@ -13228,7 +13235,7 @@ Check @type() annotation`);
         if (value[$changes] !== void 0) {
           value[$changes].setParent(this, this[$changes].root, index);
         }
-        const operation = ((_a4 = this[$changes].indexes[index]) == null ? void 0 : _a4.op) ?? exports2.OPERATION.ADD;
+        const operation = ((_a10 = this[$changes].indexes[index]) == null ? void 0 : _a10.op) ?? exports2.OPERATION.ADD;
         this[$changes].indexes[index] = index;
         this.$indexes.set(index, index);
         this.$items.set(index, value);
@@ -13342,8 +13349,8 @@ Check @type() annotation`);
       }
     };
     __name(_SetSchema, "SetSchema");
-    _SetSchema[_a3] = encodeKeyValueOperation;
-    _SetSchema[_b2] = decodeKeyValueOperation;
+    _SetSchema[_a9] = encodeKeyValueOperation;
+    _SetSchema[_b] = decodeKeyValueOperation;
     let SetSchema = _SetSchema;
     registerType("set", { constructor: SetSchema });
     function __decorate2(decorators, target2, key, desc) {
@@ -13556,18 +13563,18 @@ Check @type() annotation`);
         ]);
       }
       discardChanges() {
-        var _a4, _b3;
+        var _a10, _b2;
         let length = this.root.changes.length;
         if (length > 0) {
           while (length--) {
-            (_a4 = this.root.changes[length]) == null ? void 0 : _a4.endEncode("changes");
+            (_a10 = this.root.changes[length]) == null ? void 0 : _a10.endEncode("changes");
           }
           this.root.changes.length = 0;
         }
         length = this.root.filteredChanges.length;
         if (length > 0) {
           while (length--) {
-            (_b3 = this.root.filteredChanges[length]) == null ? void 0 : _b3.endEncode("filteredChanges");
+            (_b2 = this.root.filteredChanges[length]) == null ? void 0 : _b2.endEncode("filteredChanges");
           }
           this.root.filteredChanges.length = 0;
         }
@@ -13711,8 +13718,8 @@ Check @type() annotation`);
         return () => this.removeCallback(refId, fieldOrOperation, callback);
       }
       removeCallback(refId, field, callback) {
-        var _a4, _b3, _c2;
-        const index = (_c2 = (_b3 = (_a4 = this.callbacks) == null ? void 0 : _a4[refId]) == null ? void 0 : _b3[field]) == null ? void 0 : _c2.indexOf(callback);
+        var _a10, _b2, _c;
+        const index = (_c = (_b2 = (_a10 = this.callbacks) == null ? void 0 : _a10[refId]) == null ? void 0 : _b2[field]) == null ? void 0 : _c.indexOf(callback);
         if (index !== void 0 && index !== -1) {
           spliceOne(this.callbacks[refId][field], index);
         }
@@ -13732,7 +13739,7 @@ Check @type() annotation`);
         this.root.addRef(0, root);
       }
       decode(bytes, it = { offset: 0 }, ref = this.state) {
-        var _a4, _b3, _c2;
+        var _a10, _b2, _c;
         const allChanges = [];
         const $root = this.root;
         const totalBytes = bytes.byteLength;
@@ -13746,7 +13753,7 @@ Check @type() annotation`);
             if (!nextRef) {
               throw new Error(`"refId" not found: ${this.currentRefId}`);
             }
-            (_a4 = ref[$onDecodeEnd]) == null ? void 0 : _a4.call(ref);
+            (_a10 = ref[$onDecodeEnd]) == null ? void 0 : _a10.call(ref);
             ref = nextRef;
             decoder2 = ref.constructor[$decoder];
             continue;
@@ -13767,8 +13774,8 @@ Check @type() annotation`);
             continue;
           }
         }
-        (_b3 = ref[$onDecodeEnd]) == null ? void 0 : _b3.call(ref);
-        (_c2 = this.triggerChanges) == null ? void 0 : _c2.call(this, allChanges);
+        (_b2 = ref[$onDecodeEnd]) == null ? void 0 : _b2.call(ref);
+        (_c = this.triggerChanges) == null ? void 0 : _c.call(this, allChanges);
         $root.garbageCollectDeletedRefs();
         return allChanges;
       }
@@ -13933,10 +13940,10 @@ Check @type() annotation`);
         reflectionDecoder.decode(bytes, it);
         const typeContext = new TypeContext();
         reflection.types.forEach((reflectionType) => {
-          var _a4;
+          var _a10;
           const parentClass = typeContext.get(reflectionType.extendsId) ?? Schema;
-          const schema3 = (_a4 = class extends parentClass {
-          }, __name(_a4, "_"), _a4);
+          const schema3 = (_a10 = class extends parentClass {
+          }, __name(_a10, "_"), _a10);
           TypeContext.register(schema3);
           typeContext.add(schema3, reflectionType.id);
         }, {});
@@ -13994,7 +14001,7 @@ Check @type() annotation`);
       const onAddCalls = /* @__PURE__ */ new WeakMap();
       let currentOnAddCallback;
       decoder2.triggerChanges = function(allChanges) {
-        var _a4;
+        var _a10;
         const uniqueRefIds = /* @__PURE__ */ new Set();
         for (let i = 0, l = allChanges.length; i < l; i++) {
           const change = allChanges[i];
@@ -14005,7 +14012,7 @@ Check @type() annotation`);
             continue;
           }
           if ((change.op & exports2.OPERATION.DELETE) === exports2.OPERATION.DELETE && change.previousValue instanceof Schema) {
-            const deleteCallbacks = (_a4 = callbacks[$root.refIds.get(change.previousValue)]) == null ? void 0 : _a4[exports2.OPERATION.DELETE];
+            const deleteCallbacks = (_a10 = callbacks[$root.refIds.get(change.previousValue)]) == null ? void 0 : _a10[exports2.OPERATION.DELETE];
             for (let i2 = (deleteCallbacks == null ? void 0 : deleteCallbacks.length) - 1; i2 >= 0; i2--) {
               deleteCallbacks[i2]();
             }
@@ -14056,8 +14063,8 @@ Check @type() annotation`);
         }
       };
       function getProxy(metadataOrType, context) {
-        var _a4;
-        let metadata = ((_a4 = context.instance) == null ? void 0 : _a4.constructor[Symbol.metadata]) || metadataOrType;
+        var _a10;
+        let metadata = ((_a10 = context.instance) == null ? void 0 : _a10.constructor[Symbol.metadata]) || metadataOrType;
         let isCollection = context.instance && typeof context.instance["forEach"] === "function" || metadataOrType && typeof metadataOrType[Symbol.metadata] === "undefined";
         if (metadata && !isCollection) {
           const onAddListen = /* @__PURE__ */ __name(function(ref, prop, callback, immediate) {
@@ -14096,10 +14103,10 @@ Check @type() annotation`);
             }, "bindTo")
           }, {
             get(target2, prop) {
-              var _a5;
+              var _a11;
               const metadataField = metadata[metadata[prop]];
               if (metadataField) {
-                const instance = (_a5 = context.instance) == null ? void 0 : _a5[prop];
+                const instance = (_a11 = context.instance) == null ? void 0 : _a11[prop];
                 const onInstanceAvailable = /* @__PURE__ */ __name((callback) => {
                   const unbind = $(context.instance).listen(prop, (value, _) => {
                     callback(value, false);
@@ -14228,7 +14235,7 @@ Check @type() annotation`);
       }
       // TODO: allow to set multiple tags at once
       add(obj, tag = DEFAULT_VIEW_TAG, checkIncludeParent = true) {
-        var _a4, _b3;
+        var _a10, _b2;
         const changeTree = obj == null ? void 0 : obj[$changes];
         if (!changeTree) {
           console.warn("StateView#add(), invalid object:", obj);
@@ -14261,7 +14268,7 @@ Check @type() annotation`);
             tags = this.tags.get(changeTree);
           }
           tags.add(tag);
-          (_b3 = (_a4 = metadata == null ? void 0 : metadata[$fieldIndexesByViewTag]) == null ? void 0 : _a4[tag]) == null ? void 0 : _b3.forEach((index) => {
+          (_b2 = (_a10 = metadata == null ? void 0 : metadata[$fieldIndexesByViewTag]) == null ? void 0 : _a10[tag]) == null ? void 0 : _b2.forEach((index) => {
             if (changeTree.getChange(index) !== exports2.OPERATION.DELETE) {
               changes[index] = exports2.OPERATION.ADD;
             }
@@ -14293,12 +14300,12 @@ Check @type() annotation`);
         return this;
       }
       addParentOf(childChangeTree, tag) {
-        var _a4;
+        var _a10;
         const changeTree = childChangeTree.parent[$changes];
         const parentIndex = childChangeTree.parentIndex;
         if (!this.visible.has(changeTree)) {
           this.visible.add(changeTree);
-          const parentChangeTree = (_a4 = changeTree.parent) == null ? void 0 : _a4[$changes];
+          const parentChangeTree = (_a10 = changeTree.parent) == null ? void 0 : _a10[$changes];
           if (parentChangeTree && parentChangeTree.filteredChanges !== void 0) {
             this.addParentOf(changeTree, tag);
           }
@@ -14324,7 +14331,7 @@ Check @type() annotation`);
         }
       }
       remove(obj, tag = DEFAULT_VIEW_TAG, _isClear = false) {
-        var _a4;
+        var _a10;
         const changeTree = obj[$changes];
         if (!changeTree) {
           console.warn("StateView#remove(), invalid object:", obj);
@@ -14352,7 +14359,7 @@ Check @type() annotation`);
             }
             changes2[changeTree.parentIndex] = exports2.OPERATION.DELETE;
           } else {
-            (_a4 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a4.forEach((index) => changes[index] = exports2.OPERATION.DELETE);
+            (_a10 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a10.forEach((index) => changes[index] = exports2.OPERATION.DELETE);
           }
         } else {
           metadata == null ? void 0 : metadata[$fieldIndexesByViewTag][tag].forEach((index) => changes[index] = exports2.OPERATION.DELETE);
@@ -14374,8 +14381,8 @@ Check @type() annotation`);
         return this.visible.has(obj[$changes]);
       }
       hasTag(ob, tag = DEFAULT_VIEW_TAG) {
-        var _a4;
-        const tags = (_a4 = this.tags) == null ? void 0 : _a4.get(ob[$changes]);
+        var _a10;
+        const tags = (_a10 = this.tags) == null ? void 0 : _a10.get(ob[$changes]);
         return (tags == null ? void 0 : tags.has(tag)) ?? false;
       }
       clear() {
@@ -14592,6 +14599,7 @@ var browser = /* @__PURE__ */ __name(function() {
 }, "browser");
 var NodeWebSocket = browser;
 const WebSocket = globalThis.WebSocket || NodeWebSocket;
+var _a;
 let WebSocketTransport$1 = (_a = class {
   constructor(events) {
     this.events = events;
@@ -14628,7 +14636,8 @@ let WebSocketTransport$1 = (_a = class {
 WebSocketTransport$2.WebSocketTransport = WebSocketTransport$1;
 var H3Transport = H3Transport$1;
 var WebSocketTransport = WebSocketTransport$2;
-let Connection$1 = (_b = class {
+var _a2;
+let Connection$1 = (_a2 = class {
   constructor(protocol) {
     this.events = {};
     switch (protocol) {
@@ -14655,7 +14664,7 @@ let Connection$1 = (_b = class {
   get isOpen() {
     return this.transport.isOpen;
   }
-}, __name(_b, "Connection"), _b);
+}, __name(_a2, "Connection"), _a2);
 Connection$2.Connection = Connection$1;
 var Protocol$1 = {};
 (function(exports) {
@@ -14708,11 +14717,11 @@ const createNanoEvents = /* @__PURE__ */ __name(() => ({
   },
   events: {},
   on(event, cb) {
-    var _a3;
-    ((_a3 = this.events[event]) === null || _a3 === void 0 ? void 0 : _a3.push(cb)) || (this.events[event] = [cb]);
+    var _a9;
+    ((_a9 = this.events[event]) === null || _a9 === void 0 ? void 0 : _a9.push(cb)) || (this.events[event] = [cb]);
     return () => {
-      var _a4;
-      this.events[event] = (_a4 = this.events[event]) === null || _a4 === void 0 ? void 0 : _a4.filter((i) => cb !== i);
+      var _a10;
+      this.events[event] = (_a10 = this.events[event]) === null || _a10 === void 0 ? void 0 : _a10.filter((i) => cb !== i);
     };
   }
 }), "createNanoEvents");
@@ -14775,7 +14784,8 @@ function getStateCallbacks(room) {
   }
 }
 __name(getStateCallbacks, "getStateCallbacks");
-let SchemaSerializer$1 = (_c = class {
+var _a3;
+let SchemaSerializer$1 = (_a3 = class {
   setState(encodedState, it) {
     this.decoder.decode(encodedState, it);
   }
@@ -14797,7 +14807,7 @@ let SchemaSerializer$1 = (_c = class {
       this.state = this.decoder.state;
     }
   }
-}, __name(_c, "SchemaSerializer"), _c);
+}, __name(_a3, "SchemaSerializer"), _a3);
 SchemaSerializer$2.SchemaSerializer = SchemaSerializer$1;
 SchemaSerializer$2.getStateCallbacks = getStateCallbacks;
 var decoder;
@@ -15839,14 +15849,16 @@ try {
   textEncoder = new TextEncoder();
 } catch (error) {
 }
-let extensions, extensionClasses;
+let extensions;
+let extensionClasses;
 const hasNodeBuffer = typeof Buffer !== "undefined";
 const ByteArrayAllocate = hasNodeBuffer ? function(length) {
   return Buffer.allocUnsafeSlow(length);
 } : Uint8Array;
 const ByteArray = hasNodeBuffer ? Buffer : Uint8Array;
 const MAX_BUFFER_SIZE = hasNodeBuffer ? 4294967296 : 2144337920;
-let target, keysTarget;
+let target;
+let keysTarget;
 let targetView;
 let position = 0;
 let safeEnd;
@@ -16995,7 +17007,8 @@ var schema = umdExports$1;
 var SchemaSerializer = SchemaSerializer$2;
 var ServerError$2 = ServerError$3;
 var msgpackr = require$$8;
-let Room$1 = (_d = class {
+var _a4;
+let Room$1 = (_a4 = class {
   constructor(name, rootSchema) {
     this.onStateChange = signal.createSignal();
     this.onError = signal.createSignal();
@@ -17013,19 +17026,19 @@ let Room$1 = (_d = class {
       this.serializer.state = new rootSchema();
     }
     this.onError((code, message) => {
-      var _a3;
-      return (_a3 = console.warn) === null || _a3 === void 0 ? void 0 : _a3.call(console, `colyseus.js - onError => (${code}) ${message}`);
+      var _a9;
+      return (_a9 = console.warn) === null || _a9 === void 0 ? void 0 : _a9.call(console, `colyseus.js - onError => (${code}) ${message}`);
     });
     this.onLeave(() => this.removeAllListeners());
   }
   connect(endpoint, devModeCloseCallback, room = this, options, headers) {
     const connection = new Connection.Connection(options.protocol);
     room.connection = connection;
-    connection.events.onmessage = _d.prototype.onMessageCallback.bind(room);
+    connection.events.onmessage = _a4.prototype.onMessageCallback.bind(room);
     connection.events.onclose = function(e) {
-      var _a3;
+      var _a9;
       if (!room.hasJoined) {
-        (_a3 = console.warn) === null || _a3 === void 0 ? void 0 : _a3.call(console, `Room connection was closed unexpectedly (${e.code}): ${e.reason}`);
+        (_a9 = console.warn) === null || _a9 === void 0 ? void 0 : _a9.call(console, `Room connection was closed unexpectedly (${e.code}): ${e.reason}`);
         room.onError.invoke(e.code, e.reason);
         return;
       }
@@ -17037,8 +17050,8 @@ let Room$1 = (_d = class {
       }
     };
     connection.events.onerror = function(e) {
-      var _a3;
-      (_a3 = console.warn) === null || _a3 === void 0 ? void 0 : _a3.call(console, `Room, onError (${e.code}): ${e.reason}`);
+      var _a9;
+      (_a9 = console.warn) === null || _a9 === void 0 ? void 0 : _a9.call(console, `Room, onError (${e.code}): ${e.reason}`);
       room.onError.invoke(e.code, e.reason);
     };
     if (options.protocol === "h3") {
@@ -17160,14 +17173,14 @@ let Room$1 = (_d = class {
     }
   }
   dispatchMessage(type, message) {
-    var _a3;
+    var _a9;
     const messageType = this.getMessageHandlerKey(type);
     if (this.onMessageHandlers.events[messageType]) {
       this.onMessageHandlers.emit(messageType, message);
     } else if (this.onMessageHandlers.events["*"]) {
       this.onMessageHandlers.emit("*", type, message);
     } else {
-      (_a3 = console.warn) === null || _a3 === void 0 ? void 0 : _a3.call(console, `colyseus.js: onMessage() not registered for type '${type}'.`);
+      (_a9 = console.warn) === null || _a9 === void 0 ? void 0 : _a9.call(console, `colyseus.js: onMessage() not registered for type '${type}'.`);
     }
   }
   destroy() {
@@ -17185,7 +17198,7 @@ let Room$1 = (_d = class {
         throw new Error("invalid message type.");
     }
   }
-}, __name(_d, "Room"), _d);
+}, __name(_a4, "Room"), _a4);
 Room$2.Room = Room$1;
 var HTTP$2 = {};
 function apply(src2, tar) {
@@ -17275,7 +17288,8 @@ function _interopNamespaceDefault(e) {
 }
 __name(_interopNamespaceDefault, "_interopNamespaceDefault");
 var httpie__namespace = /* @__PURE__ */ _interopNamespaceDefault(httpie);
-let HTTP$1 = (_e = class {
+var _a5;
+let HTTP$1 = (_a5 = class {
   constructor(client, headers = {}) {
     this.client = client;
     this.headers = headers;
@@ -17294,9 +17308,9 @@ let HTTP$1 = (_e = class {
   }
   request(method, path, options = {}) {
     return httpie__namespace[method](this.client["getHttpEndpoint"](path), this.getOptions(options)).catch((e) => {
-      var _a3;
+      var _a9;
       const status = e.statusCode;
-      const message = ((_a3 = e.data) === null || _a3 === void 0 ? void 0 : _a3.error) || e.statusMessage || e.message;
+      const message = ((_a9 = e.data) === null || _a9 === void 0 ? void 0 : _a9.error) || e.statusMessage || e.message;
       if (!status && !message) {
         throw e;
       }
@@ -17314,7 +17328,7 @@ let HTTP$1 = (_e = class {
     }
     return options;
   }
-}, __name(_e, "HTTP"), _e);
+}, __name(_a5, "HTTP"), _a5);
 HTTP$2.HTTP = HTTP$1;
 var Auth$2 = {};
 var Storage$1 = {};
@@ -17403,8 +17417,12 @@ Storage$1.setItem = setItem;
 var tslib$1 = require$$0;
 var Storage = Storage$1;
 var nanoevents = nanoevents$2;
-var _Auth__initialized, _Auth__initializationPromise, _Auth__signInWindow, _Auth__events;
-let Auth$1 = (_f = class {
+var _Auth__initialized;
+var _Auth__initializationPromise;
+var _Auth__signInWindow;
+var _Auth__events;
+var _a6;
+let Auth$1 = (_a6 = class {
   constructor(http) {
     this.http = http;
     this.settings = {
@@ -17535,13 +17553,13 @@ let Auth$1 = (_f = class {
     }
     tslib$1.__classPrivateFieldGet(this, _Auth__events, "f").emit("change", authData);
   }
-}, __name(_f, "Auth"), _f);
+}, __name(_a6, "Auth"), _a6);
 _Auth__initialized = /* @__PURE__ */ new WeakMap(), _Auth__initializationPromise = /* @__PURE__ */ new WeakMap(), _Auth__signInWindow = /* @__PURE__ */ new WeakMap(), _Auth__events = /* @__PURE__ */ new WeakMap();
 Auth$2.Auth = Auth$1;
 var discord$1 = {};
 function discordURLBuilder(url) {
-  var _a3;
-  const localHostname = ((_a3 = window === null || window === void 0 ? void 0 : window.location) === null || _a3 === void 0 ? void 0 : _a3.hostname) || "localhost";
+  var _a9;
+  const localHostname = ((_a9 = window === null || window === void 0 ? void 0 : window.location) === null || _a9 === void 0 ? void 0 : _a9.hostname) || "localhost";
   const remoteHostnameSplitted = url.hostname.split(".");
   const subdomain = !url.hostname.includes("trycloudflare.com") && // ignore cloudflared subdomains
   !url.hostname.includes("discordsays.com") && // ignore discordsays.com subdomains
@@ -17556,7 +17574,7 @@ var Room = Room$2;
 var HTTP = HTTP$2;
 var Auth = Auth$2;
 var discord = discord$1;
-var _a2;
+var _a7;
 const _MatchMakeError = class _MatchMakeError extends Error {
   constructor(message, code) {
     super(message);
@@ -17567,10 +17585,10 @@ const _MatchMakeError = class _MatchMakeError extends Error {
 };
 __name(_MatchMakeError, "MatchMakeError");
 let MatchMakeError = _MatchMakeError;
-const DEFAULT_ENDPOINT = typeof window !== "undefined" && typeof ((_a2 = window === null || window === void 0 ? void 0 : window.location) === null || _a2 === void 0 ? void 0 : _a2.hostname) !== "undefined" ? `${window.location.protocol.replace("http", "ws")}//${window.location.hostname}${window.location.port && `:${window.location.port}`}` : "ws://127.0.0.1:2567";
+const DEFAULT_ENDPOINT = typeof window !== "undefined" && typeof ((_a7 = window === null || window === void 0 ? void 0 : window.location) === null || _a7 === void 0 ? void 0 : _a7.hostname) !== "undefined" ? `${window.location.protocol.replace("http", "ws")}//${window.location.hostname}${window.location.port && `:${window.location.port}`}` : "ws://127.0.0.1:2567";
 const _Client = class _Client {
   constructor(settings = DEFAULT_ENDPOINT, options) {
-    var _a3, _b2;
+    var _a9, _b;
     if (typeof settings === "string") {
       const url = settings.startsWith("/") ? new URL(settings, DEFAULT_ENDPOINT) : new URL(settings);
       const secure = url.protocol === "https:" || url.protocol === "wss:";
@@ -17596,7 +17614,7 @@ const _Client = class _Client {
     this.http = new HTTP.HTTP(this, (options === null || options === void 0 ? void 0 : options.headers) || {});
     this.auth = new Auth.Auth(this.http);
     this.urlBuilder = options === null || options === void 0 ? void 0 : options.urlBuilder;
-    if (!this.urlBuilder && typeof window !== "undefined" && ((_b2 = (_a3 = window === null || window === void 0 ? void 0 : window.location) === null || _a3 === void 0 ? void 0 : _a3.hostname) === null || _b2 === void 0 ? void 0 : _b2.includes("discordsays.com"))) {
+    if (!this.urlBuilder && typeof window !== "undefined" && ((_b = (_a9 = window === null || window === void 0 ? void 0 : window.location) === null || _a9 === void 0 ? void 0 : _a9.hostname) === null || _b === void 0 ? void 0 : _b.includes("discordsays.com"))) {
       this.urlBuilder = discord.discordURLBuilder;
       console.log("Colyseus SDK: Discord Embedded SDK detected. Using custom URL builder.");
     }
@@ -18321,14 +18339,14 @@ var umd = { exports: {} };
         return this.schemas.get(klass);
       }
       discoverTypes(klass, parentType, parentIndex, parentHasViewTag) {
-        var _a4, _b3;
+        var _a10, _b2;
         if (parentHasViewTag) {
           this.registerFilteredByParent(klass, parentType, parentIndex);
         }
         if (!this.add(klass)) {
           return;
         }
-        (_a4 = _TypeContext.inheritedTypes.get(klass)) == null ? void 0 : _a4.forEach((child) => {
+        (_a10 = _TypeContext.inheritedTypes.get(klass)) == null ? void 0 : _a10.forEach((child) => {
           this.discoverTypes(child, parentType, parentIndex, parentHasViewTag);
         });
         let parent = klass;
@@ -18336,7 +18354,7 @@ var umd = { exports: {} };
         parent !== Function.prototype) {
           this.discoverTypes(parent);
         }
-        const metadata = klass[_b3 = Symbol.metadata] ?? (klass[_b3] = {});
+        const metadata = klass[_b2 = Symbol.metadata] ?? (klass[_b2] = {});
         if (metadata[$viewFieldIndexes]) {
           this.hasFilters = true;
         }
@@ -18587,8 +18605,8 @@ Schema instances may only have up to 64 fields.`);
         return fields;
       },
       hasViewTagAtIndex(metadata, index) {
-        var _a4;
-        return (_a4 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a4.includes(index);
+        var _a10;
+        return (_a10 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a10.includes(index);
       }
     };
     function createChangeSet() {
@@ -18605,11 +18623,11 @@ Schema instances may only have up to 64 fields.`);
     }
     __name(setOperationAtIndex, "setOperationAtIndex");
     function deleteOperationAtIndex(changeSet, index) {
-      var _a4;
+      var _a10;
       let operationsIndex = changeSet.indexes[index];
       if (operationsIndex === void 0) {
         operationsIndex = Object.values(changeSet.indexes).at(-1);
-        index = (_a4 = Object.entries(changeSet.indexes).find(([_, value]) => value === operationsIndex)) == null ? void 0 : _a4[0];
+        index = (_a10 = Object.entries(changeSet.indexes).find(([_, value]) => value === operationsIndex)) == null ? void 0 : _a10[0];
       }
       changeSet.operations[operationsIndex] = void 0;
       delete changeSet.indexes[index];
@@ -18638,12 +18656,12 @@ Schema instances may only have up to 64 fields.`);
         }
       }
       setRoot(root) {
-        var _a4;
+        var _a10;
         this.root = root;
         this.checkIsFiltered(this.parent, this.parentIndex);
         const metadata = this.ref.constructor[Symbol.metadata];
         if (metadata) {
-          (_a4 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a4.forEach((index) => {
+          (_a10 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a10.forEach((index) => {
             const field = metadata[index];
             const value = this.ref[field.name];
             value == null ? void 0 : value[$changes].setRoot(root);
@@ -18655,7 +18673,7 @@ Schema instances may only have up to 64 fields.`);
         }
       }
       setParent(parent, root, parentIndex) {
-        var _a4;
+        var _a10;
         this.parent = parent;
         this.parentIndex = parentIndex;
         if (!root) {
@@ -18669,7 +18687,7 @@ Schema instances may only have up to 64 fields.`);
         }
         const metadata = this.ref.constructor[Symbol.metadata];
         if (metadata) {
-          (_a4 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a4.forEach((index) => {
+          (_a10 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a10.forEach((index) => {
             const field = metadata[index];
             const value = this.ref[field.name];
             value == null ? void 0 : value[$changes].setParent(this.ref, root, index);
@@ -18681,10 +18699,10 @@ Schema instances may only have up to 64 fields.`);
         }
       }
       forEachChild(callback) {
-        var _a4;
+        var _a10;
         const metadata = this.ref.constructor[Symbol.metadata];
         if (metadata) {
-          (_a4 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a4.forEach((index) => {
+          (_a10 = metadata[$refTypeFieldIndexes]) == null ? void 0 : _a10.forEach((index) => {
             const field = metadata[index];
             const value = this.ref[field.name];
             if (value) {
@@ -18707,9 +18725,9 @@ Schema instances may only have up to 64 fields.`);
         }
       }
       change(index, operation = exports2.OPERATION.ADD) {
-        var _a4;
+        var _a10;
         const metadata = this.ref.constructor[Symbol.metadata];
-        const isFiltered = this.isFiltered || ((_a4 = metadata == null ? void 0 : metadata[index]) == null ? void 0 : _a4.tag) !== void 0;
+        const isFiltered = this.isFiltered || ((_a10 = metadata == null ? void 0 : metadata[index]) == null ? void 0 : _a10.tag) !== void 0;
         const changeSet = isFiltered ? this.filteredChanges : this.changes;
         const previousOperation = this.indexedOperations[index];
         if (!previousOperation || previousOperation === exports2.OPERATION.DELETE) {
@@ -18792,7 +18810,7 @@ Schema instances may only have up to 64 fields.`);
         return this.ref[$getByIndex](index, isEncodeAll);
       }
       delete(index, operation, allChangesIndex = index) {
-        var _a4;
+        var _a10;
         if (index === void 0) {
           try {
             throw new Error(`@colyseus/schema ${this.ref.constructor.name}: trying to delete non-existing index '${index}'`);
@@ -18807,7 +18825,7 @@ Schema instances may only have up to 64 fields.`);
         deleteOperationAtIndex(this.allChanges, allChangesIndex);
         const previousValue = this.getValue(index);
         if (previousValue && previousValue[$changes]) {
-          (_a4 = this.root) == null ? void 0 : _a4.remove(previousValue[$changes]);
+          (_a10 = this.root) == null ? void 0 : _a10.remove(previousValue[$changes]);
         }
         if (this.filteredChanges !== void 0) {
           deleteOperationAtIndex(this.allFilteredChanges, allChangesIndex);
@@ -18818,17 +18836,17 @@ Schema instances may only have up to 64 fields.`);
         return previousValue;
       }
       endEncode(changeSetName) {
-        var _a4, _b3;
+        var _a10, _b2;
         this.indexedOperations = {};
         this[changeSetName].indexes = {};
         this[changeSetName].operations.length = 0;
         this[changeSetName].queueRootIndex = void 0;
-        (_b3 = (_a4 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b3.call(_a4);
+        (_b2 = (_a10 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b2.call(_a10);
         this.isNew = false;
       }
       discard(discardAll = false) {
-        var _a4, _b3;
-        (_b3 = (_a4 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b3.call(_a4);
+        var _a10, _b2;
+        (_b2 = (_a10 = this.ref)[$onEncodeEnd]) == null ? void 0 : _b2.call(_a10);
         this.indexedOperations = {};
         this.changes.indexes = {};
         this.changes.operations.length = 0;
@@ -18846,8 +18864,8 @@ Schema instances may only have up to 64 fields.`);
             this.allFilteredChanges.operations.length = 0;
           }
           this.forEachChild((changeTree, _) => {
-            var _a5;
-            return (_a5 = this.root) == null ? void 0 : _a5.remove(changeTree);
+            var _a11;
+            return (_a11 = this.root) == null ? void 0 : _a11.remove(changeTree);
           });
         }
       }
@@ -18931,9 +18949,9 @@ Schema instances may only have up to 64 fields.`);
     __name(_ChangeTree, "ChangeTree");
     let ChangeTree = _ChangeTree;
     function encodeValue(encoder, bytes, type2, value, operation, it) {
-      var _a4;
+      var _a10;
       if (typeof type2 === "string") {
-        (_a4 = encode2[type2]) == null ? void 0 : _a4.call(encode2, bytes, value, it);
+        (_a10 = encode2[type2]) == null ? void 0 : _a10.call(encode2, bytes, value, it);
       } else if (type2[Symbol.metadata] !== void 0) {
         encode2.number(bytes, value[$changes].refId, it);
         if ((operation & exports2.OPERATION.ADD) === exports2.OPERATION.ADD) {
@@ -19260,8 +19278,8 @@ Schema instances may only have up to 64 fields.`);
        * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
        */
       static [(_a$4 = $encoder, _b$4 = $decoder, $filter)](ref, index, view2) {
-        var _a4;
-        return !view2 || typeof ref[$childType] === "string" || view2.isChangeTreeVisible((_a4 = ref["tmpItems"][index]) == null ? void 0 : _a4[$changes]);
+        var _a10;
+        return !view2 || typeof ref[$childType] === "string" || view2.isChangeTreeVisible((_a10 = ref["tmpItems"][index]) == null ? void 0 : _a10[$changes]);
       }
       static is(type2) {
         return (
@@ -19294,7 +19312,7 @@ Schema instances may only have up to 64 fields.`);
             }
           }, "get"),
           set: /* @__PURE__ */ __name((obj, key, setValue) => {
-            var _a4;
+            var _a10;
             if (typeof key !== "symbol" && !isNaN(key)) {
               if (setValue === void 0 || setValue === null) {
                 obj.$deleteAt(key);
@@ -19321,7 +19339,7 @@ Schema instances may only have up to 64 fields.`);
                     setValue[$changes].setParent(this, obj[$changes].root, key);
                   }
                   if (previousValue !== void 0) {
-                    (_a4 = previousValue[$changes].root) == null ? void 0 : _a4.remove(previousValue[$changes]);
+                    (_a10 = previousValue[$changes].root) == null ? void 0 : _a10.remove(previousValue[$changes]);
                   }
                 } else {
                   obj.$changeAt(Number(key), setValue);
@@ -19369,7 +19387,7 @@ Schema instances may only have up to 64 fields.`);
         return this.items.length;
       }
       push(...values) {
-        var _a4;
+        var _a10;
         let length = this.tmpItems.length;
         const changeTree = this[$changes];
         for (let i = 0, l = values.length; i < values.length; i++, length++) {
@@ -19382,7 +19400,7 @@ Schema instances may only have up to 64 fields.`);
           changeTree.indexedOperation(length, exports2.OPERATION.ADD, this.items.length);
           this.items.push(value);
           this.tmpItems.push(value);
-          (_a4 = value[$changes]) == null ? void 0 : _a4.setParent(this, changeTree.root, length);
+          (_a10 = value[$changes]) == null ? void 0 : _a10.setParent(this, changeTree.root, length);
         }
         return length;
       }
@@ -19411,7 +19429,7 @@ Schema instances may only have up to 64 fields.`);
       }
       // encoding only
       $changeAt(index, value) {
-        var _a4;
+        var _a10;
         if (value === void 0 || value === null) {
           console.error("ArraySchema items cannot be null nor undefined; Use `deleteAt(index)` instead.");
           return;
@@ -19422,7 +19440,7 @@ Schema instances may only have up to 64 fields.`);
         const operation = this.items[index] !== void 0 ? typeof value === "object" ? exports2.OPERATION.DELETE_AND_ADD : exports2.OPERATION.REPLACE : exports2.OPERATION.ADD;
         const changeTree = this[$changes];
         changeTree.change(index, operation);
-        (_a4 = value[$changes]) == null ? void 0 : _a4.setParent(this, changeTree.root, index);
+        (_a10 = value[$changes]) == null ? void 0 : _a10.setParent(this, changeTree.root, index);
       }
       // encoding only
       $deleteAt(index, operation) {
@@ -19532,7 +19550,7 @@ Schema instances may only have up to 64 fields.`);
        * @param insertItems Elements to insert into the array in place of the deleted elements.
        */
       splice(start, deleteCount, ...insertItems) {
-        var _a4;
+        var _a10;
         const changeTree = this[$changes];
         const itemsLength = this.items.length;
         const tmpItemsLength = this.tmpItems.length;
@@ -19563,7 +19581,7 @@ Schema instances may only have up to 64 fields.`);
           for (let i = 0; i < insertCount; i++) {
             const addIndex = (indexes[start] ?? itemsLength) + i;
             changeTree.indexedOperation(addIndex, this.deletedIndexes[addIndex] ? exports2.OPERATION.DELETE_AND_ADD : exports2.OPERATION.ADD);
-            (_a4 = insertItems[i][$changes]) == null ? void 0 : _a4.setParent(this, changeTree.root, addIndex);
+            (_a10 = insertItems[i][$changes]) == null ? void 0 : _a10.setParent(this, changeTree.root, addIndex);
           }
         }
         if (deleteCount > insertCount) {
@@ -19927,7 +19945,7 @@ Schema instances may only have up to 64 fields.`);
         return _MapSchema;
       }
       set(key, value) {
-        var _a4;
+        var _a10;
         if (value === void 0 || value === null) {
           throw new Error(`MapSchema#set('${key}', ${value}): trying to set ${value} value on '${key}'.`);
         } else if (typeof value === "object" && this[$childType]) {
@@ -19947,7 +19965,7 @@ Schema instances may only have up to 64 fields.`);
           } else if (isRef) {
             operation = exports2.OPERATION.DELETE_AND_ADD;
             if (previousValue !== void 0) {
-              (_a4 = previousValue[$changes].root) == null ? void 0 : _a4.remove(previousValue[$changes]);
+              (_a10 = previousValue[$changes].root) == null ? void 0 : _a10.remove(previousValue[$changes]);
             }
           }
         } else {
@@ -20056,11 +20074,11 @@ Schema instances may only have up to 64 fields.`);
     __name(entity, "entity");
     function view(tag = DEFAULT_VIEW_TAG) {
       return function(target2, fieldName) {
-        var _a4;
+        var _a10;
         const constructor = target2.constructor;
         const parentClass = Object.getPrototypeOf(constructor);
         const parentMetadata = parentClass[Symbol.metadata];
-        const metadata = constructor[_a4 = Symbol.metadata] ?? (constructor[_a4] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
+        const metadata = constructor[_a10 = Symbol.metadata] ?? (constructor[_a10] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
         Metadata.setTag(metadata, fieldName, tag);
       };
     }
@@ -20113,7 +20131,7 @@ Check @type() annotation`);
           return this[fieldCached];
         }, "get"),
         set: /* @__PURE__ */ __name(function(value) {
-          var _a4, _b3;
+          var _a10, _b2;
           const previousValue = this[fieldCached] ?? void 0;
           if (value === previousValue) {
             return;
@@ -20134,12 +20152,12 @@ Check @type() annotation`);
             }
             const changeTree = this[$changes];
             if (previousValue !== void 0 && previousValue[$changes]) {
-              (_a4 = changeTree.root) == null ? void 0 : _a4.remove(previousValue[$changes]);
+              (_a10 = changeTree.root) == null ? void 0 : _a10.remove(previousValue[$changes]);
               this.constructor[$track](changeTree, fieldIndex, exports2.OPERATION.DELETE_AND_ADD);
             } else {
               this.constructor[$track](changeTree, fieldIndex, exports2.OPERATION.ADD);
             }
-            (_b3 = value[$changes]) == null ? void 0 : _b3.setParent(this, changeTree.root, fieldIndex);
+            (_b2 = value[$changes]) == null ? void 0 : _b2.setParent(this, changeTree.root, fieldIndex);
           } else if (previousValue !== void 0) {
             this[$changes].delete(fieldIndex);
           }
@@ -20152,11 +20170,11 @@ Check @type() annotation`);
     __name(getPropertyDescriptor, "getPropertyDescriptor");
     function deprecated(throws = true) {
       return function(klass, field) {
-        var _a4;
+        var _a10;
         const constructor = klass.constructor;
         const parentClass = Object.getPrototypeOf(constructor);
         const parentMetadata = parentClass[Symbol.metadata];
-        const metadata = constructor[_a4 = Symbol.metadata] ?? (constructor[_a4] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
+        const metadata = constructor[_a10 = Symbol.metadata] ?? (constructor[_a10] = Object.assign({}, constructor[Symbol.metadata], parentMetadata ?? /* @__PURE__ */ Object.create(null)));
         const fieldIndex = metadata[field];
         metadata[fieldIndex].deprecated = true;
         if (throws) {
@@ -20251,13 +20269,13 @@ Check @type() annotation`);
        * @param instance
        */
       static initialize(instance) {
-        var _a4;
+        var _a10;
         Object.defineProperty(instance, $changes, {
           value: new ChangeTree(instance),
           enumerable: false,
           writable: true
         });
-        Object.defineProperties(instance, ((_a4 = instance.constructor[Symbol.metadata]) == null ? void 0 : _a4[$descriptors]) || {});
+        Object.defineProperties(instance, ((_a10 = instance.constructor[Symbol.metadata]) == null ? void 0 : _a10[$descriptors]) || {});
       }
       static is(type2) {
         return typeof type2[Symbol.metadata] === "object";
@@ -20278,9 +20296,9 @@ Check @type() annotation`);
        * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
        */
       static [$filter](ref, index, view2) {
-        var _a4, _b3;
+        var _a10, _b2;
         const metadata = ref.constructor[Symbol.metadata];
-        const tag = (_a4 = metadata[index]) == null ? void 0 : _a4.tag;
+        const tag = (_a10 = metadata[index]) == null ? void 0 : _a10.tag;
         if (view2 === void 0) {
           return tag === void 0;
         } else if (tag === void 0) {
@@ -20288,7 +20306,7 @@ Check @type() annotation`);
         } else if (tag === DEFAULT_VIEW_TAG) {
           return view2.isChangeTreeVisible(ref[$changes]);
         } else {
-          const tags = (_b3 = view2.tags) == null ? void 0 : _b3.get(ref[$changes]);
+          const tags = (_b2 = view2.tags) == null ? void 0 : _b2.get(ref[$changes]);
           return tags && tags.has(tag);
         }
       }
@@ -20314,12 +20332,12 @@ Check @type() annotation`);
         this[$changes].change(metadata[metadata[property]].index, operation);
       }
       clone() {
-        var _a4;
+        var _a10;
         const cloned = new this.constructor();
         const metadata = this.constructor[Symbol.metadata];
         for (const fieldIndex in metadata) {
           const field = metadata[fieldIndex].name;
-          if (typeof this[field] === "object" && typeof ((_a4 = this[field]) == null ? void 0 : _a4.clone) === "function") {
+          if (typeof this[field] === "object" && typeof ((_a10 = this[field]) == null ? void 0 : _a10.clone) === "function") {
             cloned[field] = this[field].clone();
           } else {
             cloned[field] = this[field];
@@ -20404,7 +20422,7 @@ Check @type() annotation`);
         return output;
       }
       static debugChangesDeep(ref, changeSetName = "changes") {
-        var _a4, _b3;
+        var _a10, _b2;
         let output = "";
         const rootChangeTree = ref[$changes];
         const root = rootChangeTree.root;
@@ -20415,7 +20433,7 @@ Check @type() annotation`);
           const changeTree = root.changeTrees[refId];
           let includeChangeTree = false;
           let parentChangeTrees = [];
-          let parentChangeTree = (_a4 = changeTree.parent) == null ? void 0 : _a4[$changes];
+          let parentChangeTree = (_a10 = changeTree.parent) == null ? void 0 : _a10[$changes];
           if (changeTree === rootChangeTree) {
             includeChangeTree = true;
           } else {
@@ -20425,7 +20443,7 @@ Check @type() annotation`);
                 includeChangeTree = true;
                 break;
               }
-              parentChangeTree = (_b3 = parentChangeTree.parent) == null ? void 0 : _b3[$changes];
+              parentChangeTree = (_b2 = parentChangeTree.parent) == null ? void 0 : _b2[$changes];
             }
           }
           if (includeChangeTree) {
@@ -20619,7 +20637,7 @@ Check @type() annotation`);
     _CollectionSchema[_b$1] = decodeKeyValueOperation;
     let CollectionSchema = _CollectionSchema;
     registerType("collection", { constructor: CollectionSchema });
-    var _a3, _b2;
+    var _a9, _b;
     const _SetSchema = class _SetSchema {
       /**
        * Determine if a property must be filtered.
@@ -20630,7 +20648,7 @@ Check @type() annotation`);
        * - First, the encoder iterates over all "not owned" properties and encodes them.
        * - Then, the encoder iterates over all "owned" properties per instance and encodes them.
        */
-      static [(_a3 = $encoder, _b2 = $decoder, $filter)](ref, index, view2) {
+      static [(_a9 = $encoder, _b = $decoder, $filter)](ref, index, view2) {
         return !view2 || typeof ref[$childType] === "string" || view2.visible.has((ref[$getByIndex](index) ?? ref.deletedItems[index])[$changes]);
       }
       static is(type2) {
@@ -20654,7 +20672,7 @@ Check @type() annotation`);
         });
       }
       add(value) {
-        var _a4;
+        var _a10;
         if (this.has(value)) {
           return false;
         }
@@ -20662,7 +20680,7 @@ Check @type() annotation`);
         if (value[$changes] !== void 0) {
           value[$changes].setParent(this, this[$changes].root, index);
         }
-        const operation = ((_a4 = this[$changes].indexes[index]) == null ? void 0 : _a4.op) ?? exports2.OPERATION.ADD;
+        const operation = ((_a10 = this[$changes].indexes[index]) == null ? void 0 : _a10.op) ?? exports2.OPERATION.ADD;
         this[$changes].indexes[index] = index;
         this.$indexes.set(index, index);
         this.$items.set(index, value);
@@ -20776,8 +20794,8 @@ Check @type() annotation`);
       }
     };
     __name(_SetSchema, "SetSchema");
-    _SetSchema[_a3] = encodeKeyValueOperation;
-    _SetSchema[_b2] = decodeKeyValueOperation;
+    _SetSchema[_a9] = encodeKeyValueOperation;
+    _SetSchema[_b] = decodeKeyValueOperation;
     let SetSchema = _SetSchema;
     registerType("set", { constructor: SetSchema });
     function __decorate2(decorators, target2, key, desc) {
@@ -20990,18 +21008,18 @@ Check @type() annotation`);
         ]);
       }
       discardChanges() {
-        var _a4, _b3;
+        var _a10, _b2;
         let length = this.root.changes.length;
         if (length > 0) {
           while (length--) {
-            (_a4 = this.root.changes[length]) == null ? void 0 : _a4.endEncode("changes");
+            (_a10 = this.root.changes[length]) == null ? void 0 : _a10.endEncode("changes");
           }
           this.root.changes.length = 0;
         }
         length = this.root.filteredChanges.length;
         if (length > 0) {
           while (length--) {
-            (_b3 = this.root.filteredChanges[length]) == null ? void 0 : _b3.endEncode("filteredChanges");
+            (_b2 = this.root.filteredChanges[length]) == null ? void 0 : _b2.endEncode("filteredChanges");
           }
           this.root.filteredChanges.length = 0;
         }
@@ -21145,8 +21163,8 @@ Check @type() annotation`);
         return () => this.removeCallback(refId, fieldOrOperation, callback);
       }
       removeCallback(refId, field, callback) {
-        var _a4, _b3, _c2;
-        const index = (_c2 = (_b3 = (_a4 = this.callbacks) == null ? void 0 : _a4[refId]) == null ? void 0 : _b3[field]) == null ? void 0 : _c2.indexOf(callback);
+        var _a10, _b2, _c;
+        const index = (_c = (_b2 = (_a10 = this.callbacks) == null ? void 0 : _a10[refId]) == null ? void 0 : _b2[field]) == null ? void 0 : _c.indexOf(callback);
         if (index !== -1) {
           spliceOne(this.callbacks[refId][field], index);
         }
@@ -21166,7 +21184,7 @@ Check @type() annotation`);
         this.root.addRef(0, root);
       }
       decode(bytes, it = { offset: 0 }, ref = this.state) {
-        var _a4, _b3, _c2;
+        var _a10, _b2, _c;
         const allChanges = [];
         const $root = this.root;
         const totalBytes = bytes.byteLength;
@@ -21180,7 +21198,7 @@ Check @type() annotation`);
             if (!nextRef) {
               throw new Error(`"refId" not found: ${this.currentRefId}`);
             }
-            (_a4 = ref[$onDecodeEnd]) == null ? void 0 : _a4.call(ref);
+            (_a10 = ref[$onDecodeEnd]) == null ? void 0 : _a10.call(ref);
             ref = nextRef;
             decoder2 = ref.constructor[$decoder];
             continue;
@@ -21201,8 +21219,8 @@ Check @type() annotation`);
             continue;
           }
         }
-        (_b3 = ref[$onDecodeEnd]) == null ? void 0 : _b3.call(ref);
-        (_c2 = this.triggerChanges) == null ? void 0 : _c2.call(this, allChanges);
+        (_b2 = ref[$onDecodeEnd]) == null ? void 0 : _b2.call(ref);
+        (_c = this.triggerChanges) == null ? void 0 : _c.call(this, allChanges);
         $root.garbageCollectDeletedRefs();
         return allChanges;
       }
@@ -21367,10 +21385,10 @@ Check @type() annotation`);
         reflectionDecoder.decode(bytes, it);
         const typeContext = new TypeContext();
         reflection.types.forEach((reflectionType) => {
-          var _a4;
+          var _a10;
           const parentClass = typeContext.get(reflectionType.extendsId) ?? Schema;
-          const schema3 = (_a4 = class extends parentClass {
-          }, __name(_a4, "_"), _a4);
+          const schema3 = (_a10 = class extends parentClass {
+          }, __name(_a10, "_"), _a10);
           TypeContext.register(schema3);
           typeContext.add(schema3, reflectionType.id);
         }, {});
@@ -21428,7 +21446,7 @@ Check @type() annotation`);
       const onAddCalls = /* @__PURE__ */ new WeakMap();
       let currentOnAddCallback;
       decoder2.triggerChanges = function(allChanges) {
-        var _a4;
+        var _a10;
         const uniqueRefIds = /* @__PURE__ */ new Set();
         for (let i = 0, l = allChanges.length; i < l; i++) {
           const change = allChanges[i];
@@ -21439,7 +21457,7 @@ Check @type() annotation`);
             continue;
           }
           if ((change.op & exports2.OPERATION.DELETE) === exports2.OPERATION.DELETE && change.previousValue instanceof Schema) {
-            const deleteCallbacks = (_a4 = callbacks[$root.refIds.get(change.previousValue)]) == null ? void 0 : _a4[exports2.OPERATION.DELETE];
+            const deleteCallbacks = (_a10 = callbacks[$root.refIds.get(change.previousValue)]) == null ? void 0 : _a10[exports2.OPERATION.DELETE];
             for (let i2 = (deleteCallbacks == null ? void 0 : deleteCallbacks.length) - 1; i2 >= 0; i2--) {
               deleteCallbacks[i2]();
             }
@@ -21490,8 +21508,8 @@ Check @type() annotation`);
         }
       };
       function getProxy(metadataOrType, context) {
-        var _a4;
-        let metadata = ((_a4 = context.instance) == null ? void 0 : _a4.constructor[Symbol.metadata]) || metadataOrType;
+        var _a10;
+        let metadata = ((_a10 = context.instance) == null ? void 0 : _a10.constructor[Symbol.metadata]) || metadataOrType;
         let isCollection = context.instance && typeof context.instance["forEach"] === "function" || metadataOrType && typeof metadataOrType[Symbol.metadata] === "undefined";
         if (metadata && !isCollection) {
           const onAddListen = /* @__PURE__ */ __name(function(ref, prop, callback, immediate) {
@@ -21530,10 +21548,10 @@ Check @type() annotation`);
             }, "bindTo")
           }, {
             get(target2, prop) {
-              var _a5;
+              var _a11;
               const metadataField = metadata[metadata[prop]];
               if (metadataField) {
-                const instance = (_a5 = context.instance) == null ? void 0 : _a5[prop];
+                const instance = (_a11 = context.instance) == null ? void 0 : _a11[prop];
                 const onInstanceAvailable = /* @__PURE__ */ __name((callback) => {
                   const unbind = $(context.instance).listen(prop, (value, _) => {
                     callback(value, false);
@@ -21662,7 +21680,7 @@ Check @type() annotation`);
       }
       // TODO: allow to set multiple tags at once
       add(obj, tag = DEFAULT_VIEW_TAG, checkIncludeParent = true) {
-        var _a4, _b3;
+        var _a10, _b2;
         const changeTree = obj == null ? void 0 : obj[$changes];
         if (!changeTree) {
           console.warn("StateView#add(), invalid object:", obj);
@@ -21695,7 +21713,7 @@ Check @type() annotation`);
             tags = this.tags.get(changeTree);
           }
           tags.add(tag);
-          (_b3 = (_a4 = metadata == null ? void 0 : metadata[$fieldIndexesByViewTag]) == null ? void 0 : _a4[tag]) == null ? void 0 : _b3.forEach((index) => {
+          (_b2 = (_a10 = metadata == null ? void 0 : metadata[$fieldIndexesByViewTag]) == null ? void 0 : _a10[tag]) == null ? void 0 : _b2.forEach((index) => {
             if (changeTree.getChange(index) !== exports2.OPERATION.DELETE) {
               changes[index] = exports2.OPERATION.ADD;
             }
@@ -21727,12 +21745,12 @@ Check @type() annotation`);
         return this;
       }
       addParentOf(childChangeTree, tag) {
-        var _a4;
+        var _a10;
         const changeTree = childChangeTree.parent[$changes];
         const parentIndex = childChangeTree.parentIndex;
         if (!this.visible.has(changeTree)) {
           this.visible.add(changeTree);
-          const parentChangeTree = (_a4 = changeTree.parent) == null ? void 0 : _a4[$changes];
+          const parentChangeTree = (_a10 = changeTree.parent) == null ? void 0 : _a10[$changes];
           if (parentChangeTree && parentChangeTree.filteredChanges !== void 0) {
             this.addParentOf(changeTree, tag);
           }
@@ -21758,7 +21776,7 @@ Check @type() annotation`);
         }
       }
       remove(obj, tag = DEFAULT_VIEW_TAG, _isClear = false) {
-        var _a4;
+        var _a10;
         const changeTree = obj[$changes];
         if (!changeTree) {
           console.warn("StateView#remove(), invalid object:", obj);
@@ -21786,7 +21804,7 @@ Check @type() annotation`);
             }
             changes2[changeTree.parentIndex] = exports2.OPERATION.DELETE;
           } else {
-            (_a4 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a4.forEach((index) => changes[index] = exports2.OPERATION.DELETE);
+            (_a10 = metadata == null ? void 0 : metadata[$viewFieldIndexes]) == null ? void 0 : _a10.forEach((index) => changes[index] = exports2.OPERATION.DELETE);
           }
         } else {
           metadata == null ? void 0 : metadata[$fieldIndexesByViewTag][tag].forEach((index) => changes[index] = exports2.OPERATION.DELETE);
@@ -21808,8 +21826,8 @@ Check @type() annotation`);
         return this.visible.has(obj[$changes]);
       }
       hasTag(ob, tag = DEFAULT_VIEW_TAG) {
-        var _a4;
-        const tags = (_a4 = this.tags) == null ? void 0 : _a4.get(ob[$changes]);
+        var _a10;
+        const tags = (_a10 = this.tags) == null ? void 0 : _a10.get(ob[$changes]);
         return (tags == null ? void 0 : tags.has(tag)) ?? false;
       }
       clear() {
@@ -21890,7 +21908,8 @@ var __decorateClass = /* @__PURE__ */ __name((decorators, target2, key, kind) =>
   if (result) __defProp2(target2, key, result);
   return result;
 }, "__decorateClass");
-const _CardInstanceSchema = (_g = class extends umdExports.Schema {
+var _a8;
+const _CardInstanceSchema = (_a8 = class extends umdExports.Schema {
   constructor() {
     super(...arguments);
     this.instanceId = "";
@@ -21906,7 +21925,7 @@ const _CardInstanceSchema = (_g = class extends umdExports.Schema {
   }
   // Helper to create from client-like data
   static fromCardData(data, instanceId) {
-    const card = new _g();
+    const card = new _a8();
     card.instanceId = instanceId;
     card.cardId = data.id;
     card.name = data.name;
@@ -21919,7 +21938,7 @@ const _CardInstanceSchema = (_g = class extends umdExports.Schema {
     card.isLegend = data.isLegend;
     return card;
   }
-}, __name(_g, "_CardInstanceSchema"), _g);
+}, __name(_a8, "_CardInstanceSchema"), _a8);
 __decorateClass([
   umdExports.type("string")
 ], _CardInstanceSchema.prototype, "instanceId");
@@ -22530,19 +22549,19 @@ const _Lobby = class _Lobby extends phaserExports.Scene {
       { fontFamily: "Arial", fontSize: 18, color: "#ffff00", align: "center" }
     ).setOrigin(0.5).setVisible(false);
     this.readyButton.on("pointerdown", () => {
-      var _a3;
-      if (colyseusRoom && ((_a3 = this.readyButton.input) == null ? void 0 : _a3.enabled)) {
+      var _a9;
+      if (colyseusRoom && ((_a9 = this.readyButton.input) == null ? void 0 : _a9.enabled)) {
         console.log("Lobby: Sending playerReady message.");
         colyseusRoom.send("playerReady");
       }
     });
     this.readyButton.on("pointerover", () => {
-      var _a3;
-      if ((_a3 = this.readyButton.input) == null ? void 0 : _a3.enabled) this.readyButton.setColor("#55ff55");
+      var _a9;
+      if ((_a9 = this.readyButton.input) == null ? void 0 : _a9.enabled) this.readyButton.setColor("#55ff55");
     });
     this.readyButton.on("pointerout", () => {
-      var _a3;
-      if ((_a3 = this.readyButton.input) == null ? void 0 : _a3.enabled) this.readyButton.setColor("#00ff00");
+      var _a9;
+      if ((_a9 = this.readyButton.input) == null ? void 0 : _a9.enabled) this.readyButton.setColor("#00ff00");
       else this.readyButton.setColor("#888888");
     });
     this.setupColyseusListeners();
@@ -22638,10 +22657,10 @@ const _Lobby = class _Lobby extends phaserExports.Scene {
     });
   }
   addPlayerStateListener(player, sessionId) {
-    var _a3;
+    var _a9;
     if (!colyseusRoom) return;
     const $ = cjs.getStateCallbacks(colyseusRoom);
-    (_a3 = this.playerStateListeners.get(sessionId)) == null ? void 0 : _a3();
+    (_a9 = this.playerStateListeners.get(sessionId)) == null ? void 0 : _a9();
     console.log(`Lobby: Adding 'isReady' listener for player ${sessionId}`);
     const unsub = $(player).listen("isReady", (currentValue, previousValue) => {
       console.log(`Lobby: isReady changed for player ${sessionId}: ${previousValue} -> ${currentValue}`);
@@ -22739,12 +22758,12 @@ const _Lobby = class _Lobby extends phaserExports.Scene {
     }
   }
   shutdown() {
-    var _a3, _b2, _c2, _d2, _e2, _f2, _g2, _h, _i;
+    var _a9, _b, _c, _d, _e, _f, _g, _h, _i;
     console.log("Lobby scene shutting down.");
     this.listenersAttached = false;
-    (_a3 = this.phaseListenerUnsub) == null ? void 0 : _a3.call(this);
-    (_b2 = this.playerAddListenerUnsub) == null ? void 0 : _b2.call(this);
-    (_c2 = this.playerRemoveListenerUnsub) == null ? void 0 : _c2.call(this);
+    (_a9 = this.phaseListenerUnsub) == null ? void 0 : _a9.call(this);
+    (_b = this.playerAddListenerUnsub) == null ? void 0 : _b.call(this);
+    (_c = this.playerRemoveListenerUnsub) == null ? void 0 : _c.call(this);
     this.playerStateListeners.forEach((unsub) => unsub());
     this.playerStateListeners.clear();
     this.phaseListenerUnsub = null;
@@ -22752,10 +22771,10 @@ const _Lobby = class _Lobby extends phaserExports.Scene {
     this.playerRemoveListenerUnsub = null;
     this.playerTextObjects.forEach((textObj) => textObj.destroy());
     this.playerTextObjects.clear();
-    (_d2 = this.statusText) == null ? void 0 : _d2.destroy();
-    (_e2 = this.readyButton) == null ? void 0 : _e2.destroy();
-    (_f2 = this.waitingText) == null ? void 0 : _f2.destroy();
-    (_g2 = this.readyButton) == null ? void 0 : _g2.off("pointerdown");
+    (_d = this.statusText) == null ? void 0 : _d.destroy();
+    (_e = this.readyButton) == null ? void 0 : _e.destroy();
+    (_f = this.waitingText) == null ? void 0 : _f.destroy();
+    (_g = this.readyButton) == null ? void 0 : _g.off("pointerdown");
     (_h = this.readyButton) == null ? void 0 : _h.off("pointerover");
     (_i = this.readyButton) == null ? void 0 : _i.off("pointerout");
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
@@ -22785,9 +22804,9 @@ const _Shop = class _Shop extends phaserExports.Scene {
     __publicField(this, "listeners", []);
   }
   create() {
-    var _a3;
+    var _a9;
     this.scene.launch("background");
-    if (!((_a3 = this.scene.get("BoardView")) == null ? void 0 : _a3.scene.isActive())) {
+    if (!((_a9 = this.scene.get("BoardView")) == null ? void 0 : _a9.scene.isActive())) {
       this.scene.launch("BoardView");
     }
     this.scene.bringToTop();
@@ -22836,14 +22855,14 @@ const _Shop = class _Shop extends phaserExports.Scene {
       }
     });
     this.refreshButton.on("pointerover", () => {
-      var _a4;
-      if ((_a4 = this.refreshButton.input) == null ? void 0 : _a4.enabled) {
+      var _a10;
+      if ((_a10 = this.refreshButton.input) == null ? void 0 : _a10.enabled) {
         this.refreshButton.setBackgroundColor("#6666CC");
       }
     });
     this.refreshButton.on("pointerout", () => {
-      var _a4;
-      if ((_a4 = this.refreshButton.input) == null ? void 0 : _a4.enabled) {
+      var _a10;
+      if ((_a10 = this.refreshButton.input) == null ? void 0 : _a10.enabled) {
         this.refreshButton.setBackgroundColor("#4444AA");
       }
     });
@@ -22865,13 +22884,13 @@ const _Shop = class _Shop extends phaserExports.Scene {
       }
     });
     this.continueButton.on("pointerover", () => {
-      var _a4;
-      if ((_a4 = this.continueButton.input) == null ? void 0 : _a4.enabled)
+      var _a10;
+      if ((_a10 = this.continueButton.input) == null ? void 0 : _a10.enabled)
         this.continueButton.setColor("#55ff55");
     });
     this.continueButton.on("pointerout", () => {
-      var _a4;
-      if ((_a4 = this.continueButton.input) == null ? void 0 : _a4.enabled)
+      var _a10;
+      if ((_a10 = this.continueButton.input) == null ? void 0 : _a10.enabled)
         this.continueButton.setColor("#00ff00");
       else this.continueButton.setColor("#888888");
     });
@@ -22914,8 +22933,8 @@ const _Shop = class _Shop extends phaserExports.Scene {
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
   createShopCardsDisplay(centerX, centerY, gameWidth) {
-    var _a3;
-    (_a3 = this.shopOffersContainer) == null ? void 0 : _a3.destroy();
+    var _a9;
+    (_a9 = this.shopOffersContainer) == null ? void 0 : _a9.destroy();
     this.shopOffersContainer = this.add.container(0, 0);
     this.shopOffersContainer.setVisible(this.shopOffersVisible);
     this.shopCardObjects.forEach((obj) => obj.destroy());
@@ -23014,13 +23033,13 @@ const _Shop = class _Shop extends phaserExports.Scene {
       cardContainer.setData("cardData", cardData);
       this.input.setDraggable(cardContainer);
       cardContainer.off("pointerdown").on("pointerdown", (pointer) => {
-        var _a4;
-        if (!((_a4 = cardContainer.input) == null ? void 0 : _a4.enabled)) return;
+        var _a10;
+        if (!((_a10 = cardContainer.input) == null ? void 0 : _a10.enabled)) return;
         cardContainer.setData("isBeingDragged", false);
       });
       cardContainer.off("pointerup").on("pointerup", (pointer) => {
-        var _a4;
-        if (!((_a4 = cardContainer.input) == null ? void 0 : _a4.enabled)) return;
+        var _a10;
+        if (!((_a10 = cardContainer.input) == null ? void 0 : _a10.enabled)) return;
         if (!colyseusRoom || !colyseusRoom.sessionId) return;
         if (cardContainer.getData("isBeingDragged") === true) {
           cardContainer.setData("isBeingDragged", false);
@@ -23141,10 +23160,10 @@ const _Shop = class _Shop extends phaserExports.Scene {
     this.input.on(
       "dragstart",
       (pointer, gameObject) => {
-        var _a3;
+        var _a9;
         if (!(gameObject instanceof Phaser.GameObjects.Container) || !this.shopCardObjects.includes(gameObject))
           return;
-        if (!((_a3 = gameObject.input) == null ? void 0 : _a3.enabled)) return;
+        if (!((_a9 = gameObject.input) == null ? void 0 : _a9.enabled)) return;
         this.children.bringToTop(gameObject);
         gameObject.setAlpha(0.7);
         gameObject.setData("startX", gameObject.x);
@@ -23155,10 +23174,10 @@ const _Shop = class _Shop extends phaserExports.Scene {
     this.input.on(
       "drag",
       (pointer, gameObject, dragX, dragY) => {
-        var _a3;
+        var _a9;
         if (!(gameObject instanceof Phaser.GameObjects.Container) || !this.shopCardObjects.includes(gameObject))
           return;
-        if (!((_a3 = gameObject.input) == null ? void 0 : _a3.enabled)) return;
+        if (!((_a9 = gameObject.input) == null ? void 0 : _a9.enabled)) return;
         if (gameObject.getData("isBeingDragged") === true) {
           gameObject.x = dragX;
           gameObject.y = dragY;
@@ -23273,9 +23292,9 @@ const _Shop = class _Shop extends phaserExports.Scene {
     });
     this.listeners.push(
       $(colyseusRoom.state.players).onAdd((player, sessionId) => {
-        var _a3;
+        var _a9;
         if (this.playerStateListenersUnsub.has(sessionId)) {
-          (_a3 = this.playerStateListenersUnsub.get(sessionId)) == null ? void 0 : _a3();
+          (_a9 = this.playerStateListenersUnsub.get(sessionId)) == null ? void 0 : _a9();
         }
         const unsub = $(player).listen("isReady", () => {
           if (this.scene.isActive()) this.updateWaitingStatus();
@@ -23286,8 +23305,8 @@ const _Shop = class _Shop extends phaserExports.Scene {
     );
     this.listeners.push(
       $(colyseusRoom.state.players).onRemove((player, sessionId) => {
-        var _a3;
-        (_a3 = this.playerStateListenersUnsub.get(sessionId)) == null ? void 0 : _a3();
+        var _a9;
+        (_a9 = this.playerStateListenersUnsub.get(sessionId)) == null ? void 0 : _a9();
         this.playerStateListenersUnsub.delete(sessionId);
         if (this.scene.isActive()) this.updateWaitingStatus();
       })
@@ -23335,9 +23354,9 @@ const _Shop = class _Shop extends phaserExports.Scene {
     }
   }
   cleanupListeners() {
-    var _a3, _b2, _c2, _d2;
+    var _a9, _b, _c, _d;
     console.log("Shop Scene: Cleaning up listeners.");
-    (_a3 = this.phaseListenerUnsub) == null ? void 0 : _a3.call(this);
+    (_a9 = this.phaseListenerUnsub) == null ? void 0 : _a9.call(this);
     this.phaseListenerUnsub = null;
     this.playerStateListenersUnsub.forEach((unsub) => unsub());
     this.playerStateListenersUnsub.clear();
@@ -23348,9 +23367,9 @@ const _Shop = class _Shop extends phaserExports.Scene {
     this.input.off("dragstart");
     this.input.off("drag");
     this.input.off("dragend");
-    (_b2 = this.continueButton) == null ? void 0 : _b2.off("pointerdown");
-    (_c2 = this.continueButton) == null ? void 0 : _c2.off("pointerover");
-    (_d2 = this.continueButton) == null ? void 0 : _d2.off("pointerout");
+    (_b = this.continueButton) == null ? void 0 : _b.off("pointerdown");
+    (_c = this.continueButton) == null ? void 0 : _c.off("pointerover");
+    (_d = this.continueButton) == null ? void 0 : _d.off("pointerout");
   }
   updateWaitingStatus() {
     if (!colyseusRoom || !colyseusRoom.sessionId || !this.continueButton || !this.waitingText || !this.scene.isActive())
@@ -23383,18 +23402,18 @@ const _Shop = class _Shop extends phaserExports.Scene {
     });
   }
   shutdown() {
-    var _a3, _b2, _c2, _d2, _e2, _f2, _g2, _h;
+    var _a9, _b, _c, _d, _e, _f, _g, _h;
     console.log("Shop scene shutting down.");
     this.cleanupListeners();
     this.shopCardObjects.forEach((obj) => obj.destroy());
     this.shopCardObjects = [];
-    (_a3 = this.continueButton) == null ? void 0 : _a3.destroy();
-    (_b2 = this.waitingText) == null ? void 0 : _b2.destroy();
-    (_c2 = this.refreshButton) == null ? void 0 : _c2.off("pointerdown");
-    (_d2 = this.refreshButton) == null ? void 0 : _d2.off("pointerover");
-    (_e2 = this.refreshButton) == null ? void 0 : _e2.off("pointerout");
-    (_f2 = this.refreshButton) == null ? void 0 : _f2.destroy();
-    (_g2 = this.toggleShopButton) == null ? void 0 : _g2.destroy();
+    (_a9 = this.continueButton) == null ? void 0 : _a9.destroy();
+    (_b = this.waitingText) == null ? void 0 : _b.destroy();
+    (_c = this.refreshButton) == null ? void 0 : _c.off("pointerdown");
+    (_d = this.refreshButton) == null ? void 0 : _d.off("pointerover");
+    (_e = this.refreshButton) == null ? void 0 : _e.off("pointerout");
+    (_f = this.refreshButton) == null ? void 0 : _f.destroy();
+    (_g = this.toggleShopButton) == null ? void 0 : _g.destroy();
     (_h = this.shopOffersContainer) == null ? void 0 : _h.destroy();
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
@@ -23433,9 +23452,9 @@ const _Preparation = class _Preparation extends phaserExports.Scene {
   // Remove init - state comes from Colyseus
   // init(data: { playerBrews?: number, currentDay?: number }) { ... }
   create() {
-    var _a3;
+    var _a9;
     this.scene.launch("background");
-    if (!((_a3 = this.scene.get("BoardView")) == null ? void 0 : _a3.scene.isActive())) {
+    if (!((_a9 = this.scene.get("BoardView")) == null ? void 0 : _a9.scene.isActive())) {
       this.scene.launch("BoardView");
     }
     this.scene.bringToTop();
@@ -23583,15 +23602,15 @@ const _Preparation = class _Preparation extends phaserExports.Scene {
     });
   }
   cleanupListeners() {
-    var _a3, _b2, _c2, _d2, _e2, _f2, _g2, _h, _i, _j, _k, _l, _m;
+    var _a9, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     console.log("Preparation Scene: Cleaning up listeners.");
-    (_a3 = this.playerStateListenerUnsub) == null ? void 0 : _a3.call(this);
-    (_b2 = this.handAddUnsub) == null ? void 0 : _b2.call(this);
-    (_c2 = this.handRemoveUnsub) == null ? void 0 : _c2.call(this);
-    (_d2 = this.handChangeUnsub) == null ? void 0 : _d2.call(this);
-    (_e2 = this.battlefieldAddUnsub) == null ? void 0 : _e2.call(this);
-    (_f2 = this.battlefieldRemoveUnsub) == null ? void 0 : _f2.call(this);
-    (_g2 = this.battlefieldChangeUnsub) == null ? void 0 : _g2.call(this);
+    (_a9 = this.playerStateListenerUnsub) == null ? void 0 : _a9.call(this);
+    (_b = this.handAddUnsub) == null ? void 0 : _b.call(this);
+    (_c = this.handRemoveUnsub) == null ? void 0 : _c.call(this);
+    (_d = this.handChangeUnsub) == null ? void 0 : _d.call(this);
+    (_e = this.battlefieldAddUnsub) == null ? void 0 : _e.call(this);
+    (_f = this.battlefieldRemoveUnsub) == null ? void 0 : _f.call(this);
+    (_g = this.battlefieldChangeUnsub) == null ? void 0 : _g.call(this);
     (_h = this.phaseListenerUnsub) == null ? void 0 : _h.call(this);
     (_i = this.otherPlayerAddUnsub) == null ? void 0 : _i.call(this);
     (_j = this.otherPlayerRemoveUnsub) == null ? void 0 : _j.call(this);
@@ -23759,11 +23778,11 @@ const _Preparation = class _Preparation extends phaserExports.Scene {
   }
   // Override shutdown
   shutdown() {
-    var _a3, _b2;
+    var _a9, _b;
     console.log("Preparation scene shutting down explicitly.");
     this.cleanupListeners();
-    (_a3 = this.startBattleButton) == null ? void 0 : _a3.destroy();
-    (_b2 = this.waitingText) == null ? void 0 : _b2.destroy();
+    (_a9 = this.startBattleButton) == null ? void 0 : _a9.destroy();
+    (_b = this.waitingText) == null ? void 0 : _b.destroy();
     this.clientSideCardLayout.clear();
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
@@ -23848,13 +23867,13 @@ const _Battle = class _Battle extends phaserExports.Scene {
     });
   }
   cleanupListeners() {
-    var _a3;
+    var _a9;
     console.log("Battle Scene: Cleaning up listeners.");
-    (_a3 = this.phaseListenerUnsubscribe) == null ? void 0 : _a3.call(this);
+    (_a9 = this.phaseListenerUnsubscribe) == null ? void 0 : _a9.call(this);
     this.phaseListenerUnsubscribe = null;
   }
   handleBattleEnd() {
-    var _a3, _b2;
+    var _a9, _b;
     if (this.battleOver || !this.scene.isActive()) return;
     this.battleOver = true;
     console.log("Battle ended (server signal received). Displaying results.");
@@ -23880,15 +23899,15 @@ const _Battle = class _Battle extends phaserExports.Scene {
       resultMessage = "Battle Ended (Opponent Left?)";
       resultColor = "#ffffff";
     }
-    if ((_a3 = this.resultText) == null ? void 0 : _a3.active) {
+    if ((_a9 = this.resultText) == null ? void 0 : _a9.active) {
       this.resultText.setText(resultMessage).setColor(resultColor).setAlpha(1);
     }
-    if ((_b2 = this.statusText) == null ? void 0 : _b2.active) {
+    if ((_b = this.statusText) == null ? void 0 : _b.active) {
       this.statusText.setText("Waiting for next round...").setAlpha(1);
     }
   }
   handleGameOver() {
-    var _a3, _b2;
+    var _a9, _b;
     if (this.battleOver || !this.scene.isActive()) return;
     this.battleOver = true;
     console.log("Game Over signal received.");
@@ -23917,10 +23936,10 @@ const _Battle = class _Battle extends phaserExports.Scene {
       finalMessage = "Game Over (Error?)";
       finalColor = "#ff0000";
     }
-    if ((_a3 = this.resultText) == null ? void 0 : _a3.active) {
+    if ((_a9 = this.resultText) == null ? void 0 : _a9.active) {
       this.resultText.setText(finalMessage).setColor(finalColor).setAlpha(1);
     }
-    if ((_b2 = this.statusText) == null ? void 0 : _b2.active) {
+    if ((_b = this.statusText) == null ? void 0 : _b.active) {
       this.statusText.setText("Click to return to Main Menu").setAlpha(1);
     }
     this.input.once("pointerdown", () => {
@@ -23933,15 +23952,15 @@ const _Battle = class _Battle extends phaserExports.Scene {
     });
   }
   shutdown() {
-    var _a3, _b2;
+    var _a9, _b;
     console.log("Battle scene shutting down explicitly.");
     this.cleanupListeners();
     this.handCardDisplayObjects.forEach((hand) => {
       hand == null ? void 0 : hand.forEach((displayObj) => displayObj == null ? void 0 : displayObj.destroy());
     });
     this.handCardDisplayObjects.clear();
-    (_a3 = this.resultText) == null ? void 0 : _a3.destroy();
-    (_b2 = this.statusText) == null ? void 0 : _b2.destroy();
+    (_a9 = this.resultText) == null ? void 0 : _a9.destroy();
+    (_b = this.statusText) == null ? void 0 : _b.destroy();
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 };
@@ -24219,8 +24238,8 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
         }, "processCardVisualsPostBattle");
         this.playerVisuals.forEach((playerData, playerId) => {
           playerData.battlefield.forEach((cardContainer, slotKey) => {
-            var _a3;
-            const cardSchema = (_a3 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a3.battlefield.get(slotKey);
+            var _a9;
+            const cardSchema = (_a9 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a9.battlefield.get(slotKey);
             processCardVisualsPostBattle(
               cardContainer,
               cardSchema,
@@ -24229,8 +24248,8 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
             );
           });
           playerData.hand.forEach((cardContainer, slotKey) => {
-            var _a3;
-            const cardSchema = (_a3 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a3.hand.get(slotKey);
+            var _a9;
+            const cardSchema = (_a9 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a9.hand.get(slotKey);
             if (oldPhase === Phase.Battle || oldPhase === Phase.BattleEnd) {
               if (newPhase !== Phase.Battle && newPhase !== Phase.BattleEnd) {
                 if (cardSchema && cardSchema.currentHp > 0) {
@@ -25268,7 +25287,7 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     this.dayPhaseText.setText(`Day ${day} - ${phase}`);
   }
   cleanupListeners() {
-    var _a3, _b2, _c2, _d2, _e2, _f2, _g2;
+    var _a9, _b, _c, _d, _e, _f, _g;
     console.log("BoardView: Cleaning up listeners.");
     this.listeners.forEach((unsub) => {
       if (typeof unsub === "function") {
@@ -25303,13 +25322,13 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
       areas.battlefield.forEach((container) => container.destroy());
     });
     this.playerVisuals.clear();
-    (_a3 = this.playerHealthText) == null ? void 0 : _a3.destroy();
-    (_b2 = this.opponentHealthText) == null ? void 0 : _b2.destroy();
-    (_c2 = this.playerBrewsText) == null ? void 0 : _c2.destroy();
-    (_d2 = this.dayPhaseText) == null ? void 0 : _d2.destroy();
-    (_e2 = this.opponentUsernameText) == null ? void 0 : _e2.destroy();
-    (_f2 = this.sellZone) == null ? void 0 : _f2.destroy();
-    (_g2 = this.brewGainText) == null ? void 0 : _g2.destroy();
+    (_a9 = this.playerHealthText) == null ? void 0 : _a9.destroy();
+    (_b = this.opponentHealthText) == null ? void 0 : _b.destroy();
+    (_c = this.playerBrewsText) == null ? void 0 : _c.destroy();
+    (_d = this.dayPhaseText) == null ? void 0 : _d.destroy();
+    (_e = this.opponentUsernameText) == null ? void 0 : _e.destroy();
+    (_f = this.sellZone) == null ? void 0 : _f.destroy();
+    (_g = this.brewGainText) == null ? void 0 : _g.destroy();
     this.input.off("dragenter");
     this.input.off("dragleave");
     this.input.off("drop");
