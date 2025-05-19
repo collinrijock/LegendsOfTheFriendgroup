@@ -22043,9 +22043,10 @@ const _GameState = class _GameState extends umdExports.Schema {
     this.players = new umdExports.MapSchema();
     this.currentDay = 0;
     this.currentPhase = "Lobby";
-    this.battleTimer = 0;
+    this.phaseTimer = 0;
+    this.matchTimer = 0;
   }
-  // Countdown in seconds
+  // Total elapsed seconds for the match
 };
 __name(_GameState, "GameState");
 let GameState = _GameState;
@@ -22060,7 +22061,10 @@ __decorateClass([
 ], GameState.prototype, "currentPhase");
 __decorateClass([
   umdExports.type("number")
-], GameState.prototype, "battleTimer");
+], GameState.prototype, "phaseTimer");
+__decorateClass([
+  umdExports.type("number")
+], GameState.prototype, "matchTimer");
 console.log("Server schema classes (GameState, PlayerState, CardInstanceSchema) imported for Colyseus runtime:");
 console.log("- GameState:", GameState, "GameState.name:", GameState.name);
 console.log("- PlayerState:", PlayerState, "PlayerState.name:", PlayerState.name);
@@ -22391,7 +22395,7 @@ const _MainMenu = class _MainMenu extends phaserExports.Scene {
     let scaleY = this.cameras.main.height / bg.height + 0.2;
     let scale = Math.max(scaleX, scaleY);
     bg.setScale(scale).setScrollFactor(0);
-    this.add.text(Number(this.game.config.width) * 0.5, 300, "Legends of the Friend", {
+    this.add.text(Number(this.game.config.width) * 0.5, 300, "Legends of the Friendgroup", {
       fontFamily: "Arial Black",
       fontSize: 58,
       // yellow
@@ -23828,6 +23832,12 @@ const _Preparation = class _Preparation extends phaserExports.Scene {
 };
 __name(_Preparation, "Preparation");
 let Preparation = _Preparation;
+function formatTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+__name(formatTime, "formatTime");
 const _Battle = class _Battle extends phaserExports.Scene {
   // Store unsubscribe function
   constructor() {
@@ -23921,25 +23931,31 @@ const _Battle = class _Battle extends phaserExports.Scene {
     colyseusRoom == null ? void 0 : colyseusRoom.state.players.forEach((p, sid) => {
       if (sid !== (colyseusRoom == null ? void 0 : colyseusRoom.sessionId)) opponentState = p;
     });
-    let resultMessage = "Battle Ended";
+    let mainMessage = "Battle Complete!";
+    let winnerInfoMessage = "";
     let resultColor = "#ffffff";
     if (myPlayerState && opponentState) {
       if (myPlayerState.health > opponentState.health) {
-        resultMessage = "Victory!";
+        winnerInfoMessage = `${myPlayerState.username} Wins!`;
         resultColor = "#88ff88";
       } else if (opponentState.health > myPlayerState.health) {
-        resultMessage = "Defeat!";
+        winnerInfoMessage = `${opponentState.username} Wins!`;
         resultColor = "#ff8888";
       } else {
-        resultMessage = "Draw!";
+        winnerInfoMessage = "Draw!";
         resultColor = "#ffff88";
       }
+    } else if (myPlayerState) {
+      winnerInfoMessage = `${myPlayerState.username} Wins! (Opponent Left)`;
+      resultColor = "#88ff88";
     } else {
-      resultMessage = "Battle Ended (Opponent Left?)";
+      winnerInfoMessage = "(Error determining outcome)";
       resultColor = "#ffffff";
     }
+    const finalResultMessage = `${mainMessage}
+${winnerInfoMessage}`;
     if ((_a9 = this.resultText) == null ? void 0 : _a9.active) {
-      this.resultText.setText(resultMessage).setColor(resultColor).setAlpha(1);
+      this.resultText.setText(finalResultMessage).setColor(resultColor).setAlpha(1);
     }
     if ((_b = this.statusText) == null ? void 0 : _b.active) {
       this.statusText.setText("Waiting for next round...").setAlpha(1);
@@ -23950,43 +23966,69 @@ const _Battle = class _Battle extends phaserExports.Scene {
     if (this.battleOver || !this.scene.isActive()) return;
     this.battleOver = true;
     console.log("Game Over signal received.");
+    (_a9 = this.resultText) == null ? void 0 : _a9.destroy();
+    (_b = this.statusText) == null ? void 0 : _b.destroy();
+    const centerX = this.cameras.main.centerX;
+    const centerY = this.cameras.main.centerY;
+    const gameWidth = this.cameras.main.width;
+    const gameHeight = this.cameras.main.height;
+    this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0, 0.75).setDepth(1999);
+    this.add.text(centerX, centerY - 150, "GAME OVER", {
+      fontFamily: "Arial Black",
+      fontSize: "96px",
+      color: "#ff3333",
+      stroke: "#000000",
+      strokeThickness: 10,
+      align: "center"
+    }).setOrigin(0.5).setDepth(2e3);
     const myPlayerState = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(colyseusRoom.sessionId);
     let opponentState;
     colyseusRoom == null ? void 0 : colyseusRoom.state.players.forEach((p, sid) => {
       if (sid !== (colyseusRoom == null ? void 0 : colyseusRoom.sessionId)) opponentState = p;
     });
-    let finalMessage = "Game Over!";
-    let finalColor = "#ffffff";
+    let outcomeMessage = "";
     if (myPlayerState && opponentState) {
       if (myPlayerState.health > opponentState.health) {
-        finalMessage = "You Win!";
-        finalColor = "#00ff00";
+        outcomeMessage = "You Win!";
       } else if (opponentState.health > myPlayerState.health) {
-        finalMessage = "You Lose!";
-        finalColor = "#ff0000";
+        outcomeMessage = "You Lose!";
       } else {
-        finalMessage = "Draw!";
-        finalColor = "#ffff00";
+        outcomeMessage = "It's a Draw!";
       }
     } else if (myPlayerState) {
-      finalMessage = "You Win! (Opponent Left)";
-      finalColor = "#00ff00";
+      outcomeMessage = "You Win! (Opponent Left)";
     } else {
-      finalMessage = "Game Over (Error?)";
-      finalColor = "#ff0000";
+      outcomeMessage = "Match Concluded";
     }
-    if ((_a9 = this.resultText) == null ? void 0 : _a9.active) {
-      this.resultText.setText(finalMessage).setColor(finalColor).setAlpha(1);
-    }
-    if ((_b = this.statusText) == null ? void 0 : _b.active) {
-      this.statusText.setText("Click to return to Main Menu").setAlpha(1);
-    }
+    this.add.text(centerX, centerY - 30, outcomeMessage, {
+      fontFamily: "Arial",
+      fontSize: "48px",
+      color: "#ffffff",
+      stroke: "#333333",
+      strokeThickness: 6,
+      align: "center"
+    }).setOrigin(0.5).setDepth(2e3);
+    const totalMatchTime = (colyseusRoom == null ? void 0 : colyseusRoom.state.matchTimer) ?? 0;
+    this.add.text(centerX, centerY + 40, `Total Match Time: ${formatTime(totalMatchTime)}`, {
+      fontFamily: "Arial",
+      fontSize: "28px",
+      color: "#cccccc",
+      align: "center"
+    }).setOrigin(0.5).setDepth(2e3);
+    this.add.text(centerX, centerY + 120, "Click to return to Main Menu", {
+      fontFamily: "Arial",
+      fontSize: "24px",
+      color: "#ffff00",
+      align: "center"
+    }).setOrigin(0.5).setDepth(2e3);
     this.input.once("pointerdown", () => {
+      if (!this.scene.isActive()) return;
       try {
         colyseusRoom == null ? void 0 : colyseusRoom.leave();
       } catch (e) {
       }
       this.scene.stop("Background");
+      this.scene.stop("BoardView");
       this.scene.start("MainMenu");
     });
   }
@@ -24021,6 +24063,8 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     __publicField(this, "playerVisuals", /* @__PURE__ */ new Map());
     __publicField(this, "currentPhase", Phase.Lobby);
     // Add currentPhase property
+    __publicField(this, "opponentBattlefieldSnapshotAtPrepStart", /* @__PURE__ */ new Map());
+    // sessionId -> Set<instanceId>
     // Add sell zone properties
     __publicField(this, "sellZone");
     __publicField(this, "sellZoneRect");
@@ -24033,9 +24077,21 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     __publicField(this, "dayPhaseText");
     __publicField(this, "opponentUsernameText");
     // For opponent's name
+    __publicField(this, "phaseTimerText");
+    // For phase timer display
+    __publicField(this, "matchTimerText");
+    // For match-long timer display
     // Listeners
     __publicField(this, "listeners", []);
     __publicField(this, "cardSchemaListeners", /* @__PURE__ */ new Map());
+  }
+  formatTime(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+      2,
+      "0"
+    )}`;
   }
   updateCardHpVisuals(cardContainer, currentHp, maxHealth) {
     if (!cardContainer || !cardContainer.active) return;
@@ -24136,6 +24192,15 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
       fontSize: 20,
       align: "center"
     }).setOrigin(0.5).setDepth(1001);
+    this.phaseTimerText = this.add.text(gameWidth * 0.65, navbarY, `Timer: --`, {
+      // Positioned to the right of day/phase
+      ...navTextStyle,
+      fontSize: 24,
+      align: "left",
+      // Or center if preferred
+      stroke: "#000000",
+      strokeThickness: 4
+    }).setOrigin(0, 0.5).setDepth(1001).setVisible(false);
   }
   showAttackAnimation(cardInstanceId) {
     const cardContainer = this.getCardGameObjectByInstanceId(cardInstanceId);
@@ -24214,81 +24279,111 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
       $(colyseusRoom.state).listen("currentDay", () => this.updateNavbarText())
     );
     this.listeners.push(
-      $(colyseusRoom.state).listen("currentPhase", (newPhase, oldPhase) => {
-        this.currentPhase = newPhase;
-        this.updateNavbarText();
-        if (newPhase === Phase.Shop || newPhase === Phase.Preparation) {
-          this.sellZone.setVisible(true);
-        } else {
-          this.sellZone.setVisible(false);
-        }
-        const processCardVisualsPostBattle = /* @__PURE__ */ __name((cardContainer, cardSchema, ownerSessionId, slotKey) => {
-          if (!cardContainer.active) return;
-          const cooldownBarBg = cardContainer.getData(
-            "cooldownBarBg"
-          );
-          const cooldownBarFill = cardContainer.getData(
-            "cooldownBarFill"
-          );
-          if (newPhase === Phase.Battle) {
-            const cardArea = cardContainer.getData("area");
-            if (cardArea === "battlefield") {
-              if (cardSchema) {
-                if (cooldownBarBg && cooldownBarFill) {
-                  cooldownBarBg.setVisible(true);
-                  cooldownBarFill.setVisible(true);
-                  const storedWidth = cardContainer.getData(
-                    "cooldownBarBaseWidth"
+      $(colyseusRoom.state).listen(
+        "currentPhase",
+        (newPhaseVal, oldPhaseVal) => {
+          const newPhase = newPhaseVal;
+          const oldPhase = oldPhaseVal;
+          const previousPhaseIsPrep = oldPhase === Phase.Preparation;
+          this.currentPhase = newPhase;
+          this.updateNavbarText();
+          if (newPhase === Phase.Shop || newPhase === Phase.Preparation) {
+            this.sellZone.setVisible(true);
+          } else {
+            this.sellZone.setVisible(false);
+          }
+          if (this.phaseTimerText && this.phaseTimerText.active) {
+            const timedPhases = [Phase.Shop, Phase.Preparation, Phase.Battle];
+            if (timedPhases.includes(newPhase)) {
+              this.phaseTimerText.setText(
+                `Timer: ${(colyseusRoom == null ? void 0 : colyseusRoom.state.phaseTimer) ?? "--"}`
+              );
+              this.phaseTimerText.setVisible(true);
+            } else {
+              this.phaseTimerText.setVisible(false);
+            }
+          }
+          if (newPhase === Phase.Preparation) {
+            colyseusRoom.state.players.forEach(
+              (player, sessionId) => {
+                if (sessionId !== (colyseusRoom == null ? void 0 : colyseusRoom.sessionId)) {
+                  const snapshotSet = /* @__PURE__ */ new Set();
+                  player.battlefield.forEach((cardSchema) => {
+                    snapshotSet.add(cardSchema.instanceId);
+                  });
+                  this.opponentBattlefieldSnapshotAtPrepStart.set(
+                    sessionId,
+                    snapshotSet
                   );
-                  const cooldownBarBaseWidth = typeof storedWidth === "number" ? storedWidth : MINION_CARD_WIDTH - 10;
-                  cooldownBarFill.setSize(cooldownBarBaseWidth, 6);
-                  const maxCooldown = (cardSchema.speed > 0 ? cardSchema.speed : 1.5) * 1e3;
-                  cardContainer.setData("maxAttackCooldown", maxCooldown);
-                  cardContainer.setData("attackCooldownTimer", maxCooldown);
+                  console.log(
+                    `BoardView: Snapshot for opponent ${sessionId} at Prep start:`,
+                    Array.from(snapshotSet)
+                  );
+                  player.battlefield.forEach((cardSchema, slotKey) => {
+                    this.updateCardVisual(
+                      sessionId,
+                      "battlefield",
+                      slotKey,
+                      cardSchema
+                    );
+                  });
+                }
+              }
+            );
+          } else if (newPhase === Phase.Battle && previousPhaseIsPrep) {
+            colyseusRoom.state.players.forEach(
+              (player, sessionId) => {
+                if (sessionId !== (colyseusRoom == null ? void 0 : colyseusRoom.sessionId)) {
+                  player.battlefield.forEach((cardSchema, slotKey) => {
+                    this.updateCardVisual(
+                      sessionId,
+                      "battlefield",
+                      slotKey,
+                      cardSchema
+                    );
+                  });
+                }
+              }
+            );
+          }
+          const processCardVisualsPostBattle = /* @__PURE__ */ __name((cardContainer, cardSchema, ownerSessionId, slotKey) => {
+            if (!cardContainer.active) return;
+            const cooldownBarBg = cardContainer.getData(
+              "cooldownBarBg"
+            );
+            const cooldownBarFill = cardContainer.getData(
+              "cooldownBarFill"
+            );
+            if (newPhase === Phase.Battle) {
+              const cardArea = cardContainer.getData("area");
+              if (cardArea === "battlefield") {
+                if (cardSchema) {
+                  if (cooldownBarBg && cooldownBarFill) {
+                    cooldownBarBg.setVisible(true);
+                    cooldownBarFill.setVisible(true);
+                    const storedWidth = cardContainer.getData(
+                      "cooldownBarBaseWidth"
+                    );
+                    const cooldownBarBaseWidth = typeof storedWidth === "number" ? storedWidth : MINION_CARD_WIDTH - 10;
+                    cooldownBarFill.setSize(cooldownBarBaseWidth, 6);
+                    const maxCooldown = (cardSchema.speed > 0 ? cardSchema.speed : 1.5) * 1e3;
+                    cardContainer.setData("maxAttackCooldown", maxCooldown);
+                    cardContainer.setData("attackCooldownTimer", maxCooldown);
+                  } else {
+                    console.warn(
+                      `BoardView: Battle Phase - Card ${cardSchema.instanceId} (Owner: ${ownerSessionId}, Slot: ${slotKey}) missing cooldown bar elements in data. Bg: ${!!cooldownBarBg}, Fill: ${!!cooldownBarFill}`
+                    );
+                  }
                 } else {
                   console.warn(
-                    `BoardView: Battle Phase - Card ${cardSchema.instanceId} (Owner: ${ownerSessionId}, Slot: ${slotKey}) missing cooldown bar elements in data. Bg: ${!!cooldownBarBg}, Fill: ${!!cooldownBarFill}`
+                    `BoardView: Battle Phase - Battlefield card container (Owner: ${ownerSessionId}, Slot: ${slotKey}) has no cardSchema. No cooldown bar shown.`
                   );
                 }
-              } else {
-                console.warn(
-                  `BoardView: Battle Phase - Battlefield card container (Owner: ${ownerSessionId}, Slot: ${slotKey}) has no cardSchema. No cooldown bar shown.`
-                );
               }
+            } else {
+              if (cooldownBarBg) cooldownBarBg.setVisible(false);
+              if (cooldownBarFill) cooldownBarFill.setVisible(false);
             }
-          } else {
-            if (cooldownBarBg) cooldownBarBg.setVisible(false);
-            if (cooldownBarFill) cooldownBarFill.setVisible(false);
-          }
-          if (oldPhase === Phase.Battle || oldPhase === Phase.BattleEnd) {
-            if (newPhase !== Phase.Battle && newPhase !== Phase.BattleEnd) {
-              if (cardSchema && cardSchema.currentHp > 0) {
-                cardContainer.setAlpha(1);
-                const mainCardImage = cardContainer.getData(
-                  // Changed from bgRect
-                  "mainCardImage"
-                );
-                if (mainCardImage && mainCardImage.active && typeof mainCardImage.clearTint === "function") {
-                  mainCardImage.clearTint();
-                }
-              }
-            }
-          }
-        }, "processCardVisualsPostBattle");
-        this.playerVisuals.forEach((playerData, playerId) => {
-          playerData.battlefield.forEach((cardContainer, slotKey) => {
-            var _a9;
-            const cardSchema = (_a9 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a9.battlefield.get(slotKey);
-            processCardVisualsPostBattle(
-              cardContainer,
-              cardSchema,
-              playerId,
-              slotKey
-            );
-          });
-          playerData.hand.forEach((cardContainer, slotKey) => {
-            var _a9;
-            const cardSchema = (_a9 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a9.hand.get(slotKey);
             if (oldPhase === Phase.Battle || oldPhase === Phase.BattleEnd) {
               if (newPhase !== Phase.Battle && newPhase !== Phase.BattleEnd) {
                 if (cardSchema && cardSchema.currentHp > 0) {
@@ -24303,19 +24398,78 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
                 }
               }
             }
+          }, "processCardVisualsPostBattle");
+          this.playerVisuals.forEach((playerData, playerId) => {
+            playerData.battlefield.forEach((cardContainer, slotKey) => {
+              var _a9;
+              const cardSchema = (_a9 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a9.battlefield.get(slotKey);
+              processCardVisualsPostBattle(
+                cardContainer,
+                cardSchema,
+                playerId,
+                slotKey
+              );
+            });
+            playerData.hand.forEach((cardContainer, slotKey) => {
+              var _a9;
+              const cardSchema = (_a9 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a9.hand.get(slotKey);
+              if (oldPhase === Phase.Battle || oldPhase === Phase.BattleEnd) {
+                if (newPhase !== Phase.Battle && newPhase !== Phase.BattleEnd) {
+                  if (cardSchema && cardSchema.currentHp > 0) {
+                    cardContainer.setAlpha(1);
+                    const mainCardImage = cardContainer.getData(
+                      // Changed from bgRect
+                      "mainCardImage"
+                    );
+                    if (mainCardImage && mainCardImage.active && typeof mainCardImage.clearTint === "function") {
+                      mainCardImage.clearTint();
+                    }
+                  }
+                }
+              }
+            });
           });
-        });
+        }
+      )
+    );
+    this.listeners.push(
+      $(colyseusRoom.state).listen("phaseTimer", (newTime) => {
+        if (this.phaseTimerText && this.phaseTimerText.active && this.phaseTimerText.visible) {
+          const timedPhases = [Phase.Shop, Phase.Preparation, Phase.Battle];
+          if (timedPhases.includes(this.currentPhase)) {
+            if (newTime >= 0) {
+              this.phaseTimerText.setText(`Timer: ${newTime}`);
+            }
+          }
+        }
+      })
+    );
+    this.listeners.push(
+      $(colyseusRoom.state).listen("matchTimer", (newTime) => {
+        if (this.matchTimerText && this.matchTimerText.active) {
+          if (newTime > 0 || (colyseusRoom == null ? void 0 : colyseusRoom.state.currentPhase) !== Phase.Lobby && (colyseusRoom == null ? void 0 : colyseusRoom.state.currentPhase) !== Phase.GameOver) {
+            this.matchTimerText.setText(`Match: ${this.formatTime(newTime)}`);
+            this.matchTimerText.setVisible(true);
+          } else if ((colyseusRoom == null ? void 0 : colyseusRoom.state.currentPhase) === Phase.GameOver) {
+            this.matchTimerText.setText(`Match: ${this.formatTime(newTime)}`);
+            this.matchTimerText.setVisible(true);
+          } else {
+            this.matchTimerText.setVisible(false);
+          }
+        }
       })
     );
     this.listeners.push(
       $(colyseusRoom.state.players).onAdd(
-        (player, sessionId) => {
-          console.log(`BoardView: Player added ${sessionId}`);
-          this.addPlayerVisuals(sessionId);
-          this.addPlayerListeners(player, sessionId);
-          this.updatePlayerSlots(player, sessionId);
-          this.updateNavbarText();
-        }
+        $(colyseusRoom.state.players).onAdd(
+          (player, sessionId) => {
+            console.log(`BoardView: Player added ${sessionId}`);
+            this.addPlayerVisuals(sessionId);
+            this.addPlayerListeners(player, sessionId);
+            this.updatePlayerSlots(player, sessionId);
+            this.updateNavbarText();
+          }
+        )
       )
     );
     this.listeners.push(
@@ -24557,6 +24711,7 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
       visuals.battlefieldSlotOutlines.forEach((outline) => outline.destroy());
     }
     this.playerVisuals.delete(sessionId);
+    this.opponentBattlefieldSnapshotAtPrepStart.delete(sessionId);
   }
   updateCardVisual(sessionId, area, slotKey, cardSchema) {
     if (!this.scene.isActive()) {
@@ -24574,9 +24729,19 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     let isObscured = false;
     if (area === "hand") {
       y = isLocalPlayer ? HAND_Y_PLAYER : HAND_Y_OPPONENT;
-      if (!isLocalPlayer) isObscured = true;
+      if (!isLocalPlayer) {
+        isObscured = true;
+      }
     } else {
       y = isLocalPlayer ? BATTLEFIELD_Y_PLAYER : BATTLEFIELD_Y_OPPONENT;
+      if (!isLocalPlayer && this.currentPhase === Phase.Preparation) {
+        const snapshot = this.opponentBattlefieldSnapshotAtPrepStart.get(sessionId);
+        if (snapshot && snapshot.has(cardSchema.instanceId)) {
+          isObscured = false;
+        } else {
+          isObscured = true;
+        }
+      }
     }
     const cardContainer = this.createCardGameObject(
       cardSchema,
@@ -24668,7 +24833,9 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     container.setData("displayCardWidth", displayCardWidth);
     container.setData("displayCardHeight", displayCardHeight);
     if (isObscured) {
-      const cardBack = this.add.image(0, 0, "cardBack").setOrigin(0.5).setDisplaySize(FULL_CARD_WIDTH, FULL_CARD_HEIGHT);
+      const backWidth = area === "hand" ? FULL_CARD_WIDTH : MINION_CARD_WIDTH;
+      const backHeight = area === "hand" ? FULL_CARD_HEIGHT : MINION_CARD_HEIGHT;
+      const cardBack = this.add.image(0, 0, "cardBack").setOrigin(0.5).setDisplaySize(backWidth, backHeight);
       container.add(cardBack);
       return container;
     }
@@ -25376,7 +25543,7 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     this.dayPhaseText.setText(`Day ${day} - ${phase}`);
   }
   cleanupListeners() {
-    var _a9, _b, _c, _d, _e, _f, _g;
+    var _a9, _b, _c, _d, _e, _f, _g, _h, _i;
     console.log("BoardView: Cleaning up listeners.");
     this.listeners.forEach((unsub) => {
       if (typeof unsub === "function") {
@@ -25416,8 +25583,10 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     (_c = this.playerBrewsText) == null ? void 0 : _c.destroy();
     (_d = this.dayPhaseText) == null ? void 0 : _d.destroy();
     (_e = this.opponentUsernameText) == null ? void 0 : _e.destroy();
-    (_f = this.sellZone) == null ? void 0 : _f.destroy();
-    (_g = this.brewGainText) == null ? void 0 : _g.destroy();
+    (_f = this.phaseTimerText) == null ? void 0 : _f.destroy();
+    (_g = this.matchTimerText) == null ? void 0 : _g.destroy();
+    (_h = this.sellZone) == null ? void 0 : _h.destroy();
+    (_i = this.brewGainText) == null ? void 0 : _i.destroy();
     this.input.off("dragenter");
     this.input.off("dragleave");
     this.input.off("drop");

@@ -18,7 +18,7 @@ export class MainMenu extends Scene {
     let scale = Math.max(scaleX, scaleY);
     bg.setScale(scale).setScrollFactor(0);
 
-    this.add.text(Number(this.game.config.width) * 0.5, 300, "Legends of the Friend", {
+    this.add.text(Number(this.game.config.width) * 0.5, 300, "Legends of the Friendgroup", {
       fontFamily: "Arial Black",
       fontSize: 58,
       // yellow

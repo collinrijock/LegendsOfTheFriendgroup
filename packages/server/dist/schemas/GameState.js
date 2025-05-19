@@ -172,8 +172,10 @@ class GameState extends schema_1.Schema {
         // Optional: Server-controlled shop cards
         // @type([CardInstanceSchema])
         // shopCards = new ArraySchema<CardInstanceSchema>();
-        // Optional: Server-side battle timer
-        this.battleTimer = 0; // Countdown in seconds
+        // Timer for the current phase (Shop, Preparation, Battle)
+        this.phaseTimer = 0; // Countdown in seconds
+        // Match-long timer
+        this.matchTimer = 0; // Total elapsed seconds for the match
     }
 }
 exports.GameState = GameState;
@@ -192,4 +194,8 @@ __decorate([
 __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)
-], GameState.prototype, "battleTimer", void 0);
+], GameState.prototype, "phaseTimer", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], GameState.prototype, "matchTimer", void 0);

@@ -14,6 +14,12 @@ import * as path from 'path';
 const cardDatabasePath = path.join(__dirname, '../../src/data/cards.json');
 const cardDatabase = JSON.parse(fs.readFileSync(cardDatabasePath, 'utf8'));
 
+// --- Phase Duration Constants ---
+const SHOP_DURATION = 25; // seconds
+const PREPARATION_DURATION = 15; // seconds
+const BATTLE_DURATION = 45; // seconds
+// --- End Phase Duration Constants ---
+
 // --- Constants for Rewards ---
 // --- End Constants ---
 
@@ -30,7 +36,11 @@ export class GameRoom extends Room<GameState> {
 
   maxClients = 2; // Set max clients for 1v1
   battleEndTimeout: Delayed | null = null; // For delayed transition after battle ends
-  battleTimerInterval: Delayed | null = null; // For server-side battle timer countdown
+  // battleTimerInterval: Delayed | null = null; // Old name for battle phase timer and ticks
+  battleTickInterval: Delayed | null = null; // New name: For server-side battle timer countdown and attack ticks
+  genericPhaseTimerInterval: Delayed | null = null; // New: For Shop and Preparation phase timers
+  matchTimerInterval: Delayed | null = null; // For match-long timer
+  
   private cardAttackReadiness: Map<string, number> = new Map(); // instanceId -> msToNextAttack
   private generatePlayerShopOffers(player: PlayerState) {
     player.shopOfferIds.clear(); // Clear previous offers
@@ -609,9 +619,46 @@ export class GameRoom extends Room<GameState> {
       }
     }
   }
-
+  
   // --- Phase Transition Logic ---
-
+  
+  startGenericPhaseTimer() {
+    if (this.genericPhaseTimerInterval) this.genericPhaseTimerInterval.clear();
+    this.genericPhaseTimerInterval = this.clock.setInterval(() => {
+        // Ensure we are in a phase that uses this generic timer
+        if (this.state.currentPhase === Phase.Shop || this.state.currentPhase === Phase.Preparation) {
+            if (this.state.phaseTimer > 0) {
+                this.state.phaseTimer--;
+            }
+            // Check if timer reached zero AFTER decrementing
+            if (this.state.phaseTimer <= 0) {
+                if (this.genericPhaseTimerInterval) { // Check again before clearing, might have been cleared by checkPhaseTransition
+                    this.genericPhaseTimerInterval.clear();
+                    this.genericPhaseTimerInterval = null;
+                }
+                this.forcePhaseTransition();
+            }
+        } else {
+            // Phase changed unexpectedly (e.g. all players readied up), clear timer
+            if (this.genericPhaseTimerInterval) {
+                this.genericPhaseTimerInterval.clear();
+                this.genericPhaseTimerInterval = null;
+            }
+        }
+    }, 1000);
+  }
+  
+  forcePhaseTransition() {
+    // Check if the game is still in a phase that should be force transitioned
+    if (this.state.currentPhase === Phase.Shop || this.state.currentPhase === Phase.Preparation) {
+        console.log(`Phase timer for ${this.state.currentPhase} expired. Forcing transition.`);
+        this.state.players.forEach(p => p.isReady = true);
+        this.checkPhaseTransition(); // This will handle the actual phase change
+    } else {
+        console.log(`forcePhaseTransition called for ${this.state.currentPhase}, but it's not Shop or Preparation. Timer might have been cleared already.`);
+    }
+  }
+  
   checkPhaseTransition() {
     // First, check if we have enough players for phases other than Lobby or GameOver
     if (
@@ -648,6 +695,16 @@ export class GameRoom extends Room<GameState> {
       console.log(
         `All ${this.state.players.size} players ready. Transitioning from ${this.state.currentPhase}`
       );
+      // If transitioning because all players are ready (manually or forced by this.forcePhaseTransition)
+      // and it's from Shop or Prep, clear the generic timer if it's still running.
+      if (this.state.currentPhase === Phase.Shop || this.state.currentPhase === Phase.Preparation) {
+          if (this.genericPhaseTimerInterval) {
+              console.log(`All players ready for ${this.state.currentPhase}, clearing generic phase timer.`);
+              this.genericPhaseTimerInterval.clear();
+              this.genericPhaseTimerInterval = null;
+          }
+      }
+    
       switch (this.state.currentPhase) {
         case Phase.Lobby:
           if (this.state.players.size === this.maxClients) {
@@ -725,10 +782,17 @@ export class GameRoom extends Room<GameState> {
     });
     console.log(`--- End State Log ---`);
     // --- End Logging ---
-
+  
     const oldPhase = this.state.currentPhase;
     console.log(`Transitioning phase: ${oldPhase} -> ${newPhase}`);
-
+  
+    // Clear generic phase timer if it's running
+    if (this.genericPhaseTimerInterval) {
+        this.genericPhaseTimerInterval.clear();
+        this.genericPhaseTimerInterval = null;
+    }
+    // Note: battleTickInterval is cleared within endBattle or if phase changes unexpectedly from Battle.
+  
     // Reset shopRefreshCost when leaving Shop phase
     if (oldPhase === Phase.Shop && newPhase !== Phase.Shop) {
       this.state.players.forEach((player) => {
@@ -745,6 +809,24 @@ export class GameRoom extends Room<GameState> {
     this.state.players.forEach((player) => {
       player.isReady = false;
     });
+
+    // Start match timer when Day 1 Shop begins (transitioning from Lobby)
+    if (newPhase === Phase.Shop && this.state.currentDay === 1 && oldPhase === Phase.Lobby && !this.matchTimerInterval) {
+        console.log("Starting match timer for Day 1 Shop.");
+        this.state.matchTimer = 0;
+        this.matchTimerInterval = this.clock.setInterval(() => {
+            this.state.matchTimer++;
+        }, 1000);
+    }
+
+    // Stop match timer at GameOver
+    if (newPhase === Phase.GameOver) {
+        if (this.matchTimerInterval) {
+            this.matchTimerInterval.clear();
+            this.matchTimerInterval = null;
+            console.log("Match timer stopped at GameOver.");
+        }
+    }
 
     // --- Add Post-Transition Logging Here ---
     console.log(`--- State AFTER Transition to: ${newPhase} ---`);
@@ -766,31 +848,42 @@ export class GameRoom extends Room<GameState> {
     if (newPhase === Phase.Shop) {
       // currentDay is incremented in checkPhaseTransition for BattleEnd -> Shop
       // currentDay is set to 1 in checkPhaseTransition for Lobby -> Shop
-      // So, no need to set currentDay here explicitly unless it's a direct transition not covered by checkPhaseTransition
+      this.state.phaseTimer = SHOP_DURATION;
+      this.startGenericPhaseTimer();
       this.generateShopOffers(); // Generate new offers for each player
+    } else if (newPhase === Phase.Preparation) {
+        this.state.phaseTimer = PREPARATION_DURATION;
+        this.startGenericPhaseTimer();
+    } else if (newPhase === Phase.Battle) {
+      this.startBattle(); // startBattle will set and manage this.state.phaseTimer via battleTickInterval
+    } else {
+      // For phases like Lobby, BattleEnd, GameOver, there's no active countdown.
+      this.state.phaseTimer = 0;
     }
-    if (newPhase === Phase.Battle) {
-      this.startBattle();
-    }
+  
+    // Clean up battle-specific timers if transitioning out of Battle or BattleEnd
+    // The battleTickInterval is cleared in endBattle.
+    // The battleEndTimeout is for the delay in BattleEnd phase.
     if (newPhase === Phase.GameOver) {
-      // Clean up timers if any
-      if (this.battleTimerInterval) this.battleTimerInterval.clear();
+      if (this.battleTickInterval) this.battleTickInterval.clear(); // Should be cleared by endBattle already
       if (this.battleEndTimeout) this.battleEndTimeout.clear();
     }
-
+  
     console.log(
-      `Phase is now ${this.state.currentPhase}. Day: ${this.state.currentDay}. Players reset to not ready.`
+      `Phase is now ${this.state.currentPhase}. Day: ${this.state.currentDay}. Players reset to not ready. Phase Timer: ${this.state.phaseTimer}`
     );
   }
-
+  
   // --- Battle Logic ---
 
   startBattle() {
     console.log("Starting Battle Phase!");
-    this.state.battleTimer = 45; // Set battle duration
+    // this.state.battleTimer = 45; // Old: Set battle duration using battleTimer
+    this.state.phaseTimer = BATTLE_DURATION; // New: Set phaseTimer for battle
 
     // Clear previous interval if any
-    if (this.battleTimerInterval) this.battleTimerInterval.clear();
+    // if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Old name
+    if (this.battleTickInterval) this.battleTickInterval.clear(); // New name
 
     // --- Initialize card attack readiness ---
     this.cardAttackReadiness.clear();
@@ -806,161 +899,119 @@ export class GameRoom extends Room<GameState> {
     // --- End Initialize ---
 
     // Start server-side timer countdown
-    this.battleTimerInterval = this.clock.setInterval(() => {
+    // this.battleTimerInterval = this.clock.setInterval(() => { // Old name
+    this.battleTickInterval = this.clock.setInterval(() => { // New name
       if (this.state.currentPhase === Phase.Battle) {
         const delta = 1000; // Interval duration in ms
 
         // --- Server-Side Card Attack Simulation ---
-        const attacksThisTick: Array<{
-          attackerPlayerId: string;
-          attackerCard: CardInstanceSchema;
-          targetPlayerId: string;
-          targetCard: CardInstanceSchema;
-          damage: number;
+        // Step 1: Identify all attacks that will occur this tick and update readiness timers
+        const pendingAttacksThisTick: Array<{
+            attackerPlayerId: string;
+            attackerCard: CardInstanceSchema; // Reference to schema for attack value and other details
+            targetPlayerId: string;
+            targetCard: CardInstanceSchema;   // Reference to schema for target details
         }> = [];
 
         const playerIds = Array.from(this.state.players.keys());
         if (playerIds.length === 2) {
-          this.state.players.forEach((currentPlayer, currentPlayerId) => {
-            const opponentId = playerIds.find((id) => id !== currentPlayerId);
-            if (!opponentId) return;
-            const opponentPlayer = this.state.players.get(opponentId);
-            if (!opponentPlayer) return;
+            this.state.players.forEach((currentPlayer, currentPlayerId) => {
+                const opponentId = playerIds.find((id) => id !== currentPlayerId)!; // Should always find for 2 players
+                const opponentPlayer = this.state.players.get(opponentId)!; // Should always exist
 
-            const livingOpponentCards = Array.from(
-              opponentPlayer.battlefield.values()
-            ).filter((c) => c.currentHp > 0);
+                const livingOpponentCards = Array.from(opponentPlayer.battlefield.values()).filter((c) => c.currentHp > 0);
 
-            currentPlayer.battlefield.forEach((attackerCard) => {
-              if (attackerCard.currentHp <= 0) return; // Skip dead attackers
+                currentPlayer.battlefield.forEach((attackerCard) => {
+                    if (attackerCard.currentHp <= 0) return; // Skip dead attackers
 
-              let timeToNext =
-                this.cardAttackReadiness.get(attackerCard.instanceId) ||
-                (attackerCard.speed > 0 ? attackerCard.speed : 1.5) * 1000;
-              timeToNext -= delta;
+                    // Get existing timeToNextAttack or initialize if not present (e.g. card just appeared)
+                    // Default to 0 (ready now) if not in map, though it should be initialized in startBattle.
+                    let timeToNextAttack = this.cardAttackReadiness.get(attackerCard.instanceId) || 0;
+                    timeToNextAttack -= delta;
 
-              if (timeToNext <= 0) {
-                if (livingOpponentCards.length > 0) {
-                  const targetCard =
-                    livingOpponentCards[
-                      Math.floor(Math.random() * livingOpponentCards.length)
-                    ];
-                  attacksThisTick.push({
-                    attackerPlayerId: currentPlayerId,
-                    attackerCard: attackerCard,
-                    targetPlayerId: opponentId,
-                    targetCard: targetCard,
-                    damage: attackerCard.attack,
-                  });
-                }
-                // Reset timer regardless of whether a target was found
-                const speedInMs =
-                  (attackerCard.speed > 0 ? attackerCard.speed : 1.5) * 1000;
-                this.cardAttackReadiness.set(
-                  attackerCard.instanceId,
-                  speedInMs
-                );
-              } else {
-                this.cardAttackReadiness.set(
-                  attackerCard.instanceId,
-                  timeToNext
-                );
-              }
-            });
-          });
-
-          // Process collected attacks
-          attacksThisTick.forEach((attack) => {
-            // attack.targetCard is the CardInstanceSchema object from the state.
-            // attack.attackerCard is the CardInstanceSchema object from the state.
-
-            // Ensure the attacker and target are still valid and alive.
-            const attackerPlayer = this.state.players.get(
-              attack.attackerPlayerId
-            );
-            const targetPlayer = this.state.players.get(attack.targetPlayerId);
-
-            if (attackerPlayer && targetPlayer) {
-              // Verify the attacker is still on their board and alive
-              let currentAttackerOnBoard: CardInstanceSchema | undefined;
-              attackerPlayer.battlefield.forEach((card) => {
-                if (
-                  card.instanceId === attack.attackerCard.instanceId &&
-                  card.currentHp > 0
-                ) {
-                  currentAttackerOnBoard = card;
-                }
-              });
-
-              // Verify the target is still on their board and alive
-              let currentTargetOnBoard: CardInstanceSchema | undefined;
-              let foundTargetCardDataForLog: {
-                id: string;
-                hp: number;
-                name: string;
-              } | null = null;
-
-              targetPlayer.battlefield.forEach((card) => {
-                if (card.instanceId === attack.targetCard.instanceId) {
-                  foundTargetCardDataForLog = {
-                    id: card.instanceId,
-                    hp: card.currentHp,
-                    name: card.name,
-                  };
-                  if (card.currentHp > 0) {
-                    currentTargetOnBoard = card;
-                  }
-                }
-              });
-
-              if (!currentAttackerOnBoard) {
-                console.log(
-                  `[SERVER BATTLE DEBUG] Attacker ${attack.attackerCard.name} (ID: ${attack.attackerCard.instanceId}, Player: ${attackerPlayer.username}) not found on board or not alive for processing attack.`
-                );
-              }
-              if (!foundTargetCardDataForLog) {
-                console.log(
-                  `[SERVER BATTLE DEBUG] Target card (ID: ${attack.targetCard.instanceId}) not found on ${targetPlayer.username}'s battlefield when processing attack from ${attack.attackerCard.name}.`
-                );
-              } else if (!currentTargetOnBoard) {
-                console.log(
-                  `[SERVER BATTLE DEBUG] Target ${foundTargetCardDataForLog} Attack by ${
-                    currentAttackerOnBoard?.name || attack.attackerCard.name
-                  } aborted.`
-                );
-              }
-
-              if (currentAttackerOnBoard && currentTargetOnBoard) {
-                const oldHp = currentTargetOnBoard.currentHp;
-                console.log(
-                  `[SERVER BATTLE DEBUG] Applying damage: Target ${currentTargetOnBoard.name} (Player: ${targetPlayer.username}) HP before: ${oldHp}, Damage from ${currentAttackerOnBoard.name} (Player: ${attackerPlayer.username}): ${attack.damage}`
-                );
-                currentTargetOnBoard.currentHp = Math.max(
-                  0,
-                  currentTargetOnBoard.currentHp - attack.damage
-                );
-                console.log(
-                  `[SERVER BATTLE] ${currentAttackerOnBoard.name} (P: ${attackerPlayer.username}) attacks ${currentTargetOnBoard.name} (P: ${targetPlayer.username}) for ${attack.damage} damage. HP: ${oldHp} -> ${currentTargetOnBoard.currentHp}`
-                );
-
-                // Broadcast the attack event to all clients
-                this.broadcast("battleAttackEvent", {
-                  attackerInstanceId: currentAttackerOnBoard.instanceId,
-                  targetInstanceId: currentTargetOnBoard.instanceId,
-                  damageDealt: attack.damage,
-                  attackerPlayerId: attack.attackerPlayerId,
-                  targetPlayerId: attack.targetPlayerId,
+                    if (timeToNextAttack <= 0) {
+                        // Card is ready to attack
+                        if (livingOpponentCards.length > 0) {
+                            const targetCard = livingOpponentCards[Math.floor(Math.random() * livingOpponentCards.length)];
+                            pendingAttacksThisTick.push({
+                                attackerPlayerId: currentPlayerId,
+                                attackerCard: attackerCard,
+                                targetPlayerId: opponentId,
+                                targetCard: targetCard,
+                            });
+                        }
+                        // Reset timer for next attack, accounting for any "overdue" time
+                        const speedInMs = (attackerCard.speed > 0 ? attackerCard.speed : 1.5) * 1000;
+                        this.cardAttackReadiness.set(attackerCard.instanceId, speedInMs + timeToNextAttack);
+                    } else {
+                        // Update timer if not yet ready
+                        this.cardAttackReadiness.set(attackerCard.instanceId, timeToNextAttack);
+                    }
                 });
-              }
-            }
-          });
+            });
         }
+
+        // Step 2: Calculate total damage for each target from all pending attacks
+        const damageToApplyToTargets: Map<string, { totalDamage: number, sources: Array<{attackerPlayerId: string, attackerInstanceId: string, damageFromSource: number}> }> = new Map();
+
+        pendingAttacksThisTick.forEach(attack => {
+            // Attacker and target references (attack.attackerCard, attack.targetCard) are from the state when pendingAttacksThisTick was populated.
+            // Their currentHp is relevant for their own survival but attack value is fixed for this tick.
+            if (attack.attackerCard.currentHp > 0) { // Attacker must still be alive to deal damage
+                const targetInstanceId = attack.targetCard.instanceId;
+                const damageFromThisAttack = attack.attackerCard.attack;
+
+                if (!damageToApplyToTargets.has(targetInstanceId)) {
+                    damageToApplyToTargets.set(targetInstanceId, { totalDamage: 0, sources: [] });
+                }
+                const currentTargetDamageInfo = damageToApplyToTargets.get(targetInstanceId)!;
+                currentTargetDamageInfo.totalDamage += damageFromThisAttack;
+                currentTargetDamageInfo.sources.push({
+                    attackerPlayerId: attack.attackerPlayerId,
+                    attackerInstanceId: attack.attackerCard.instanceId,
+                    damageFromSource: damageFromThisAttack
+                });
+            }
+        });
+
+        // Step 3: Apply all calculated damage to targets and broadcast events
+        damageToApplyToTargets.forEach((damageInfo, targetInstanceId) => {
+            let targetCardSchema: CardInstanceSchema | undefined;
+            let targetPlayerIdForEvent: string | undefined;
+
+            // Find the target card schema in the current state to apply damage
+            this.state.players.forEach((p, pId) => {
+                p.battlefield.forEach(card => {
+                    if (card.instanceId === targetInstanceId) {
+                        targetCardSchema = card;
+                        targetPlayerIdForEvent = pId;
+                    }
+                });
+            });
+
+            if (targetCardSchema && targetPlayerIdForEvent) {
+                const oldHp = targetCardSchema.currentHp;
+                // Only apply damage if target is still alive (could be killed by another effect, though not currently possible)
+                if (oldHp > 0) {
+                    targetCardSchema.currentHp = Math.max(0, oldHp - damageInfo.totalDamage);
+                    console.log(`[SERVER BATTLE] ${targetCardSchema.name} (P: ${this.state.players.get(targetPlayerIdForEvent)?.username}) takes ${damageInfo.totalDamage} total damage. HP: ${oldHp} -> ${targetCardSchema.currentHp}`);
+
+                    // Broadcast individual attack events that contributed to this damage
+                    damageInfo.sources.forEach(source => {
+                        this.broadcast("battleAttackEvent", {
+                            attackerInstanceId: source.attackerInstanceId,
+                            targetInstanceId: targetInstanceId,
+                            damageDealt: source.damageFromSource,
+                            attackerPlayerId: source.attackerPlayerId,
+                            targetPlayerId: targetPlayerIdForEvent!,
+                        });
+                    });
+                }
+            }
+        });
         // --- End Server-Side Card Attack Simulation ---
 
         // --- Check for Battle End by Board Clear ---
-        // let player1Cleared = true; // Old logic
-        // let player2Cleared = true; // Old logic
-        // const playerIds = Array.from(this.state.players.keys()); // Already defined above
         if (playerIds.length === 2) {
           const player1 = this.state.players.get(playerIds[0]);
           const player2 = this.state.players.get(playerIds[1]);
@@ -973,36 +1024,35 @@ export class GameRoom extends Room<GameState> {
               player2.battlefield.values()
             ).some((c) => c.currentHp > 0);
 
-            const player1BoardWasPopulated = player1.battlefield.size > 0;
-            const player2BoardWasPopulated = player2.battlefield.size > 0;
-
-            // End condition:
-            // A player's board was populated AND they now have no living cards.
-            if (
-              (player1BoardWasPopulated && !player1HasLivingCards) ||
-              (player2BoardWasPopulated && !player2HasLivingCards)
-            ) {
+            // Removed player1BoardWasPopulated and player2BoardWasPopulated checks.
+            // New condition: if either player (or both) has no living cards, the battle might end.
+            if (!player1HasLivingCards || !player2HasLivingCards) {
               console.log(
-                `Battle timer loop: Board clear condition met. P1 HasLiving: ${player1HasLivingCards} (WasPopulated: ${player1BoardWasPopulated}), P2 HasLiving: ${player2HasLivingCards} (WasPopulated: ${player2BoardWasPopulated}). Calling endBattle.`
+                `Battle timer loop: Potential board clear condition met. P1 HasLiving: ${player1HasLivingCards}, P2 HasLiving: ${player2HasLivingCards}. Calling endBattle.`
               );
-              this.endBattle(false); // End battle, not due to timeout
+              this.endBattle(false); // End battle, not due to timeout. endBattle will determine winner/loser/draw.
               return; // Stop further processing for this interval tick
             }
           }
         }
         // --- End Board Clear Check ---
 
-        this.state.battleTimer--;
-        // console.log(`Battle timer: ${this.state.battleTimer}`); // Optional: Log countdown
-        if (this.state.battleTimer <= 0) {
+        // Decrement phaseTimer for Battle phase
+        if (this.state.phaseTimer > 0) {
+            this.state.phaseTimer--;
+        }
+        // console.log(`Battle phase timer: ${this.state.phaseTimer}`); // Optional: Log countdown
+
+        if (this.state.phaseTimer <= 0) {
           console.log(
-            "Battle timer loop: Timer reached zero. Calling endBattle."
+            "Battle phase timer loop: Timer reached zero. Calling endBattle."
           ); // Log before call
           this.endBattle(true); // End battle due to time limit
         }
         // TODO: Add check for board empty condition if needed
       } else {
-        if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Stop timer if phase changed unexpectedly
+        // if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Stop timer if phase changed unexpectedly // Old name
+        if (this.battleTickInterval) this.battleTickInterval.clear(); // New name
       }
     }, 1000); // Update every second
   }
@@ -1029,10 +1079,10 @@ export class GameRoom extends Room<GameState> {
     console.log(
       `--- Starting endBattle --- Phase changed from ${previousPhaseForBattleEnd} to ${this.state.currentPhase}`
     );
-
+    
     console.log(`Ending Battle Phase. Timeout: ${timeoutReached}`);
-    if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Stop the timer
-
+    if (this.battleTickInterval) this.battleTickInterval.clear(); // Stop the timer
+    
     // --- Calculate Results (Server-Side) ---
     let player1SessionId = "";
     let player2SessionId = "";
@@ -1362,5 +1412,16 @@ export class GameRoom extends Room<GameState> {
   // Utility to get card data from the "database"
   getCardDataById(cardId: string): any | null {
     return cardDatabase.find((card: { id: any }) => card.id === cardId) || null;
+  }
+  
+  onDispose() {
+    console.log("GameRoom disposed.");
+    if (this.battleTickInterval) this.battleTickInterval.clear();
+    if (this.genericPhaseTimerInterval) this.genericPhaseTimerInterval.clear();
+    if (this.battleEndTimeout) this.battleEndTimeout.clear();
+    if (this.matchTimerInterval) {
+        this.matchTimerInterval.clear();
+        this.matchTimerInterval = null;
+    }
   }
 }

@@ -89,7 +89,11 @@ export class GameState extends Schema {
   // @type([CardInstanceSchema])
   // shopCards = new ArraySchema<CardInstanceSchema>();
 
-  // Optional: Server-side battle timer
+  // Timer for the current phase (Shop, Preparation, Battle)
   @type("number")
-  battleTimer: number = 0; // Countdown in seconds
+  phaseTimer: number = 0; // Countdown in seconds
+
+  // Match-long timer
+  @type("number")
+  matchTimer: number = 0; // Total elapsed seconds for the match
 }

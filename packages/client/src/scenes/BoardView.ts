@@ -49,6 +49,8 @@ export class BoardView extends Scene {
   > = new Map();
 
   private currentPhase: Phase = Phase.Lobby; // Add currentPhase property
+  private opponentBattlefieldSnapshotAtPrepStart: Map<string, Set<string>> =
+    new Map(); // sessionId -> Set<instanceId>
 
   // Add sell zone properties
   private sellZone!: Phaser.GameObjects.Container;
@@ -62,6 +64,8 @@ export class BoardView extends Scene {
   private playerBrewsText!: Phaser.GameObjects.Text;
   private dayPhaseText!: Phaser.GameObjects.Text;
   private opponentUsernameText!: Phaser.GameObjects.Text; // For opponent's name
+  private phaseTimerText!: Phaser.GameObjects.Text; // For phase timer display
+  private matchTimerText!: Phaser.GameObjects.Text; // For match-long timer display
 
   // Listeners
   private listeners: Array<() => void> = [];
@@ -69,6 +73,15 @@ export class BoardView extends Scene {
 
   constructor() {
     super("BoardView");
+  }
+
+  private formatTime(totalSeconds: number): string {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+      2,
+      "0"
+    )}`;
   }
 
   private updateCardHpVisuals(
@@ -224,6 +237,19 @@ export class BoardView extends Scene {
       })
       .setOrigin(0.5)
       .setDepth(1001);
+
+    this.phaseTimerText = this.add
+      .text(gameWidth * 0.65, navbarY, `Timer: --`, {
+        // Positioned to the right of day/phase
+        ...navTextStyle,
+        fontSize: 24,
+        align: "left", // Or center if preferred
+        stroke: "#000000",
+        strokeThickness: 4,
+      })
+      .setOrigin(0, 0.5) // Adjust origin if centered: .setOrigin(0.5)
+      .setDepth(1001)
+      .setVisible(false); // Initially hidden, shown by phase logic
   }
 
   private showAttackAnimation(cardInstanceId: string) {
@@ -321,121 +347,153 @@ export class BoardView extends Scene {
       $(colyseusRoom.state).listen("currentDay", () => this.updateNavbarText())
     );
     this.listeners.push(
-      $(colyseusRoom.state).listen("currentPhase", (newPhase, oldPhase) => {
-        // Added oldPhase
-        this.currentPhase = newPhase as Phase; // Update currentPhase
-        this.updateNavbarText();
+      $(colyseusRoom.state).listen(
+        "currentPhase",
+        (newPhaseVal, oldPhaseVal) => {
+          const newPhase = newPhaseVal as Phase;
+          const oldPhase = oldPhaseVal as Phase;
+          const previousPhaseIsPrep = oldPhase === Phase.Preparation;
+          this.currentPhase = newPhase;
+          this.updateNavbarText(); // This will update day/phase text
 
-        // Show/hide sell zone based on phase
-        if (newPhase === Phase.Shop || newPhase === Phase.Preparation) {
-          this.sellZone.setVisible(true);
-        } else {
-          this.sellZone.setVisible(false);
-        }
+          // Show/hide sell zone based on phase
+          if (newPhase === Phase.Shop || newPhase === Phase.Preparation) {
+            this.sellZone.setVisible(true);
+          } else {
+            this.sellZone.setVisible(false);
+          }
 
-        const processCardVisualsPostBattle = (
-          cardContainer: Phaser.GameObjects.Container,
-          cardSchema: any | undefined,
-          ownerSessionId: string,
-          slotKey: string
-        ) => {
-          if (!cardContainer.active) return;
+          // Update phase timer display based on new phase
+          if (this.phaseTimerText && this.phaseTimerText.active) {
+            const timedPhases = [Phase.Shop, Phase.Preparation, Phase.Battle];
+            if (timedPhases.includes(newPhase)) {
+              // Set initial text for the new phase, actual countdown handled by phaseTimer listener
+              this.phaseTimerText.setText(
+                `Timer: ${colyseusRoom?.state.phaseTimer ?? "--"}`
+              );
+              this.phaseTimerText.setVisible(true);
+            } else {
+              this.phaseTimerText.setVisible(false);
+            }
+          }
 
-          const cooldownBarBg = cardContainer.getData(
-            "cooldownBarBg"
-          ) as Phaser.GameObjects.Rectangle;
-          const cooldownBarFill = cardContainer.getData(
-            "cooldownBarFill"
-          ) as Phaser.GameObjects.Rectangle;
-
-          if (newPhase === Phase.Battle) {
-            const cardArea = cardContainer.getData("area");
-            if (cardArea === "battlefield") {
-              if (cardSchema) {
-                if (cooldownBarBg && cooldownBarFill) {
-                  cooldownBarBg.setVisible(true);
-                  cooldownBarFill.setVisible(true);
-
-                  // Get the cooldown bar width from the card's data or use a fallback
-                  const storedWidth = cardContainer.getData(
-                    "cooldownBarBaseWidth"
+          // Snapshotting and re-rendering logic based on phase transitions
+          if (newPhase === Phase.Preparation) {
+            // Transitioning into Preparation phase
+            colyseusRoom!.state.players.forEach(
+              (player: ClientPlayerState, sessionId: string) => {
+                if (sessionId !== colyseusRoom?.sessionId) {
+                  // If opponent
+                  const snapshotSet = new Set<string>();
+                  player.battlefield.forEach((cardSchema) => {
+                    snapshotSet.add(cardSchema.instanceId);
+                  });
+                  this.opponentBattlefieldSnapshotAtPrepStart.set(
+                    sessionId,
+                    snapshotSet
                   );
-                  const cooldownBarBaseWidth =
-                    typeof storedWidth === "number"
-                      ? storedWidth
-                      : MINION_CARD_WIDTH - 10;
-                  cooldownBarFill.setSize(cooldownBarBaseWidth, 6); // Use the retrieved width value
+                  console.log(
+                    `BoardView: Snapshot for opponent ${sessionId} at Prep start:`,
+                    Array.from(snapshotSet)
+                  );
 
-                  const maxCooldown =
-                    (cardSchema.speed > 0 ? cardSchema.speed : 1.5) * 1000;
-                  cardContainer.setData("maxAttackCooldown", maxCooldown);
-                  cardContainer.setData("attackCooldownTimer", maxCooldown);
+                  // Re-render opponent's battlefield cards to apply initial Prep visuals
+                  player.battlefield.forEach((cardSchema, slotKey) => {
+                    this.updateCardVisual(
+                      sessionId,
+                      "battlefield",
+                      slotKey,
+                      cardSchema
+                    );
+                  });
+                }
+              }
+            );
+          } else if (newPhase === Phase.Battle && previousPhaseIsPrep) {
+            // Transitioning from Prep to Battle: Re-render opponent's battlefield cards to make them visible
+            colyseusRoom!.state.players.forEach(
+              (player: ClientPlayerState, sessionId: string) => {
+                if (sessionId !== colyseusRoom?.sessionId) {
+                  // If opponent
+                  player.battlefield.forEach((cardSchema, slotKey) => {
+                    this.updateCardVisual(
+                      sessionId,
+                      "battlefield",
+                      slotKey,
+                      cardSchema
+                    );
+                  });
+                }
+              }
+            );
+            // Optionally clear snapshots now, or wait until next Prep phase
+            // this.opponentBattlefieldSnapshotAtPrepStart.clear();
+          }
+
+          const processCardVisualsPostBattle = (
+            cardContainer: Phaser.GameObjects.Container,
+            cardSchema: any | undefined,
+            ownerSessionId: string,
+            slotKey: string
+          ) => {
+            if (!cardContainer.active) return;
+
+            const cooldownBarBg = cardContainer.getData(
+              "cooldownBarBg"
+            ) as Phaser.GameObjects.Rectangle;
+            const cooldownBarFill = cardContainer.getData(
+              "cooldownBarFill"
+            ) as Phaser.GameObjects.Rectangle;
+
+            if (newPhase === Phase.Battle) {
+              const cardArea = cardContainer.getData("area");
+              if (cardArea === "battlefield") {
+                if (cardSchema) {
+                  if (cooldownBarBg && cooldownBarFill) {
+                    cooldownBarBg.setVisible(true);
+                    cooldownBarFill.setVisible(true);
+
+                    // Get the cooldown bar width from the card's data or use a fallback
+                    const storedWidth = cardContainer.getData(
+                      "cooldownBarBaseWidth"
+                    );
+                    const cooldownBarBaseWidth =
+                      typeof storedWidth === "number"
+                        ? storedWidth
+                        : MINION_CARD_WIDTH - 10;
+                    cooldownBarFill.setSize(cooldownBarBaseWidth, 6); // Use the retrieved width value
+
+                    const maxCooldown =
+                      (cardSchema.speed > 0 ? cardSchema.speed : 1.5) * 1000;
+                    cardContainer.setData("maxAttackCooldown", maxCooldown);
+                    cardContainer.setData("attackCooldownTimer", maxCooldown);
+                  } else {
+                    console.warn(
+                      `BoardView: Battle Phase - Card ${
+                        cardSchema.instanceId
+                      } (Owner: ${ownerSessionId}, Slot: ${slotKey}) missing cooldown bar elements in data. Bg: ${!!cooldownBarBg}, Fill: ${!!cooldownBarFill}`
+                    );
+                  }
                 } else {
                   console.warn(
-                    `BoardView: Battle Phase - Card ${
-                      cardSchema.instanceId
-                    } (Owner: ${ownerSessionId}, Slot: ${slotKey}) missing cooldown bar elements in data. Bg: ${!!cooldownBarBg}, Fill: ${!!cooldownBarFill}`
+                    `BoardView: Battle Phase - Battlefield card container (Owner: ${ownerSessionId}, Slot: ${slotKey}) has no cardSchema. No cooldown bar shown.`
                   );
                 }
               } else {
-                console.warn(
-                  `BoardView: Battle Phase - Battlefield card container (Owner: ${ownerSessionId}, Slot: ${slotKey}) has no cardSchema. No cooldown bar shown.`
-                );
+                // This case should ideally not happen if we are iterating only battlefield cards, but good for diagnostics
+                // console.warn(`BoardView: Battle Phase - Card container (Owner: ${ownerSessionId}, Slot: ${slotKey}) has area '${cardArea}' instead of 'battlefield'. No cooldown bar shown.`);
               }
             } else {
-              // This case should ideally not happen if we are iterating only battlefield cards, but good for diagnostics
-              // console.warn(`BoardView: Battle Phase - Card container (Owner: ${ownerSessionId}, Slot: ${slotKey}) has area '${cardArea}' instead of 'battlefield'. No cooldown bar shown.`);
+              // Not in Battle phase
+              if (cooldownBarBg) cooldownBarBg.setVisible(false);
+              if (cooldownBarFill) cooldownBarFill.setVisible(false);
             }
-          } else {
-            // Not in Battle phase
-            if (cooldownBarBg) cooldownBarBg.setVisible(false);
-            if (cooldownBarFill) cooldownBarFill.setVisible(false);
-          }
 
-          // Reset visuals if transitioning out of battle phases
-          if (oldPhase === Phase.Battle || oldPhase === Phase.BattleEnd) {
-            if (newPhase !== Phase.Battle && newPhase !== Phase.BattleEnd) {
-              if (cardSchema && cardSchema.currentHp > 0) {
-                // Only reset if alive
-                cardContainer.setAlpha(1.0);
-                const mainCardImage = cardContainer.getData(
-                  // Changed from bgRect
-                  "mainCardImage"
-                ) as Phaser.GameObjects.Image;
-                if (
-                  mainCardImage &&
-                  mainCardImage.active &&
-                  typeof mainCardImage.clearTint === "function"
-                ) {
-                  mainCardImage.clearTint();
-                }
-              }
-              // If cardSchema.currentHp <= 0, it should already be tinted/dimmed by HP listener
-            }
-          }
-        };
-
-        this.playerVisuals.forEach((playerData, playerId) => {
-          playerData.battlefield.forEach((cardContainer, slotKey) => {
-            const cardSchema = colyseusRoom?.state.players
-              .get(playerId)
-              ?.battlefield.get(slotKey) as ClientCardInstance | undefined; // Use ClientCardInstance
-            processCardVisualsPostBattle(
-              cardContainer,
-              cardSchema,
-              playerId,
-              slotKey
-            );
-          });
-          // Hand cards generally don't have cooldown bars or battle-specific states other than HP
-          playerData.hand.forEach((cardContainer, slotKey) => {
-            const cardSchema = colyseusRoom?.state.players
-              .get(playerId)
-              ?.hand.get(slotKey) as ClientCardInstance | undefined; // Use ClientCardInstance
-            // Process hand cards if they need any visual reset (e.g. if they could be 'dead' visually)
+            // Reset visuals if transitioning out of battle phases
             if (oldPhase === Phase.Battle || oldPhase === Phase.BattleEnd) {
               if (newPhase !== Phase.Battle && newPhase !== Phase.BattleEnd) {
                 if (cardSchema && cardSchema.currentHp > 0) {
+                  // Only reset if alive
                   cardContainer.setAlpha(1.0);
                   const mainCardImage = cardContainer.getData(
                     // Changed from bgRect
@@ -449,22 +507,104 @@ export class BoardView extends Scene {
                     mainCardImage.clearTint();
                   }
                 }
+                // If cardSchema.currentHp <= 0, it should already be tinted/dimmed by HP listener
               }
             }
+          };
+
+          this.playerVisuals.forEach((playerData, playerId) => {
+            playerData.battlefield.forEach((cardContainer, slotKey) => {
+              const cardSchema = colyseusRoom?.state.players
+                .get(playerId)
+                ?.battlefield.get(slotKey) as ClientCardInstance | undefined; // Use ClientCardInstance
+              processCardVisualsPostBattle(
+                cardContainer,
+                cardSchema,
+                playerId,
+                slotKey
+              );
+            });
+            // Hand cards generally don't have cooldown bars or battle-specific states other than HP
+            playerData.hand.forEach((cardContainer, slotKey) => {
+              const cardSchema = colyseusRoom?.state.players
+                .get(playerId)
+                ?.hand.get(slotKey) as ClientCardInstance | undefined; // Use ClientCardInstance
+              // Process hand cards if they need any visual reset (e.g. if they could be 'dead' visually)
+              if (oldPhase === Phase.Battle || oldPhase === Phase.BattleEnd) {
+                if (newPhase !== Phase.Battle && newPhase !== Phase.BattleEnd) {
+                  if (cardSchema && cardSchema.currentHp > 0) {
+                    cardContainer.setAlpha(1.0);
+                    const mainCardImage = cardContainer.getData(
+                      // Changed from bgRect
+                      "mainCardImage"
+                    ) as Phaser.GameObjects.Image;
+                    if (
+                      mainCardImage &&
+                      mainCardImage.active &&
+                      typeof mainCardImage.clearTint === "function"
+                    ) {
+                      mainCardImage.clearTint();
+                    }
+                  }
+                }
+              }
+            });
           });
-        });
+        }
+      )
+    );
+
+    this.listeners.push(
+      $(colyseusRoom.state).listen("phaseTimer", (newTime: number) => {
+        if (
+          this.phaseTimerText &&
+          this.phaseTimerText.active &&
+          this.phaseTimerText.visible
+        ) {
+          // Only update if the text is supposed to be visible for the current phase
+          const timedPhases = [Phase.Shop, Phase.Preparation, Phase.Battle];
+          if (timedPhases.includes(this.currentPhase as Phase)) {
+            if (newTime >= 0) {
+              // Show 0 before it disappears or phase changes
+              this.phaseTimerText.setText(`Timer: ${newTime}`);
+            }
+          }
+        }
+      })
+    );
+
+    this.listeners.push(
+      $(colyseusRoom.state).listen("matchTimer", (newTime: number) => {
+        if (this.matchTimerText && this.matchTimerText.active) {
+          if (
+            newTime > 0 ||
+            (colyseusRoom?.state.currentPhase !== Phase.Lobby &&
+              colyseusRoom?.state.currentPhase !== Phase.GameOver)
+          ) {
+            this.matchTimerText.setText(`Match: ${this.formatTime(newTime)}`);
+            this.matchTimerText.setVisible(true);
+          } else if (colyseusRoom?.state.currentPhase === Phase.GameOver) {
+            // Keep visible at game over to show final time, or hide if preferred
+            this.matchTimerText.setText(`Match: ${this.formatTime(newTime)}`);
+            this.matchTimerText.setVisible(true);
+          } else {
+            this.matchTimerText.setVisible(false);
+          }
+        }
       })
     );
 
     this.listeners.push(
       $(colyseusRoom.state.players).onAdd(
-        (player: ClientPlayerState, sessionId: string) => {
-          console.log(`BoardView: Player added ${sessionId}`);
-          this.addPlayerVisuals(sessionId);
-          this.addPlayerListeners(player, sessionId);
-          this.updatePlayerSlots(player, sessionId); // Initial population
-          this.updateNavbarText(); // Update opponent name if they joined
-        }
+        $(colyseusRoom.state.players).onAdd(
+          (player: ClientPlayerState, sessionId: string) => {
+            console.log(`BoardView: Player added ${sessionId}`);
+            this.addPlayerVisuals(sessionId);
+            this.addPlayerListeners(player, sessionId);
+            this.updatePlayerSlots(player, sessionId); // Initial population
+            this.updateNavbarText(); // Update opponent name if they joined
+          }
+        )
       )
     );
 
@@ -794,6 +934,7 @@ export class BoardView extends Scene {
       visuals.battlefieldSlotOutlines.forEach((outline) => outline.destroy());
     }
     this.playerVisuals.delete(sessionId);
+    this.opponentBattlefieldSnapshotAtPrepStart.delete(sessionId); // Clear snapshot for removed player
   }
 
   private updateCardVisual(
@@ -822,10 +963,22 @@ export class BoardView extends Scene {
 
     if (area === "hand") {
       y = isLocalPlayer ? HAND_Y_PLAYER : HAND_Y_OPPONENT;
-      if (!isLocalPlayer) isObscured = true;
+      if (!isLocalPlayer) {
+        isObscured = true; // Opponent's hand is always obscured
+      }
     } else {
       // battlefield
       y = isLocalPlayer ? BATTLEFIELD_Y_PLAYER : BATTLEFIELD_Y_OPPONENT;
+      if (!isLocalPlayer && this.currentPhase === Phase.Preparation) {
+        // If it's an opponent's card on their battlefield during Preparation phase
+        const snapshot =
+          this.opponentBattlefieldSnapshotAtPrepStart.get(sessionId);
+        if (snapshot && snapshot.has(cardSchema.instanceId)) {
+          isObscured = false; // Card was in snapshot (existed at Prep start), so visible
+        } else {
+          isObscured = true; // Card not in snapshot (newly played in Prep) or no snapshot, so obscure
+        }
+      }
     }
 
     const cardContainer = this.createCardGameObject(
@@ -951,12 +1104,17 @@ export class BoardView extends Scene {
     container.setData("displayCardHeight", displayCardHeight);
 
     if (isObscured) {
-      // For obscured opponent hand cards, use FULL_CARD dimensions for the card back
+      // Determine dimensions for the card back based on the area
+      const backWidth = area === "hand" ? FULL_CARD_WIDTH : MINION_CARD_WIDTH;
+      const backHeight =
+        area === "hand" ? FULL_CARD_HEIGHT : MINION_CARD_HEIGHT;
+
       const cardBack = this.add
         .image(0, 0, "cardBack")
         .setOrigin(0.5)
-        .setDisplaySize(FULL_CARD_WIDTH, FULL_CARD_HEIGHT);
+        .setDisplaySize(backWidth, backHeight);
       container.add(cardBack);
+      // Data like instanceId, slotKey, area, ownerSessionId will be set by the caller (updateCardVisual)
       return container;
     }
 
@@ -1979,6 +2137,8 @@ export class BoardView extends Scene {
     this.playerBrewsText?.destroy();
     this.dayPhaseText?.destroy();
     this.opponentUsernameText?.destroy();
+    this.phaseTimerText?.destroy(); // Destroy phase timer text
+    this.matchTimerText?.destroy(); // Destroy match timer text
 
     // Clean up sell zone elements
     this.sellZone?.destroy();

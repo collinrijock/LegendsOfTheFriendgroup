@@ -6,6 +6,13 @@ import { Phase, ClientPlayerState, ClientCardInstance } from "../schemas/ClientS
 // Import getStateCallbacks for 0.16 listener syntax
 import { getStateCallbacks } from "colyseus.js";
 
+// Helper function to format seconds into MM:SS
+function formatTime(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 export class Battle extends Scene {
   private handCardDisplayObjects: Map<string, (Phaser.GameObjects.Text | null)[]> = new Map(); // Display opponent hand? Maybe just placeholders.
 
@@ -110,26 +117,33 @@ export class Battle extends Scene {
     let opponentState: ClientPlayerState | undefined;
     colyseusRoom?.state.players.forEach((p: any, sid: string) => { if (sid !== colyseusRoom?.sessionId) opponentState = p as ClientPlayerState; });
 
-    let resultMessage = "Battle Ended";
-    let resultColor = "#ffffff";
+    let mainMessage = "Battle Complete!";
+    let winnerInfoMessage = "";
+    let resultColor = "#ffffff"; // Default color
+
     if (myPlayerState && opponentState) {
         if (myPlayerState.health > opponentState.health) {
-             resultMessage = "Victory!";
-             resultColor = "#88ff88";
+             winnerInfoMessage = `${myPlayerState.username} Wins!`;
+             resultColor = "#88ff88"; // Green for local player win
         } else if (opponentState.health > myPlayerState.health) {
-             resultMessage = "Defeat!";
-             resultColor = "#ff8888";
+             winnerInfoMessage = `${opponentState.username} Wins!`;
+             resultColor = "#ff8888"; // Red for local player loss
         } else {
-             resultMessage = "Draw!";
-             resultColor = "#ffff88";
+             winnerInfoMessage = "Draw!";
+             resultColor = "#ffff88"; // Yellow for draw
         }
-    } else {
-        resultMessage = "Battle Ended (Opponent Left?)";
+    } else if (myPlayerState) { // Opponent likely left
+        winnerInfoMessage = `${myPlayerState.username} Wins! (Opponent Left)`;
+        resultColor = "#88ff88";
+    } else { // Should not happen if myPlayerState is the local player
+        winnerInfoMessage = "(Error determining outcome)";
         resultColor = "#ffffff";
     }
 
+    const finalResultMessage = `${mainMessage}\n${winnerInfoMessage}`;
+
     if (this.resultText?.active) {
-        this.resultText.setText(resultMessage).setColor(resultColor).setAlpha(1);
+        this.resultText.setText(finalResultMessage).setColor(resultColor).setAlpha(1);
     }
     if (this.statusText?.active) {
         this.statusText.setText("Waiting for next round...").setAlpha(1);
@@ -141,33 +155,75 @@ export class Battle extends Scene {
      this.battleOver = true;
      console.log("Game Over signal received.");
 
+     // Hide or destroy any existing battle result text
+     this.resultText?.destroy();
+     this.statusText?.destroy();
+
+     const centerX = this.cameras.main.centerX;
+     const centerY = this.cameras.main.centerY;
+     const gameWidth = this.cameras.main.width;
+     const gameHeight = this.cameras.main.height;
+
+     // Add a dark overlay
+     const overlay = this.add.rectangle(centerX, centerY, gameWidth, gameHeight, 0x000000, 0.75)
+         .setDepth(1999); // Ensure it's on top of board but below game over text
+
+     // "GAME OVER" Title
+     const gameOverTitle = this.add.text(centerX, centerY - 150, "GAME OVER", {
+         fontFamily: "Arial Black",
+         fontSize: "96px",
+         color: "#ff3333",
+         stroke: "#000000",
+         strokeThickness: 10,
+         align: "center"
+     }).setOrigin(0.5).setDepth(2000);
+
      const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
      let opponentState: ClientPlayerState | undefined;
      colyseusRoom?.state.players.forEach((p: any, sid: string) => { if (sid !== colyseusRoom?.sessionId) opponentState = p as ClientPlayerState; });
 
-     let finalMessage = "Game Over!";
-     let finalColor = "#ffffff";
-
+     let outcomeMessage = "";
      if (myPlayerState && opponentState) {
-         if (myPlayerState.health > opponentState.health) { finalMessage = "You Win!"; finalColor = "#00ff00"; }
-         else if (opponentState.health > myPlayerState.health) { finalMessage = "You Lose!"; finalColor = "#ff0000"; }
-         else { finalMessage = "Draw!"; finalColor = "#ffff00"; }
+         if (myPlayerState.health > opponentState.health) { outcomeMessage = "You Win!"; }
+         else if (opponentState.health > myPlayerState.health) { outcomeMessage = "You Lose!"; }
+         else { outcomeMessage = "It's a Draw!"; }
      } else if (myPlayerState) {
-         finalMessage = "You Win! (Opponent Left)"; finalColor = "#00ff00";
+         outcomeMessage = "You Win! (Opponent Left)";
      } else {
-         finalMessage = "Game Over (Error?)"; finalColor = "#ff0000";
+         outcomeMessage = "Match Concluded";
      }
 
-     if (this.resultText?.active) {
-        this.resultText.setText(finalMessage).setColor(finalColor).setAlpha(1);
-     }
-     if (this.statusText?.active) {
-        this.statusText.setText("Click to return to Main Menu").setAlpha(1);
-     }
+     const outcomeText = this.add.text(centerX, centerY - 30, outcomeMessage, {
+         fontFamily: "Arial",
+         fontSize: "48px",
+         color: "#ffffff",
+         stroke: "#333333",
+         strokeThickness: 6,
+         align: "center"
+     }).setOrigin(0.5).setDepth(2000);
+
+     // Display Total Match Time
+     const totalMatchTime = colyseusRoom?.state.matchTimer ?? 0;
+     const matchTimeText = this.add.text(centerX, centerY + 40, `Total Match Time: ${formatTime(totalMatchTime)}`, {
+         fontFamily: "Arial",
+         fontSize: "28px",
+         color: "#cccccc",
+         align: "center"
+     }).setOrigin(0.5).setDepth(2000);
+
+
+     const returnPrompt = this.add.text(centerX, centerY + 120, "Click to return to Main Menu", {
+         fontFamily: "Arial",
+         fontSize: "24px",
+         color: "#ffff00",
+         align: "center"
+     }).setOrigin(0.5).setDepth(2000);
 
      this.input.once('pointerdown', () => {
+         if (!this.scene.isActive()) return;
          try { colyseusRoom?.leave(); } catch(e) {}
-         this.scene.stop("Background");
+         this.scene.stop("Background"); // Stop background if it's running
+         this.scene.stop("BoardView"); // Stop BoardView if it's running
          this.scene.start("MainMenu");
      });
   }
