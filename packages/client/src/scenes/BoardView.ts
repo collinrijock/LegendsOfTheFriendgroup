@@ -5,12 +5,21 @@ import {
   CardData,
 } from "../utils/colyseusClient";
 import {
-  ClientGameState, // Use ClientGameState if needed for full state typing
+  ClientGameState,
   ClientPlayerState,
   ClientCardInstance,
   Phase,
-} from "../schemas/ClientSchemas"; // Adjust path
+} from "../schemas/ClientSchemas";
 import { getStateCallbacks } from "colyseus.js";
+import {
+  createCardGameObject,
+  updateCardHpVisuals as utilUpdateCardHpVisuals,
+  MINION_CARD_WIDTH,
+  MINION_CARD_HEIGHT,
+  FULL_CARD_WIDTH,
+  FULL_CARD_HEIGHT,
+  CardRenderData
+} from "../utils/renderCardUtils";
 
 // Remove CardUIData as ClientCardInstance can be used
 // interface CardUIData {
@@ -89,66 +98,8 @@ export class BoardView extends Scene {
     currentHp: number,
     maxHealth: number
   ) {
-    if (!cardContainer || !cardContainer.active) return;
-
-    const hpText = cardContainer.getData(
-      "hpTextObject"
-    ) as Phaser.GameObjects.Text;
-    const mainCardImage = cardContainer.getData(
-      "mainCardImage"
-    ) as Phaser.GameObjects.Image; // Changed from backgroundRectangle
-
-    if (hpText && hpText.active) {
-      hpText.setText(`${currentHp}/${maxHealth}`);
-      const hpPercent = maxHealth > 0 ? currentHp / maxHealth : 0;
-      if (currentHp <= 0) {
-        hpText.setColor("#ff0000"); // Red for dead
-      } else if (hpPercent < 0.3) {
-        hpText.setColor("#ff8888"); // Lighter Red for low
-      } else if (hpPercent < 0.6) {
-        hpText.setColor("#ffff88"); // Yellow for medium
-      } else {
-        hpText.setColor("#88ff88"); // Green for high
-      }
-    }
-
-    // Handle dimming/tinting for death or revival
-    const isVisuallyDead = cardContainer.alpha < 1.0; // A simple check
-
-    if (currentHp <= 0) {
-      if (!isVisuallyDead) {
-        // Apply death visuals if not already applied
-        cardContainer.setAlpha(0.6);
-        if (
-          mainCardImage &&
-          mainCardImage.active &&
-          typeof mainCardImage.setTint === "function"
-        ) {
-          // Check mainCardImage
-          mainCardImage.setTint(0x777777);
-        }
-      }
-    } else {
-      // currentHp > 0
-      if (isVisuallyDead) {
-        // Apply alive visuals if it was visually dead
-        cardContainer.setAlpha(1.0);
-        if (
-          mainCardImage &&
-          mainCardImage.active &&
-          typeof mainCardImage.clearTint === "function"
-        ) {
-          // Check mainCardImage
-          mainCardImage.clearTint();
-        } else if (mainCardImage && mainCardImage.active) {
-          console.warn(
-            "BoardView: updateCardHpVisuals - clearTint method not found on mainCardImage for card.",
-            cardContainer.getData("instanceId"),
-            mainCardImage
-          );
-        }
-      }
-    }
+    // Use the utility function instead of local implementation
+    utilUpdateCardHpVisuals(cardContainer, currentHp, maxHealth);
   }
 
   preload() {
@@ -1094,189 +1045,24 @@ export class BoardView extends Scene {
     isLocalPlayer: boolean,
     area: "hand" | "battlefield"
   ): Phaser.GameObjects.Container {
-    const container = this.add.container(x, y);
+    // Convert ClientCardInstance to CardRenderData
+    const cardRenderData: CardRenderData = {
+      name: cardSchema.name,
+      attack: cardSchema.attack,
+      speed: cardSchema.speed,
+      health: cardSchema.health,
+      currentHp: cardSchema.currentHp,
+      brewCost: cardSchema.brewCost,
+      artUrl: cardSchema.artUrl,
+      instanceId: cardSchema.instanceId
+    };
 
-    const displayCardWidth =
-      area === "hand" ? FULL_CARD_WIDTH : MINION_CARD_WIDTH;
-    const displayCardHeight =
-      area === "hand" ? FULL_CARD_HEIGHT : MINION_CARD_HEIGHT;
-    container.setData("displayCardWidth", displayCardWidth);
-    container.setData("displayCardHeight", displayCardHeight);
-
-    if (isObscured) {
-      // Determine dimensions for the card back based on the area
-      const backWidth = area === "hand" ? FULL_CARD_WIDTH : MINION_CARD_WIDTH;
-      const backHeight =
-        area === "hand" ? FULL_CARD_HEIGHT : MINION_CARD_HEIGHT;
-
-      const cardBack = this.add
-        .image(0, 0, "cardBack")
-        .setOrigin(0.5)
-        .setDisplaySize(backWidth, backHeight);
-      container.add(cardBack);
-      // Data like instanceId, slotKey, area, ownerSessionId will be set by the caller (updateCardVisual)
-      return container;
-    }
-
-    const cardTextureKey =
-      area === "hand" ? "cardFullTier1" : "cardMinionTier1";
-    const cardImage = this.add.image(0, 0, cardTextureKey).setOrigin(0.5);
-    cardImage.setDisplaySize(displayCardWidth, displayCardHeight);
-    container.add(cardImage);
-    container.setData("mainCardImage", cardImage);
-
-    if (area === "hand") {
-      // Full Card Sprite (Hand)
-      const nameText = this.add
-        .text(0, -20, cardSchema.name, {
-          // Middle center, moved up
-          fontFamily: "Arial",
-          fontSize: 16,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 4,
-          align: "center",
-          wordWrap: { width: displayCardWidth - 20 },
-        })
-        .setOrigin(0.5, 0.5);
-      container.add(nameText);
-
-      const attackText = this.add
-        .text(
-          -MINION_CARD_WIDTH / 2 + 32,
-          MINION_CARD_HEIGHT * 0.03,
-          `${cardSchema.attack}`,
-          {
-            fontFamily: "Arial",
-            fontSize: 16,
-            color: "#ffffff",
-            stroke: "#000000",
-            strokeThickness: 4,
-          }
-        )
-        .setOrigin(0, 0.5);
-      container.add(attackText);
-
-      const hpText = this.add
-        .text(
-          MINION_CARD_WIDTH / 2 - 18,
-          6,
-          `${cardSchema.currentHp}  ${cardSchema.health}`,
-          {
-            fontFamily: "Arial",
-            fontSize: 16,
-            color: "#00ff00",
-            stroke: "#000000",
-            strokeThickness: 4,
-          }
-        )
-        .setOrigin(1, 0.5);
-      container.add(hpText);
-      container.setData("hpTextObject", hpText);
-
-      const speedText = this.add
-        .text(0, displayCardHeight / 2 - 50, `${cardSchema.speed}`, {
-          fontFamily: "Arial",
-          fontSize: 16,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 3,
-        })
-        .setOrigin(0.5, 1);
-      container.add(speedText);
-    } else {
-      // Minion Card Sprite (Battlefield)
-      // Name Text (Top-center)
-      const nameText = this.add
-        .text(
-          0,
-          -displayCardHeight / 2 + 5, // 12px from top
-          cardSchema.name,
-          {
-            fontFamily: "Arial",
-            fontSize: 14,
-            color: "#ffffff",
-            stroke: "#000000",
-            strokeThickness: 4,
-            align: "center",
-            wordWrap: { width: displayCardWidth },
-          }
-        )
-        .setOrigin(0.5, 0);
-      container.add(nameText);
-
-      // Attack Text (Top-left)
-      const attackText = this.add
-        .text(-displayCardWidth / 2 + 32, 32, `${cardSchema.attack}`, {
-          // Middle-left
-          fontFamily: "Arial",
-          fontSize: 16, // Value only
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 4,
-        })
-        .setOrigin(0, 0.5);
-      container.add(attackText);
-
-      // Speed Text (Top-right)
-      const speedText = this.add
-        .text(
-          0,
-          43, // 30px from top
-          `${cardSchema.speed}`,
-          {
-            fontFamily: "Arial",
-            fontSize: 14,
-            color: "#ffffff",
-            stroke: "#000000",
-            strokeThickness: 3,
-          }
-        )
-        .setOrigin(1, 0);
-      container.add(speedText);
-
-      // HP Text (Bottom-right, above cooldown bar)
-      const hpText = this.add
-        .text(
-          displayCardWidth / 2 - 10,
-          displayCardHeight / 2 - 30, // 30px from bottom
-          `${cardSchema.currentHp}/${cardSchema.health}`,
-          {
-            fontFamily: "Arial",
-            fontSize: 14,
-            color: "#00ff00",
-            stroke: "#000000",
-            strokeThickness: 3,
-          }
-        )
-        .setOrigin(1, 1);
-      container.add(hpText);
-      container.setData("hpTextObject", hpText);
-
-      // Cooldown Bar elements for battlefield cards (15px from bottom)
-      const cooldownBarY = displayCardHeight / 2 - 15;
-      const cooldownBarWidth = displayCardWidth - 10;
-      const cooldownBarBg = this.add
-        .rectangle(0, cooldownBarY, cooldownBarWidth, 6, 0x000000, 0.5)
-        .setVisible(false);
-      const cooldownBarFill = this.add
-        .rectangle(
-          -cooldownBarWidth / 2,
-          cooldownBarY,
-          cooldownBarWidth,
-          6,
-          0x44ff44
-        )
-        .setOrigin(0, 0.5)
-        .setVisible(false);
-      container.add(cooldownBarBg);
-      container.add(cooldownBarFill);
-      container.setData("cooldownBarBg", cooldownBarBg);
-      container.setData("cooldownBarFill", cooldownBarFill);
-      container.setData("attackCooldownTimer", 0);
-      container.setData("maxAttackCooldown", 0);
-      container.setData("cooldownBarBaseWidth", cooldownBarWidth);
-    }
+    const cardType = area === "hand" ? "full" : "minion";
+    const container = createCardGameObject(this, cardRenderData, cardType, isObscured);
+    
+    // Position the container
+    container.setPosition(x, y);
+    
     return container;
   }
 

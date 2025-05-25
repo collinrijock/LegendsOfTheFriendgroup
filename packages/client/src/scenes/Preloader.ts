@@ -57,6 +57,7 @@ export class Preloader extends Scene {
     // Load card sprites
     this.load.image("cardFullTier1", "CardFullTier1.png");
     this.load.image("cardMinionTier1", "CardMinionTier1.png");
+    this.load.image("lola_art", "lola.png"); // Load card art
   }
 
   create() {

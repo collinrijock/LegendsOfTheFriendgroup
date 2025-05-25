@@ -1,5 +1,3 @@
-// packages/client/src/schemas/ClientSchemas.ts
-
 export enum Phase {
     Lobby = "Lobby",
     Shop = "Shop",
@@ -20,6 +18,7 @@ export interface ClientCardInstance {
     brewCost: number;
     description: string;
     isLegend: boolean;
+    artUrl: string; // URL or key for card art
 }
 
 export interface ClientPlayerState {

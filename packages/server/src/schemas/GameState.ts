@@ -22,6 +22,7 @@ export class CardInstanceSchema extends Schema {
     @type("number") brewCost: number = 0;
     @type("string") description: string = "";
     @type("boolean") isLegend: boolean = false;
+    @type("string") artUrl: string = ""; // URL or key for card art
 
     // Helper to create from client-like data
     static fromCardData(data: any, instanceId: string): CardInstanceSchema {
@@ -36,6 +37,7 @@ export class CardInstanceSchema extends Schema {
         card.brewCost = data.brewCost;
         card.description = data.description;
         card.isLegend = data.isLegend;
+        card.artUrl = data.artUrl || "lola.png"; // Default if not provided
         return card;
     }
 }

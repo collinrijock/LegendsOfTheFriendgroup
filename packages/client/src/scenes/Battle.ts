@@ -56,13 +56,8 @@ export class Battle extends Scene {
         stroke: "#000000",
         strokeThickness: 8,
         align: "center",
-    }).setOrigin(0.5).setAlpha(0);
+    }).setOrigin(0.5).setAlpha(0)?.setDepth(1500);
 
-    this.statusText = this.add.text(centerX, gameHeight - 50, "", {
-         fontFamily: "Arial", fontSize: 24, color: "#ffff00", align: "center"
-    }).setOrigin(0.5).setAlpha(0);
-
-    // --- Colyseus Listeners ---
     this.setupColyseusListeners();
 
     // Register shutdown event listener
@@ -143,7 +138,7 @@ export class Battle extends Scene {
     const finalResultMessage = `${mainMessage}\n${winnerInfoMessage}`;
 
     if (this.resultText?.active) {
-        this.resultText.setText(finalResultMessage).setColor(resultColor).setAlpha(1);
+        this.resultText.setText(finalResultMessage).setColor(resultColor).setAlpha(1).setDepth(1500);
     }
     if (this.statusText?.active) {
         this.statusText.setText("Waiting for next round...").setAlpha(1);

@@ -260,17 +260,23 @@ export class Preparation extends Scene {
       }
     );
     // Add listeners for existing other players
-  colyseusRoom.state.players.forEach((existingPlayer: any, sessionId: string) => { // Cast to any or use ClientPlayerState
-    if (sessionId !== myPlayerId) {
-      // Use proxy for existing player
-      const unsub = $(existingPlayer as ClientPlayerState).listen("isReady", () => {
-        // Listen specifically to isReady
-        if (this.scene.isActive()) this.updateWaitingStatus();
-      });
-      this.otherPlayerChangeListeners.set(sessionId, unsub);
-    }
-  });
-}
+    colyseusRoom.state.players.forEach(
+      (existingPlayer: any, sessionId: string) => {
+        // Cast to any or use ClientPlayerState
+        if (sessionId !== myPlayerId) {
+          // Use proxy for existing player
+          const unsub = $(existingPlayer as ClientPlayerState).listen(
+            "isReady",
+            () => {
+              // Listen specifically to isReady
+              if (this.scene.isActive()) this.updateWaitingStatus();
+            }
+          );
+          this.otherPlayerChangeListeners.set(sessionId, unsub);
+        }
+      }
+    );
+  }
 
   cleanupListeners() {
     console.log("Preparation Scene: Cleaning up listeners.");
@@ -390,7 +396,8 @@ export class Preparation extends Scene {
     if (!myPlayerState) return;
 
     let allPlayersReady = true;
-    colyseusRoom.state.players.forEach((player: any) => { // Cast to any or use ClientPlayerState
+    colyseusRoom.state.players.forEach((player: any) => {
+      // Cast to any or use ClientPlayerState
       if (!(player as ClientPlayerState).isReady) allPlayersReady = false;
     });
 
@@ -399,34 +406,30 @@ export class Preparation extends Scene {
       !amReady && colyseusRoom.state.currentPhase === Phase.Preparation;
 
     // Enable/disable button based on interaction state AND board state
-    this.updateStartButtonState(); // This handles the button color/interactivity based on board content
+    // updateStartButtonState handles the button color/interactivity based on board content and ready state
+    this.updateStartButtonState();
 
-    // Show/hide waiting text
+    // Show/hide waiting text and adjust button text if ready
     if (amReady && !allPlayersReady) {
       this.waitingText
         .setText("Waiting for other player(s)...")
         .setVisible(true);
-      this.startBattleButton.setText("Waiting..."); // Change button text
-      this.startBattleButton.disableInteractive().setColor("#888888"); // Ensure disabled while waiting
+      this.startBattleButton.setText("Cancel Ready"); // Change button text
+      // updateStartButtonState will set color and interactivity based on amReady
     } else {
       this.waitingText.setVisible(false);
       this.startBattleButton.setText("Start Battle"); // Reset button text
-      // Re-enable button *if* conditions are met (handled by updateStartButtonState)
-      this.updateStartButtonState();
+      // updateStartButtonState will set color and interactivity
     }
 
     // BoardView handles drag interaction state
   }
 
   updateStartButtonState() {
-    // --- Add Null Check ---
     if (!this.startBattleButton || !this.startBattleButton.active) {
-      console.warn(
-        "updateStartButtonState called but button is null or inactive."
-      );
-      return; // Guard if called too early or after shutdown
+      return;
     }
-    let battlefieldCardsCount = 0; // Initialize count here
+    let battlefieldCardsCount = 0;
     const boardView = this.scene.get("BoardView") as BoardView;
     if (boardView && boardView.scene.isActive()) {
       const layoutData = boardView.getLocalPlayerLayoutData();
@@ -436,42 +439,114 @@ export class Preparation extends Scene {
         }
       });
     }
-    const canStart = battlefieldCardsCount > 0;
+    const canStartBattle = battlefieldCardsCount > 0;
 
     const myPlayerState = colyseusRoom?.state.players.get(
       colyseusRoom?.sessionId
-    );
+    ) as ClientPlayerState | undefined;
     const amReady = myPlayerState?.isReady ?? false;
     const isPrepPhase = colyseusRoom?.state.currentPhase === Phase.Preparation;
 
-    const shouldBeEnabled = canStart && !amReady && isPrepPhase;
+    // Remove existing listeners to prevent stacking
+    this.startBattleButton.off("pointerdown").off("pointerover").off("pointerout");
 
-    if (shouldBeEnabled) {
-      this.startBattleButton.setColor("#00ff00");
-      this.startBattleButton.setInteractive({ useHandCursor: true });
-      this.startBattleButton.off("pointerdown"); // Remove previous listener
-      this.startBattleButton.once("pointerdown", this.confirmPreparation, this); // Call confirmPreparation
-      this.startBattleButton.on("pointerover", () =>
-        this.startBattleButton.setColor("#55ff55")
-      );
-      this.startBattleButton.on("pointerout", () =>
-        this.startBattleButton.setColor("#00ff00")
-      );
-    } else {
-      // Keep disabled color unless actively waiting (handled by updateWaitingStatus)
-      // Check waitingText visibility *before* potentially accessing it
-      if (this.waitingText && !this.waitingText.visible) {
-        this.startBattleButton.setColor("#888888");
+    // Define pointerdown behavior
+    this.startBattleButton.on("pointerdown", () => {
+      if (!colyseusRoom || !colyseusRoom.sessionId) return;
+      const currentMyPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+
+      if (currentMyPlayerState && colyseusRoom.state.currentPhase === Phase.Preparation) {
+        if (currentMyPlayerState.isReady) {
+          colyseusRoom.send("playerUnready");
+        } else {
+          // Only confirm if canStartBattle is true (player has cards on board)
+          // This check is implicitly handled by the button being disabled if !canStartBattle
+          // but good to be explicit if confirmPreparation had other ways to be called.
+          if (canStartBattle) {
+              this.confirmPreparation();
+          } else {
+              console.log("Preparation: Cannot start battle, no cards on battlefield.");
+          }
+        }
       }
-      // This is the line causing the error if this.startBattleButton is null
-      this.startBattleButton.disableInteractive(); // Error occurs here if button is null
-      this.startBattleButton.off("pointerdown");
-      this.startBattleButton.off("pointerover");
-      this.startBattleButton.off("pointerout");
+    });
+
+    // Define pointerover behavior
+    this.startBattleButton.on("pointerover", () => {
+      if (this.startBattleButton.input?.enabled) {
+        const currentMyPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+        const currentAmReady = currentMyPlayerState?.isReady ?? false;
+        if (currentAmReady) { // "Cancel Ready" state
+          this.startBattleButton.setColor("#ffaa55"); // Hover for "Cancel Ready"
+        } else { // "Start Battle" state (and enabled)
+          this.startBattleButton.setColor("#55ff55"); // Hover for "Start Battle"
+        }
+      }
+    });
+
+    // Define pointerout behavior
+    this.startBattleButton.on("pointerout", () => {
+      // Color will be reset by the main logic below based on current state
+      // This handler primarily ensures that if it was hovered, it reverts.
+      // The main logic will then set the correct non-hover color.
+      // Re-evaluate current state to set correct base color on pointerout
+      const currentMyPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+      const currentAmReady = currentMyPlayerState?.isReady ?? false;
+      const currentIsPrepPhase = colyseusRoom?.state.currentPhase === Phase.Preparation;
+
+      if (!currentIsPrepPhase) {
+          this.startBattleButton.setColor("#888888"); // Disabled color
+      } else {
+          if (currentAmReady) {
+              this.startBattleButton.setColor("#ff8800"); // Normal for "Cancel Ready"
+          } else {
+              // To determine color for "Start Battle", we need canStartBattle again
+              let currentBattlefieldCardsCount = 0;
+              const currentBoardView = this.scene.get("BoardView") as BoardView;
+              if (currentBoardView && currentBoardView.scene.isActive()) {
+                  const layoutData = currentBoardView.getLocalPlayerLayoutData();
+                  layoutData.forEach((entry) => {
+                      if (entry.area === "battlefield") currentBattlefieldCardsCount++;
+                  });
+              }
+              const currentCanStartBattle = currentBattlefieldCardsCount > 0;
+
+              if (currentCanStartBattle) {
+                  this.startBattleButton.setColor("#00ff00"); // Normal for "Start Battle"
+              } else {
+                  this.startBattleButton.setColor("#888888"); // Disabled color
+              }
+          }
+      }
+      // If button is disabled, it should be grey anyway.
+      if (!this.startBattleButton.input?.enabled && this.startBattleButton.active) {
+          this.startBattleButton.setColor("#888888");
+      }
+    });
+
+    // Set text, color, and interactivity based on current state
+    if (!isPrepPhase) {
+      this.startBattleButton.setText("Start Battle").setColor("#888888").disableInteractive();
+    } else {
+      // It IS the Preparation phase
+      if (amReady) {
+        // Player is ready: "Cancel Ready", orange, interactive.
+        this.startBattleButton.setText("Cancel Ready").setColor("#ff8800").setInteractive({ useHandCursor: true });
+      } else {
+        // Player is NOT ready.
+        this.startBattleButton.setText("Start Battle");
+        if (canStartBattle) {
+          // Not ready, but CAN start: Green, interactive.
+          this.startBattleButton.setColor("#00ff00").setInteractive({ useHandCursor: true });
+        } else {
+          // Not ready, CANNOT start: Grey, disabled.
+          this.startBattleButton.setColor("#888888").disableInteractive();
+        }
+      }
     }
   }
 
-  // Called when the "Start Battle" button is clicked
+  // Called when the "Start Battle" button is clicked AND player is NOT ready
   confirmPreparation() {
     if (!colyseusRoom) return;
     console.log("Confirming preparation layout...");

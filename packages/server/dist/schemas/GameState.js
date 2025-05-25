@@ -35,6 +35,7 @@ class CardInstanceSchema extends schema_1.Schema {
         this.brewCost = 0;
         this.description = "";
         this.isLegend = false;
+        this.artUrl = ""; // URL or key for card art
     }
     // Helper to create from client-like data
     static fromCardData(data, instanceId) {
@@ -49,6 +50,7 @@ class CardInstanceSchema extends schema_1.Schema {
         card.brewCost = data.brewCost;
         card.description = data.description;
         card.isLegend = data.isLegend;
+        card.artUrl = data.artUrl || "lola.png"; // Default if not provided
         return card;
     }
 }
@@ -93,6 +95,10 @@ __decorate([
     (0, schema_1.type)("boolean"),
     __metadata("design:type", Boolean)
 ], CardInstanceSchema.prototype, "isLegend", void 0);
+__decorate([
+    (0, schema_1.type)("string"),
+    __metadata("design:type", String)
+], CardInstanceSchema.prototype, "artUrl", void 0);
 // Remove old Draggables schema if it exists
 /*
 export class Draggables extends Schema {

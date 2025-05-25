@@ -6,9 +6,12 @@ import {
   ClientCardInstance,
 } from "../schemas/ClientSchemas";
 import { getStateCallbacks } from "colyseus.js";
-
-const CARD_WIDTH = 120; // Was 100, updated for Full Card Sprite
-const CARD_HEIGHT = 168; // Was 140, updated for Full Card Sprite
+import {
+  createCardGameObject,
+  FULL_CARD_WIDTH as CARD_WIDTH,
+  FULL_CARD_HEIGHT as CARD_HEIGHT,
+  CardRenderData
+} from "../utils/renderCardUtils";
 
 // Removed local CardData interface, using imported one from colyseusClient
 
@@ -83,10 +86,10 @@ export class Shop extends Scene {
     
     this.refreshButton = this.add.text(gameWidth - 150, 180, `Refresh: ${refreshCost} 🍺`, {
       fontFamily: "Arial",
-      fontSize: 18,
+      fontSize: 22, // Increased from 18
       color: "#FFFFFF",
       backgroundColor: "#4444AA",
-      padding: { x: 10, y: 5 },
+      padding: { x: 15, y: 8 }, // Increased padding
     }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
   
     this.refreshButton.on("pointerdown", () => {
@@ -121,30 +124,49 @@ export class Shop extends Scene {
         align: "center",
       })
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+    .setInteractive({ useHandCursor: true });
 
     this.continueButton.on("pointerdown", () => {
       const myPlayerState = colyseusRoom?.state.players.get(
         colyseusRoom.sessionId
-      );
+      ) as ClientPlayerState | undefined; // Added type cast
+
       if (
         colyseusRoom &&
         myPlayerState &&
-        !myPlayerState.isReady &&
         colyseusRoom.state.currentPhase === Phase.Shop
       ) {
-        colyseusRoom.send("playerReady");
+        if (myPlayerState.isReady) {
+          // Player is already ready, so send unready
+          colyseusRoom.send("playerUnready");
+        } else {
+          // Player is not ready, so send ready
+          colyseusRoom.send("playerReady");
+        }
       }
     });
 
     this.continueButton.on("pointerover", () => {
-      if (this.continueButton.input?.enabled)
-        this.continueButton.setColor("#55ff55");
+      if (this.continueButton.input?.enabled) {
+        const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+        if (myPlayerState?.isReady) {
+          this.continueButton.setColor("#ffaa55"); // Hover color for "Cancel Ready"
+        } else {
+          this.continueButton.setColor("#55ff55"); // Hover color for "Continue"
+        }
+      }
     });
     this.continueButton.on("pointerout", () => {
-      if (this.continueButton.input?.enabled)
-        this.continueButton.setColor("#00ff00");
-      else this.continueButton.setColor("#888888");
+      if (this.continueButton.input?.enabled) {
+        const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+        if (myPlayerState?.isReady) {
+          this.continueButton.setColor("#ff8800"); // Normal color for "Cancel Ready"
+        } else {
+          this.continueButton.setColor("#00ff00"); // Normal color for "Continue"
+        }
+      } else {
+        this.continueButton.setColor("#888888"); // Disabled color
+      }
     });
 
     this.waitingText = this.add
@@ -248,13 +270,6 @@ export class Shop extends Scene {
     this.shopOffersContainer.add(this.shopOffersBackground);
 
     shopOfferIds.forEach((cardId: string, index: number) => {
-      // For each card ID, we need to find the card data
-      // Since we don't load card data locally anymore, we'll request it from the server
-      
-      // In a complete implementation, the server would send the full card data
-      // For now, we'll construct temporary card data from what we receive from the server
-
-      // Get card data from what's available in the state objects
       const cardData = this.getCardDataFromServer(cardId);
       
       if (!cardData) {
@@ -263,93 +278,31 @@ export class Shop extends Scene {
       }
 
       const cardX = startShopX + index * (CARD_WIDTH + shopCardSpacing);
-      const cardContainer = this.add.container(cardX, shopY);
+      
+      // Convert CardData to CardRenderData
+      const cardRenderData: CardRenderData = {
+        name: cardData.name,
+        attack: cardData.attack,
+        speed: cardData.speed,
+        health: cardData.health,
+        brewCost: cardData.brewCost,
+        artUrl: cardData.artUrl
+      };
 
-      const cardImage = this.add
-        .image(0, 0, "cardFullTier1")
-        .setOrigin(0.5)
-        .setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
-      cardContainer.add(cardImage);
-
-      // Name: Middle center, moved up
-      const nameText = this.add
-        .text(0, -20, cardData.name, {
-          fontFamily: "Arial",
-          fontSize: 16,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 4,
-          align: "center",
-          wordWrap: { width: CARD_WIDTH - 20 },
-        })
-        .setOrigin(0.5, 0.5);
-      cardContainer.add(nameText);
-
-      // Attack: Under name, to the left (adjusted position)
-      const attackText = this.add
-        .text(-CARD_WIDTH / 2 + 32, CARD_HEIGHT * 0.03, `${cardData.attack}`, {
-          fontFamily: "Arial",
-          fontSize: 16,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 3,
-        })
-        .setOrigin(0, 0.5);
-      cardContainer.add(attackText);
-
-      // HP: Middle right (adjusted position)
-      const healthText = this.add
-        .text(CARD_WIDTH / 2 - 18, 6, `${cardData.health}/${cardData.health}`, {
-          fontFamily: "Arial",
-          fontSize: 16,
-          color: "#00ff00",
-          stroke: "#000000",
-          strokeThickness: 3,
-        })
-        .setOrigin(1, 0.5);
-      cardContainer.add(healthText);
-
-      // Speed: Middle bottom (adjusted position)
-      const speedText = this.add
-        .text(0, CARD_HEIGHT / 2 - 50, `${cardData.speed}`, {
-          fontFamily: "Arial",
-          fontSize: 16,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 3,
-        })
-        .setOrigin(0.5, 1);
-      cardContainer.add(speedText);
-
-      // Brew Cost: Top-right corner (remains similar)
-      const costText = this.add
-        .text(
-          CARD_WIDTH / 2 - 8,
-          -CARD_HEIGHT / 2 + 8,
-          `${cardData.brewCost}B`,
-          {
-            fontFamily: "Arial",
-            fontSize: 14,
-            color: "#ffff00",
-            stroke: "#000000",
-            strokeThickness: 3,
-            align: "right",
-          }
-        )
-        .setOrigin(1, 0);
-      cardContainer.add(costText);
+      // Use the utility function to create the card
+      const cardContainer = createCardGameObject(this, cardRenderData, 'full', false);
+      cardContainer.setPosition(cardX, shopY);
 
       cardContainer.setSize(CARD_WIDTH, CARD_HEIGHT);
-      cardContainer.setSize(CARD_WIDTH, CARD_HEIGHT); // Important for hit area
       cardContainer.setInteractive({ useHandCursor: true });
       cardContainer.setData("cardId", cardData.id);
-      cardContainer.setData("cardData", cardData); // Store full card data if needed
+      cardContainer.setData("cardData", cardData);
       this.input.setDraggable(cardContainer);
 
       // Add pointerdown and pointerup listeners for click-to-buy
       cardContainer.off('pointerdown').on('pointerdown', (pointer: Phaser.Input.Pointer) => {
         if (!cardContainer.input?.enabled) return;
-        cardContainer.setData('isBeingDragged', false); // Reset flag on new pointer down
+        cardContainer.setData('isBeingDragged', false);
       });
 
       cardContainer.off('pointerup').on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -357,17 +310,16 @@ export class Shop extends Scene {
         if (!colyseusRoom || !colyseusRoom.sessionId) return;
 
         if (cardContainer.getData('isBeingDragged') === true) {
-            // This was a drag, dragend will handle it.
-            cardContainer.setData('isBeingDragged', false); // Reset for safety
+            cardContainer.setData('isBeingDragged', false);
             return;
         }
 
-        // If not dragged, treat as a click to buy
+        // Click-to-buy logic remains the same
         const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
         if (!myPlayerState) return;
 
         let firstEmptyHandSlot = -1;
-        for (let i = 0; i < 5; i++) { // Assuming 5 hand slots
+        for (let i = 0; i < 5; i++) {
             if (!myPlayerState.hand.has(String(i))) {
                 firstEmptyHandSlot = i;
                 break;
@@ -376,7 +328,7 @@ export class Shop extends Scene {
 
         if (firstEmptyHandSlot !== -1) {
             const cardId = cardContainer.getData('cardId') as string;
-            const currentCardData = cardContainer.getData('cardData') as CardData; // Use currentCardData
+            const currentCardData = cardContainer.getData('cardData') as CardData;
 
             if (cardId && currentCardData && myPlayerState.brews >= currentCardData.brewCost) {
                 console.log(`Shop: Click-to-buy card ${cardId} (Cost: ${currentCardData.brewCost}) into hand slot ${firstEmptyHandSlot}. Brews: ${myPlayerState.brews}`);
@@ -384,24 +336,17 @@ export class Shop extends Scene {
                     cardId: cardId,
                     handSlotIndex: firstEmptyHandSlot,
                 });
-                // Card will be removed from shop offers by server state update & re-render.
             } else {
                 if (currentCardData && myPlayerState.brews < currentCardData.brewCost) {
                     console.log(`Shop: Not enough brews (${myPlayerState.brews}) to click-buy card ${cardId} (Cost: ${currentCardData.brewCost}).`);
-                    // TODO: Optionally show a "not enough brews" message to the player
                 } else {
                     console.log(`Shop: Click-to-buy failed for card ${cardId}. CardData: ${!!currentCardData}`);
                 }
             }
         } else {
             console.log("Shop: Hand is full, cannot click-buy.");
-            // TODO: Optionally show a "hand full" message to the player
         }
-        // No need to snap back cardContainer here, as it wasn't moved for a click.
-        // If the buy is successful, the server will update shopOfferIds, and createShopCardsDisplay will be called,
-        // effectively removing the bought card from the display.
       });
-
 
       this.shopCardObjects.push(cardContainer);
       this.shopOffersContainer.add(cardContainer);
@@ -640,15 +585,16 @@ export class Shop extends Scene {
   private updateRefreshButtonState() {
     if (!colyseusRoom || !this.refreshButton || !this.refreshButton.active) return;
     
-    const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
+    const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined; // Cast for type safety
     if (!myPlayerState) return;
     
     // Update text with current cost
-    this.refreshButton.setText(`Refresh: ${myPlayerState.shopRefreshCost} 🍺`);
+    this.refreshButton.setText(`Refresh Shop: ${myPlayerState.shopRefreshCost} 🍺`);
     
-    // Enable/disable based on whether player has enough brews
+    // Enable/disable based on whether player has enough brews AND is not ready AND is in Shop phase
     const canRefresh = myPlayerState.brews >= myPlayerState.shopRefreshCost &&
-                      colyseusRoom.state.currentPhase === Phase.Shop;
+                    !myPlayerState.isReady && // Player cannot refresh if they are ready
+                    colyseusRoom.state.currentPhase === Phase.Shop;
     
     if (canRefresh) {
       this.refreshButton.setColor("#FFFFFF");
@@ -810,30 +756,42 @@ export class Shop extends Scene {
 
     const amReady = myPlayerState.isReady;
     const isShopPhase = colyseusRoom.state.currentPhase === Phase.Shop;
-    const canInteract = !amReady && isShopPhase;
+    const canInteract = isShopPhase; // Player can always interact with the button in Shop phase if it's enabled
 
     this.continueButton.setInteractive(canInteract);
-    // Removed incorrect line: this.continueButton.input.useHandCursor = canInteract;
-    this.continueButton.setColor(canInteract ? "#00ff00" : "#888888");
+    
+    if (amReady) {
+      this.continueButton.setText("Cancel Ready").setColor("#ff8800"); // Orange for cancel
+    } else {
+      this.continueButton.setText("Continue").setColor("#00ff00"); // Green for continue
+    }
+    // Ensure disabled color is applied if interaction is not allowed (e.g. wrong phase, though canInteract handles this for Shop)
+    if (!canInteract) {
+        this.continueButton.setColor("#888888").disableInteractive();
+    }
+
 
     if (amReady && !allPlayersReady && isShopPhase) {
       this.waitingText
         .setText("Waiting for other player(s)...")
         .setVisible(true);
-      this.continueButton.setText("Waiting...");
+      // Button text is already "Cancel Ready"
     } else if (!isShopPhase) {
       this.waitingText
         .setText(`Waiting for ${colyseusRoom.state.currentPhase} phase...`)
         .setVisible(true);
-      this.continueButton.setText("Continue");
+      this.continueButton.setText("Continue").setColor("#888888").disableInteractive(); // Disable if not shop phase
     } else {
       this.waitingText.setVisible(false);
-      this.continueButton.setText("Continue");
+      // Button text is "Continue" or "Cancel Ready" based on amReady
     }
 
     this.shopCardObjects.forEach((cardObj) => {
-      if (cardObj.input) cardObj.input.enabled = canInteract;
+      if (cardObj.input) cardObj.input.enabled = !amReady && isShopPhase; // Can only interact with cards if not ready
     });
+
+    // Update refresh button interactability based on ready state
+    this.updateRefreshButtonState(); // Call this to ensure refresh button is disabled if player is ready
   }
 
   shutdown() {

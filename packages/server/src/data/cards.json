@@ -7,7 +7,8 @@
     "health": 8,
     "brewCost": 4,
     "description": "Fast but frail.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "tanky_boi_01",
@@ -17,7 +18,8 @@
     "health": 25,
     "brewCost": 5,
     "description": "Takes a beating.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "tanky_boi_02",
@@ -27,7 +29,8 @@
     "health": 20,
     "brewCost": 5,
     "description": "Takes a beating.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "glass_cannon_01",
@@ -37,7 +40,8 @@
     "health": 4,
     "brewCost": 5,
     "description": "Hits hard, dies fast.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "balanced_bud_01",
@@ -47,7 +51,8 @@
     "health": 12,
     "brewCost": 6,
     "description": "Good all-around.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "balanced_bud_02",
@@ -57,7 +62,8 @@
     "health": 14,
     "brewCost": 6,
     "description": "Good all-around.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "speedy_scout_01",
@@ -67,7 +73,8 @@
     "health": 4,
     "brewCost": 3,
     "description": "Attacks quickly.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "speedy_scout_02",
@@ -77,7 +84,8 @@
     "health": 5,
     "brewCost": 3,
     "description": "Attacks quickly.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "bruiser_01",
@@ -87,7 +95,8 @@
     "health": 18,
     "brewCost": 7,
     "description": "Tough and hits reasonably hard.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "bruiser_02",
@@ -97,7 +106,8 @@
     "health": 18,
     "brewCost": 7,
     "description": "Tough and hits reasonably hard.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "sniper_01",
@@ -107,7 +117,8 @@
     "health": 12,
     "brewCost": 8,
     "description": "Slow wind-up, big impact.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "swarm_ling_01",
@@ -117,7 +128,8 @@
     "health": 6,
     "brewCost": 1,
     "description": "Cheap and fast, but weak.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "raccoon_01",
@@ -127,7 +139,8 @@
     "health": 9,
     "brewCost": 3,
     "description": "Cheap and fast, but weak.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "swarm_ling_02",
@@ -137,7 +150,8 @@
     "health": 15,
     "brewCost": 1,
     "description": "Cheap and tanky, but weak.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "guardian_01",
@@ -147,7 +161,8 @@
     "health": 32,
     "brewCost": 9,
     "description": "A defensive wall.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "berserker_01",
@@ -157,7 +172,8 @@
     "health": 16,
     "brewCost": 12,
     "description": "Expensive but very powerful.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "brigade_beamer_01",
@@ -167,7 +183,8 @@
     "health": 7,
     "brewCost": 4,
     "description": "Chill with collin.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "minigunner_01",
@@ -177,7 +194,8 @@
     "health": 10,
     "brewCost": 10,
     "description": "Pew pew pew.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "humonculated_chungorian_01",
@@ -187,7 +205,8 @@
     "health": 32,
     "brewCost": 15,
     "description": "Strong and chunky",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "hobgoblin_01",
@@ -197,7 +216,8 @@
     "health": 8,
     "brewCost": 2,
     "description": "Strong and chunky",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   },
   {
     "id": "party_potato_01",
@@ -207,6 +227,7 @@
     "health": 8,
     "brewCost": 2,
     "description": "Cheap and well rounded.",
-    "isLegend": false
+    "isLegend": false,
+    "artUrl": "lola.png"
   }
 ]

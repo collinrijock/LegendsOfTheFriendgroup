@@ -28,6 +28,7 @@ export interface CardData {
   brewCost: number;
   description: string;
   isLegend: boolean;
+  artUrl: string; // URL or key for card art
 }
 export let globalCardDataCache: Map<string, CardData> = new Map();
 

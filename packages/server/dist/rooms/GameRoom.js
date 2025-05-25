@@ -44,7 +44,7 @@ const path = __importStar(require("path"));
 const cardDatabasePath = path.join(__dirname, '../../src/data/cards.json');
 const cardDatabase = JSON.parse(fs.readFileSync(cardDatabasePath, 'utf8'));
 // --- Phase Duration Constants ---
-const SHOP_DURATION = 25; // seconds
+const SHOP_DURATION = 35; // seconds (increased from 25)
 const PREPARATION_DURATION = 15; // seconds
 const BATTLE_DURATION = 45; // seconds
 // --- End Phase Duration Constants ---
@@ -128,6 +128,25 @@ class GameRoom extends colyseus_1.Room {
                 console.log(`Player ${client.sessionId} is ready for phase: ${this.state.currentPhase}`);
                 player.isReady = true;
                 this.checkPhaseTransition();
+            }
+        });
+        this.onMessage("playerUnready", (client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (player && player.isReady === true) {
+                // Check current phase to ensure unreadying is appropriate
+                if (this.state.currentPhase === GameState_1.Phase.Lobby ||
+                    this.state.currentPhase === GameState_1.Phase.Shop ||
+                    this.state.currentPhase === GameState_1.Phase.Preparation) {
+                    console.log(`Player ${player.username} (${client.sessionId}) is un-readying for phase: ${this.state.currentPhase}`);
+                    player.isReady = false;
+                    // Do not call checkPhaseTransition here.
+                    // The client UI will update. If this player was the last one needed for a transition,
+                    // the "allReady" condition in checkPhaseTransition will now fail if another player
+                    // subsequently readies up or a timer forces a check.
+                }
+                else {
+                    console.warn(`Player ${player.username} (${client.sessionId}) attempted to unready during inappropriate phase: ${this.state.currentPhase}`);
+                }
             }
         });
         this.onMessage("refreshShop", (client) => {
