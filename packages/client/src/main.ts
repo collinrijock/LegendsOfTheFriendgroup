@@ -1,36 +1,44 @@
 import { ScaleFlow } from "./utils/ScaleFlow";
 import { initiateDiscordSDK } from "./utils/discordSDK";
+// Import Colyseus connection function and room variable from the new file
+import { connectColyseus, colyseusRoom, colyseusClient } from "./utils/colyseusClient"; // Updated import
+
+// Import GameState schema if needed for type hints, though scenes will handle specifics
+// import { ClientGameState } from "./schemas/ClientSchemas"; // Use client-side schema
 
 import { Boot } from "./scenes/Boot";
-import { Game } from "./scenes/Game";
+import { Game } from "./scenes/Game"; // Keep for now, but likely unused in main flow
 import { MainMenu } from "./scenes/MainMenu";
 import { Preloader } from "./scenes/Preloader";
 import { Background } from "./scenes/Background";
-// Import the new Lobby scene
 import { Lobby } from "./scenes/Lobby";
-// Import the new Shop scene
 import { Shop } from "./scenes/Shop";
-// Import the new Preparation scene
 import { Preparation } from "./scenes/Preparation";
-// Import the new Battle scene
 import { Battle } from "./scenes/Battle";
+import { BoardView } from "./scenes/BoardView"; // Import BoardView
+
+// --- Global Colyseus Room Variable (Now imported from colyseusClient.ts) ---
+// export let colyseusRoom: Room | null = null; // Moved
+// export let colyseusClient: Client | null = null; // Moved
+
+// Function to connect to Colyseus (Moved to colyseusClient.ts)
+// export async function connectColyseus(accessToken: string, username: string) { ... } // Moved
 
 
 (async () => {
-  initiateDiscordSDK();
+  // Initiate Discord SDK first
+  // This now handles Colyseus connection internally via the imported connectColyseus
+  await initiateDiscordSDK();
 
+  // Phaser game setup remains largely the same
   new ScaleFlow({
     type: Phaser.AUTO,
     parent: "gameParent",
-    width: 1280, // this must be a pixel value
-    height: 720, // this must be a pixel value
+    width: 1600,
+    height: 900,
     backgroundColor: "#000000",
     roundPixels: false,
     pixelArt: false,
-    // Add Lobby and Shop to the scene list
-    // Game scene is still here but not directly accessed from Lobby anymore
-    // Add Preparation scene to the list
-    // Add Battle scene to the list
-    scene: [Boot, Preloader, MainMenu, Lobby, Shop, Preparation, Battle, Game, Background],
+    scene: [Boot, Preloader, MainMenu, Lobby, Shop, Preparation, Battle, BoardView, Game, Background], // Added BoardView
   });
 })();

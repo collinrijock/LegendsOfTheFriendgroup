@@ -3,9 +3,9 @@ import Phaser from "phaser";
 export class ScaleFlow {
   game: Phaser.Game;
 
-  canvas: HTMLCanvasElement;
-  parent: HTMLDivElement;
-  guide: HTMLDivElement;
+  canvas!: HTMLCanvasElement;
+  parent!: HTMLDivElement;
+  guide!: HTMLDivElement;
 
   static scaleManager: Phaser.Scale.ScaleManager;
   static cameras: Set<Phaser.Cameras.Scene2D.Camera>;
@@ -13,9 +13,9 @@ export class ScaleFlow {
   static gameZone: Phaser.Geom.Rectangle;
   static uiZone: Phaser.Geom.Rectangle;
 
-  static width: number;
-  static height: number;
-  static center: Phaser.Math.Vector2;
+  static width: number = 1600;
+  static height: number = 900;
+  static center: Phaser.Math.Vector2 = new Phaser.Math.Vector2(1600 / 2, 900 / 2);
 
   static isLandscape: boolean;
 
@@ -25,8 +25,8 @@ export class ScaleFlow {
   static readonly RESIZE: string = "scaleflowresize";
 
   constructor(config: Phaser.Types.Core.GameConfig) {
-    const width = config.width as number;
-    const height = config.height as number;
+    const width = (config.width as number) || ScaleFlow.width;
+    const height = (config.height as number) || ScaleFlow.height;
 
     ScaleFlow.width = width;
     ScaleFlow.height = height;

@@ -1,408 +1,817 @@
 import { Scene } from "phaser";
+import { colyseusRoom, globalCardDataCache, CardData } from "../utils/colyseusClient";
+import {
+  Phase,
+  ClientPlayerState,
+  ClientCardInstance,
+} from "../schemas/ClientSchemas";
+import { getStateCallbacks } from "colyseus.js";
+import {
+  createCardGameObject,
+  FULL_CARD_WIDTH as CARD_WIDTH,
+  FULL_CARD_HEIGHT as CARD_HEIGHT,
+  CardRenderData
+} from "../utils/renderCardUtils";
 
-// --- Utility Function ---
-function generateUniqueId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
-
-// --- Interfaces ---
-interface CardData {
-  id: string; // Base card type ID from JSON
-  name: string;
-  attack: number;
-  speed: number;
-  health: number; // Max health
-  brewCost: number;
-  description: string;
-  isLegend: boolean;
-}
-
-// Represents a specific instance of a card owned by the player
-interface CardInstance extends CardData {
-    instanceId: string; // Unique ID for this specific card instance
-    currentHp: number; // Current health of this instance
-}
+// Removed local CardData interface, using imported one from colyseusClient
 
 export class Shop extends Scene {
-  private cardsInShop: CardData[] = []; // Cards currently offered in the shop
-  // private selectedCards: CardData[] = []; // REMOVED - Replaced by drag-to-buy
-  private playerBrews: number = 10; // Starting brews for Day 1
-  private brewText!: Phaser.GameObjects.Text; // Navbar text
-  private confirmButton!: Phaser.GameObjects.Text; // Now just "Continue"
-  private shopCardObjects: Phaser.GameObjects.Text[] = []; // Draggable shop card visuals
-  // private maxSelection: number = 2; // REMOVED
-  private currentDay: number = 1;
+  private continueButton!: Phaser.GameObjects.Text;
+  private shopCardObjects: Phaser.GameObjects.Container[] = [];
+  private waitingText!: Phaser.GameObjects.Text;
+  private refreshButton!: Phaser.GameObjects.Text;
+  private cardDataCache: Map<string, CardData> = new Map(); // Add card data cache
 
-  // Hand display elements
-  private handSlotObjects: Phaser.GameObjects.Rectangle[] = [];
-  private handSlots: Phaser.Geom.Rectangle[] = [];
-  private handCardDisplayObjects: (Phaser.GameObjects.Text | null)[] = [null, null, null, null, null]; // Visuals for cards in hand
+  // For shop offers UI
+  private shopOffersContainer!: Phaser.GameObjects.Container;
+  private shopOffersBackground!: Phaser.GameObjects.Rectangle;
+  private toggleShopButton!: Phaser.GameObjects.Text;
+  private shopOffersVisible: boolean = true;
+
+  private phaseListenerUnsub: (() => void) | null = null;
+  private playerStateListenersUnsub: Map<string, () => void> = new Map();
+  private shopOfferListenersUnsub: Array<() => void> = [];
+  private listeners: Array<() => void> = [];
 
   constructor() {
     super("Shop");
   }
 
-  // Add init method to receive data from Battle scene (or load from registry)
-  init(data: { playerBrews?: number, currentDay?: number }) {
-      // Load state from registry or use defaults/passed data
-      this.playerBrews = data.playerBrews === undefined ? (this.registry.get('playerBrews') || 10) : data.playerBrews;
-      this.currentDay = data.currentDay || this.registry.get('currentDay') || 1;
-      this.registry.set('currentDay', this.currentDay); // Ensure registry is up-to-date
-
-      // Hand/Battlefield state is read directly from registry in create
-      // Reset shop-specific arrays
-      this.cardsInShop = [];
-      this.shopCardObjects = [];
-      this.handCardDisplayObjects = [null, null, null, null, null]; // Reset visual array
-      this.handSlotObjects = [];
-      this.handSlots = [];
-  }
-
-  preload() {
-    // Assets for cards would be loaded in Preloader, ensure cardData is loaded
-  }
-
   create() {
-    this.scene.launch("background"); // Keep background consistent
+    this.scene.launch("background");
+
+    if (!this.scene.get("BoardView")?.scene.isActive()) {
+      this.scene.launch("BoardView");
+    }
+    this.scene.bringToTop();
+
+    if (!colyseusRoom || !colyseusRoom.state || !colyseusRoom.sessionId) {
+      console.error("Shop Scene: Colyseus room not available!");
+      this.add
+        .text(
+          this.cameras.main.centerX,
+          this.cameras.main.centerY,
+          "Error: Connection lost.\nPlease return to Main Menu.",
+          {
+            fontFamily: "Arial",
+            fontSize: "24px",
+            color: "#ff0000",
+            align: "center",
+          }
+        )
+        .setOrigin(0.5);
+      this.input.once("pointerdown", () => {
+        try {
+          colyseusRoom?.leave(true);
+        } catch (e) {}
+        this.scene.start("MainMenu");
+      });
+      return;
+    }
 
     const centerX = this.cameras.main.centerX;
     const centerY = this.cameras.main.centerY;
     const gameWidth = this.cameras.main.width;
     const gameHeight = this.cameras.main.height;
 
-    // Get current day and health from registry
-    const currentDay = this.registry.get('currentDay') || 1;
-    const playerHealth = this.registry.get('playerHealth') || 50;
-
-    // --- Navbar ---
-    const navbarY = 25;
-    const navbarHeight = 50;
-    this.add.rectangle(centerX, navbarY, gameWidth, navbarHeight, 0x000000, 0.6); // Semi-transparent background
-
-    // Health Display (Left)
-    this.add.text(50, navbarY, `Health: ${playerHealth}`, {
-        fontFamily: "Arial",
-        fontSize: 20, // Slightly smaller for more info
-        color: "#00ff00", // Green for health
-        align: "left"
-    }).setOrigin(0, 0.5); // Align left vertically centered
-
-    // Day/Phase Display (Center)
-    this.add.text(centerX, navbarY, `Day ${currentDay} - Shop Phase`, {
-        fontFamily: "Arial",
-        fontSize: 24,
-        color: "#ffffff",
-        align: "center"
-    }).setOrigin(0.5);
-
-    // Brews Display (Right) - Moved to Navbar
-    this.brewText = this.add.text(gameWidth - 50, navbarY, `Brews: ${this.playerBrews}`, {
-        fontFamily: "Arial",
-        fontSize: 20, // Slightly smaller
-        color: "#ffff00", // Yellow for brews
-        align: "right"
-    }).setOrigin(1, 0.5); // Align right vertically centered
-    // --- End Navbar ---
-
-
-    // Title - Center Top (Adjust Y position below navbar)
-    this.add
-      .text(centerX, 80, `Shop`, { // Adjusted Y
+    this.createShopCardsDisplay(centerX, centerY, gameWidth);
+    this.setupDragAndDrop(); // For shop offers
+    
+    // Request data for shop cards
+    this.requestMissingCardData();
+    
+    // Create refresh button
+    const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
+    const refreshCost = myPlayerState?.shopRefreshCost || 2;
+    
+    this.refreshButton = this.add.text(gameWidth - 150, 180, `Refresh: ${refreshCost} 🍺`, {
+      fontFamily: "Arial",
+      fontSize: 22, // Increased from 18
+      color: "#FFFFFF",
+      backgroundColor: "#4444AA",
+      padding: { x: 15, y: 8 }, // Increased padding
+    }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
+  
+    this.refreshButton.on("pointerdown", () => {
+      const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId);
+      if (colyseusRoom && myPlayerState && myPlayerState.brews >= myPlayerState.shopRefreshCost) {
+        colyseusRoom.send("refreshShop");
+      }
+    });
+  
+    this.refreshButton.on("pointerover", () => {
+      if (this.refreshButton.input?.enabled) {
+        this.refreshButton.setBackgroundColor("#6666CC");
+      }
+    });
+  
+    this.refreshButton.on("pointerout", () => {
+      if (this.refreshButton.input?.enabled) {
+        this.refreshButton.setBackgroundColor("#4444AA");
+      }
+    });
+  
+    // Initial update of button state
+    this.updateRefreshButtonState();
+  
+    this.continueButton = this.add
+      .text(centerX, gameHeight - 50, "Continue", {
         fontFamily: "Arial Black",
-        fontSize: 48,
-        color: "#ffffff",
+        fontSize: 40,
+        color: "#00ff00",
         stroke: "#000000",
-        strokeThickness: 8,
+        strokeThickness: 6,
         align: "center",
       })
-      .setOrigin(0.5);
-
-    // Instructions - Removed old "Select X cards" text
-    /* this.add
-      .text(centerX, 120, `Select ${this.maxSelection} cards`, { ... })
-      .setOrigin(0.5);
-    */
-    this.add
-      .text(centerX, 120, `Drag cards to your hand below to buy`, { // New instructions
-        fontFamily: "Arial",
-        fontSize: 20,
-        color: "#dddddd",
-        align: "center",
-      })
-      .setOrigin(0.5);
-
-
-    // --- Hand Slots Display (Similar to Preparation scene) ---
-    const handSlotY = gameHeight - 120;
-    const handSlotWidth = 100;
-    const handSlotHeight = 140;
-    const handSlotSpacing = 15;
-    const totalHandSlotsWidth = 5 * handSlotWidth + 4 * handSlotSpacing;
-    const startHandSlotsX = centerX - totalHandSlotsWidth / 2 + handSlotWidth / 2;
-
-    this.handSlots = [];
-    this.handSlotObjects = [];
-    const playerHandState: (CardInstance | null)[] = this.registry.get('playerHandState') || [null, null, null, null, null];
-
-    for (let i = 0; i < 5; i++) {
-        const slotX = startHandSlotsX + i * (handSlotWidth + handSlotSpacing);
-        const slotRect = new Phaser.Geom.Rectangle(
-            slotX - handSlotWidth / 2,
-            handSlotY - handSlotHeight / 2,
-            handSlotWidth,
-            handSlotHeight
-        );
-        this.handSlots.push(slotRect);
-
-        // Visual representation for hand slots
-        const slotGraphics = this.add.rectangle(
-            slotX,
-            handSlotY,
-            handSlotWidth,
-            handSlotHeight,
-            0x222222, 0.4
-        ).setStrokeStyle(1, 0xaaaaaa);
-        this.handSlotObjects.push(slotGraphics);
-
-        // Display card if it exists in the persistent state
-        const cardInstance = playerHandState[i];
-        if (cardInstance) {
-            const cardText = this.createCardText(
-                cardInstance,
-                slotX,
-                handSlotY,
-                handSlotWidth,
-                handSlotHeight,
-                "#444488" // Hand card color
-            );
-            this.handCardDisplayObjects[i] = cardText;
-            // Make hand cards non-interactive in shop? Or allow selling later? For now, non-interactive.
-            // cardText.setInteractive();
-        }
-    }
-    // --- End Hand Slots Display ---
-
-
-    // Load card data from cache
-    const allCards: CardData[] = this.cache.json.get("cardData");
-
-    // --- Display 4 Shop Cards (Center the card area) ---
-    const totalCardAreaWidth = gameWidth * 0.8; // Use 80% of width for cards
-    const cardDisplayWidth = 150; // Fixed width for card representation
-    const cardSpacing = (totalCardAreaWidth - (4 * cardDisplayWidth)) / 3; // Space between 4 cards
-    const startX = centerX - totalCardAreaWidth / 2 + cardDisplayWidth / 2; // Calculate starting X to center the group
-    const cardY = centerY - 50; // Position cards vertically centered slightly above middle
-
-    this.shopCardObjects = []; // Clear previous objects if scene restarts
-    this.cardsInShop = []; // Clear previous shop cards
-
-    if (!allCards || allCards.length === 0) {
-        console.error("Card data not loaded or empty!");
-        // Handle error, maybe display a message
-        return;
-    }
-
-    for (let i = 0; i < 4; i++) {
-      // Select a random card from the available pool
-      const randomCard = Phaser.Utils.Array.GetRandom(allCards);
-      // In a real scenario, you might want to prevent duplicates or weight rarities
-      this.cardsInShop.push(randomCard);
-
-      const cardRepresentation = this.add.text(
-        startX + i * (cardDisplayWidth + cardSpacing), // Position cards with spacing
-        cardY,
-        `${randomCard.name}\nCost: ${randomCard.brewCost}\nAtk: ${randomCard.attack} / HP: ${randomCard.health}\nSpd: ${randomCard.speed}`, // Use random card data
-        {
-          fontFamily: "Arial",
-          fontSize: 16, // Slightly smaller font
-          color: "#ffffff",
-          backgroundColor: "#333333",
-          padding: { x: 10, y: 5 },
-          align: "center",
-          fixedWidth: cardDisplayWidth, // Use fixed width
-          wordWrap: { width: cardDisplayWidth - 20 } // Adjust word wrap
-        }
-      )
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true, draggable: true }); // Make draggable
+    .setInteractive({ useHandCursor: true });
 
-      // Store the card data with the game object for easy access in the handler
-      cardRepresentation.setData("cardData", randomCard); // Use the randomly selected card
-      // cardRepresentation.setData("isSelected", false); // REMOVED
-      this.shopCardObjects.push(cardRepresentation);
+    this.continueButton.on("pointerdown", () => {
+      const myPlayerState = colyseusRoom?.state.players.get(
+        colyseusRoom.sessionId
+      ) as ClientPlayerState | undefined; // Added type cast
 
-      // REMOVE OLD CLICK HANDLER
-      // cardRepresentation.on("pointerdown", () => {
-      //   this.toggleCardSelection(cardRepresentation);
-      // });
-    }
-
-    // --- Drag and Drop Logic for Buying ---
-    this.input.on('dragstart', (pointer, gameObject: Phaser.GameObjects.Text) => {
-        // Check if it's a shop card being dragged
-        if (this.shopCardObjects.includes(gameObject)) {
-            this.children.bringToTop(gameObject);
-            gameObject.setAlpha(0.7);
-            // Store original position for snap back
-            gameObject.setData('startX', gameObject.x);
-            gameObject.setData('startY', gameObject.y);
+      if (
+        colyseusRoom &&
+        myPlayerState &&
+        colyseusRoom.state.currentPhase === Phase.Shop
+      ) {
+        if (myPlayerState.isReady) {
+          // Player is already ready, so send unready
+          colyseusRoom.send("playerUnready");
+        } else {
+          // Player is not ready, so send ready
+          colyseusRoom.send("playerReady");
         }
-        // Add logic here if hand cards become draggable later (e.g., for selling)
+      }
     });
 
-    this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
-        if (this.shopCardObjects.includes(gameObject)) {
+    this.continueButton.on("pointerover", () => {
+      if (this.continueButton.input?.enabled) {
+        const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+        if (myPlayerState?.isReady) {
+          this.continueButton.setColor("#ffaa55"); // Hover color for "Cancel Ready"
+        } else {
+          this.continueButton.setColor("#55ff55"); // Hover color for "Continue"
+        }
+      }
+    });
+    this.continueButton.on("pointerout", () => {
+      if (this.continueButton.input?.enabled) {
+        const myPlayerState = colyseusRoom?.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined;
+        if (myPlayerState?.isReady) {
+          this.continueButton.setColor("#ff8800"); // Normal color for "Cancel Ready"
+        } else {
+          this.continueButton.setColor("#00ff00"); // Normal color for "Continue"
+        }
+      } else {
+        this.continueButton.setColor("#888888"); // Disabled color
+      }
+    });
+
+    this.waitingText = this.add
+      .text(centerX, gameHeight - 20, "", {
+        fontFamily: "Arial",
+        fontSize: 18,
+        color: "#ffff00",
+        align: "center",
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+
+    this.setupColyseusListeners();
+    this.updateWaitingStatus();
+    this.time.delayedCall(50, () =>
+      this.createShopCardsDisplay(centerX, centerY, gameWidth)
+    ); // Recreate shop display
+
+    // Toggle Shop Button
+    this.toggleShopButton = this.add
+      .text(
+        gameWidth - 100, // Position top-right or similar
+        centerY - 250, // Adjust Y to be above shop offers
+        "Toggle Shop",
+        {
+          fontFamily: "Arial",
+          fontSize: 16,
+          color: "#FFFFFF",
+          backgroundColor: "#555555",
+          padding: { x: 5, y: 5 },
+        }
+      )
+      .setOrigin(1, 0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.toggleShopButton.on("pointerdown", () => {
+      this.shopOffersVisible = !this.shopOffersVisible;
+      this.shopOffersContainer.setVisible(this.shopOffersVisible);
+      this.toggleShopButton.setText(
+        this.shopOffersVisible ? "Hide Shop" : "Show Shop"
+      );
+    });
+    // Initial text
+    this.toggleShopButton.setText(
+      this.shopOffersVisible ? "Hide Shop" : "Show Shop"
+    );
+  
+    // Register shutdown event listener
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+  }
+  
+  private createShopCardsDisplay(
+    centerX: number,
+    centerY: number,
+    gameWidth: number
+  ) {
+    // Destroy previous container if it exists
+    this.shopOffersContainer?.destroy();
+
+    // Create a container for shop offers and their background
+    this.shopOffersContainer = this.add.container(0, 0);
+    this.shopOffersContainer.setVisible(this.shopOffersVisible);
+
+    // Clear old card objects from the main scene list, they will be in the container
+    this.shopCardObjects.forEach((obj) => obj.destroy());
+    this.shopCardObjects = [];
+
+    const myPlayerState = colyseusRoom?.state.players.get(
+      colyseusRoom.sessionId
+    );
+    const shopOfferIds = myPlayerState?.shopOfferIds;
+
+    if (!shopOfferIds || shopOfferIds.length === 0) {
+      console.log("Shop: No shop offers from server.");
+      if (this.shopOffersBackground && this.shopOffersBackground.active)
+        this.shopOffersBackground.setVisible(false);
+      return;
+    }
+
+    // Get card data directly from server state instead of local JSON
+    const shopCardSpacing = 20;
+    const numOffers = shopOfferIds.length > 0 ? shopOfferIds.length : 4;
+    const shopY = centerY;
+    const totalShopWidth =
+      numOffers * CARD_WIDTH + (numOffers - 1) * shopCardSpacing;
+    const startShopX = centerX - totalShopWidth / 2 + CARD_WIDTH / 2;
+
+    const bgWidth = totalShopWidth + shopCardSpacing * 2;
+    const bgHeight = CARD_HEIGHT + shopCardSpacing * 2;
+    if (this.shopOffersBackground && this.shopOffersBackground.active) {
+      this.shopOffersBackground.destroy();
+    }
+    this.shopOffersBackground = this.add.rectangle(
+      centerX,
+      shopY,
+      bgWidth,
+      bgHeight,
+      0x000033,
+      0.6
+    );
+    this.shopOffersContainer.add(this.shopOffersBackground);
+
+    shopOfferIds.forEach((cardId: string, index: number) => {
+      const cardData = this.getCardDataFromServer(cardId);
+      
+      if (!cardData) {
+        console.warn(`Shop: Card data not found for ID: ${cardId}`);
+        return;
+      }
+
+      const cardX = startShopX + index * (CARD_WIDTH + shopCardSpacing);
+      
+      // Convert CardData to CardRenderData
+      const cardRenderData: CardRenderData = {
+        name: cardData.name,
+        attack: cardData.attack,
+        speed: cardData.speed,
+        health: cardData.health,
+        brewCost: cardData.brewCost,
+        artUrl: cardData.artUrl,
+        statBuffs: new Map<string, number>() // Shop offers don't have buffs yet
+      };
+
+      // Use the utility function to create the card
+      const cardContainer = createCardGameObject(this, cardRenderData, 'full', false);
+      cardContainer.setPosition(cardX, shopY);
+
+      cardContainer.setSize(CARD_WIDTH, CARD_HEIGHT);
+      cardContainer.setInteractive({ useHandCursor: true });
+      cardContainer.setData("cardId", cardData.id);
+      cardContainer.setData("cardData", cardData);
+      this.input.setDraggable(cardContainer);
+
+      // Add pointerdown and pointerup listeners for click-to-buy
+      cardContainer.off('pointerdown').on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        if (!cardContainer.input?.enabled) return;
+        cardContainer.setData('isBeingDragged', false);
+      });
+
+      cardContainer.off('pointerup').on('pointerup', (pointer: Phaser.Input.Pointer) => {
+        if (!cardContainer.input?.enabled) return;
+        if (!colyseusRoom || !colyseusRoom.sessionId) return;
+
+        if (cardContainer.getData('isBeingDragged') === true) {
+            cardContainer.setData('isBeingDragged', false);
+            return;
+        }
+
+        // Click-to-buy logic remains the same
+        const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
+        if (!myPlayerState) return;
+
+        let firstEmptyHandSlot = -1;
+        for (let i = 0; i < 5; i++) {
+            if (!myPlayerState.hand.has(String(i))) {
+                firstEmptyHandSlot = i;
+                break;
+            }
+        }
+
+        if (firstEmptyHandSlot !== -1) {
+            const cardId = cardContainer.getData('cardId') as string;
+            const currentCardData = cardContainer.getData('cardData') as CardData;
+
+            if (cardId && currentCardData && myPlayerState.brews >= currentCardData.brewCost) {
+                console.log(`Shop: Click-to-buy card ${cardId} (Cost: ${currentCardData.brewCost}) into hand slot ${firstEmptyHandSlot}. Brews: ${myPlayerState.brews}`);
+                colyseusRoom.send("buyCard", {
+                    cardId: cardId,
+                    handSlotIndex: firstEmptyHandSlot,
+                });
+            } else {
+                if (currentCardData && myPlayerState.brews < currentCardData.brewCost) {
+                    console.log(`Shop: Not enough brews (${myPlayerState.brews}) to click-buy card ${cardId} (Cost: ${currentCardData.brewCost}).`);
+                } else {
+                    console.log(`Shop: Click-to-buy failed for card ${cardId}. CardData: ${!!currentCardData}`);
+                }
+            }
+        } else {
+            console.log("Shop: Hand is full, cannot click-buy.");
+        }
+      });
+
+      this.shopCardObjects.push(cardContainer);
+      this.shopOffersContainer.add(cardContainer);
+    });
+  }
+
+  private requestMissingCardData() {
+    if (!colyseusRoom || !colyseusRoom.state || !colyseusRoom.sessionId) return;
+    
+    const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
+    if (!myPlayerState) return;
+    
+    const shopOfferIds = myPlayerState.shopOfferIds;
+    
+    if (shopOfferIds && shopOfferIds.length > 0) {
+      // Get IDs for cards not in global cache
+      const missingIds: string[] = [];
+      shopOfferIds.forEach((id: string) => { // Type 'string' inferred from shopOfferIds: ArraySchema<string>
+        if (!globalCardDataCache.has(id)) {
+          missingIds.push(id);
+        }
+      });
+      
+      // Request missing card data
+      if (missingIds.length > 0) {
+        console.log("Requesting missing cards from server:", missingIds);
+        colyseusRoom.send("getCardsByIds", { cardIds: missingIds });
+      }
+    }
+  }
+
+  private getCardDataFromServer(cardId: string): CardData | undefined {
+    // First check the global card cache
+    if (globalCardDataCache.has(cardId)) {
+      return globalCardDataCache.get(cardId);
+    }
+    
+    // If not in global cache, check existing instances in the state
+    if (!colyseusRoom || !colyseusRoom.state) return undefined;
+
+    let cardData: CardData | undefined = undefined;
+
+    colyseusRoom.state.players.forEach((player: any) => { // Cast to any or use ClientPlayerState
+      // Look in player's hand
+      (player as ClientPlayerState).hand.forEach((card: ClientCardInstance) => {
+        if (card.cardId === cardId) {
+          cardData = {
+            id: card.cardId,
+            name: card.name,
+            attack: card.attack,
+            speed: card.speed,
+            health: card.health,
+            brewCost: card.brewCost,
+            description: card.description,
+            isLegend: card.isLegend
+          };
+        }
+      });
+      
+      // Look in player's battlefield
+      (player as ClientPlayerState).battlefield.forEach((card: ClientCardInstance) => {
+        if (card.cardId === cardId) {
+          cardData = {
+            id: card.cardId,
+            name: card.name,
+            attack: card.attack,
+            speed: card.speed,
+            health: card.health,
+            brewCost: card.brewCost,
+            description: card.description,
+            isLegend: card.isLegend
+          };
+        }
+      });
+    });
+    
+    // Create a placeholder if we still don't have data
+    if (!cardData) {
+      cardData = {
+        id: cardId,
+        name: `Card ${cardId.split('_').pop()}`,
+        attack: 1,
+        speed: 1,
+        health: 1,
+        brewCost: 1,
+        description: "Loading card details...",
+        isLegend: false
+      };
+      console.warn(`Shop: Card data not found for ID: ${cardId} in global cache or state`);
+    }
+    
+    return cardData;
+  }
+
+  private setupDragAndDrop() {
+    this.input.off("dragstart");
+    this.input.off("drag");
+    this.input.off("dragend");
+    this.input.off("pointerdown"); // Ensure we clear previous general pointerdown if any
+    this.input.off("pointerup");   // Ensure we clear previous general pointerup if any
+
+    // Remove individual pointerdown/pointerup from shopCardObjects if set previously
+    this.shopCardObjects.forEach(cardContainer => {
+        cardContainer.off('pointerdown');
+        cardContainer.off('pointerup');
+    });
+
+
+    this.input.on(
+      "dragstart",
+      (
+        pointer: Phaser.Input.Pointer,
+        gameObject: Phaser.GameObjects.GameObject
+      ) => {
+        if (
+          !(gameObject instanceof Phaser.GameObjects.Container) ||
+          !this.shopCardObjects.includes(gameObject)
+        )
+          return;
+        if (!gameObject.input?.enabled) return;
+
+        this.children.bringToTop(gameObject); // Bring container to top
+        gameObject.setAlpha(0.7);
+        gameObject.setData("startX", gameObject.x);
+        gameObject.setData("startY", gameObject.y);
+        gameObject.setData('isBeingDragged', true); // Flag that dragging has started
+      }
+    );
+
+    this.input.on(
+      "drag",
+      (
+        pointer: Phaser.Input.Pointer,
+        gameObject: Phaser.GameObjects.GameObject,
+        dragX: number,
+        dragY: number
+      ) => {
+        if (
+          !(gameObject instanceof Phaser.GameObjects.Container) ||
+          !this.shopCardObjects.includes(gameObject)
+        )
+          return;
+        if (!gameObject.input?.enabled) return;
+        if (gameObject.getData('isBeingDragged') === true) { // Only move if dragging
             gameObject.x = dragX;
             gameObject.y = dragY;
         }
-    });
+      }
+    );
 
-    this.input.on('dragend', (pointer, gameObject: Phaser.GameObjects.Text) => {
-        if (this.shopCardObjects.includes(gameObject)) {
-            gameObject.setAlpha(1.0);
+    this.input.on(
+      "dragend",
+      (
+        pointer: Phaser.Input.Pointer,
+        gameObject: Phaser.GameObjects.GameObject
+      ) => {
+        if (
+          !colyseusRoom ||
+          !(gameObject instanceof Phaser.GameObjects.Container) ||
+          !this.shopCardObjects.includes(gameObject)
+        ) {
+          if (gameObject instanceof Phaser.GameObjects.Container) {
+            gameObject.setData('isBeingDragged', false); // Reset flag even if other conditions fail
+          }
+          return;
+        }
+        
+        gameObject.setAlpha(1.0);
+        let buyAttempted = false;
+
+        if (gameObject.getData('isBeingDragged') === true) { // Process drop only if it was a drag
             const droppedX = gameObject.x;
             const droppedY = gameObject.y;
-            let bought = false;
 
-            // Check drop on Hand Slots
-            for (let i = 0; i < this.handSlots.length; i++) {
-                const playerHandState: (CardInstance | null)[] = this.registry.get('playerHandState');
-                // Check if slot exists and is empty, and if dropped within its bounds
-                if (this.handSlots[i] && playerHandState[i] === null && Phaser.Geom.Rectangle.Contains(this.handSlots[i], droppedX, droppedY)) {
+            const boardViewScene = this.scene.get(
+              "BoardView"
+            ) as import("./BoardView").BoardView;
+
+            // Check hand slots
+            for (let i = 0; i < 5; i++) {
+              const slotPos = boardViewScene?.getSlotPixelPosition(true, "hand", i);
+              if (slotPos) {
+                const handSlotDropZone = new Phaser.Geom.Rectangle(
+                  slotPos.x - 50,
+                  slotPos.y - 70,
+                  100,
+                  140
+                );
+                if (
+                  Phaser.Geom.Rectangle.Contains(
+                    handSlotDropZone,
+                    droppedX,
+                    droppedY
+                  )
+                ) {
+                  const myPlayerState = colyseusRoom.state.players.get(
+                    colyseusRoom.sessionId
+                  );
+                  if (myPlayerState && !myPlayerState.hand.has(String(i))) {
+                    const cardId = gameObject.getData("cardId") as string;
                     const cardData = gameObject.getData("cardData") as CardData;
-                    if (this.playerBrews >= cardData.brewCost) {
-                        // Buy the card
-                        this.playerBrews -= cardData.brewCost;
-                        const newCardInstance: CardInstance = {
-                            ...cardData, // Copy base data
-                            instanceId: generateUniqueId(),
-                            currentHp: cardData.health // Start with full HP
-                        };
-
-                        // Update registry state
-                        playerHandState[i] = newCardInstance;
-                        this.registry.set('playerHandState', playerHandState);
-
-                        // Update visuals
-                        const slot = this.handSlots[i];
-                        const newCardText = this.createCardText(
-                            newCardInstance,
-                            slot.centerX,
-                            slot.centerY,
-                            this.handSlotObjects[i].width, // Use actual slot dimensions
-                            this.handSlotObjects[i].height,
-                            "#444488" // Hand card color
-                        );
-                        this.handCardDisplayObjects[i] = newCardText; // Store visual reference
-
-                        // Remove the shop card visual and data
-                        gameObject.destroy();
-                        this.shopCardObjects = this.shopCardObjects.filter(obj => obj !== gameObject);
-                        // Optional: Refresh shop or replace bought card? For now, just remove.
-
-                        bought = true;
-                        this.updateUI(); // Update brew count display
-                        console.log(`Bought ${cardData.name} for ${cardData.brewCost} brews. Placed in hand slot ${i}.`);
-                        break; // Exit loop once placed
+                    if (cardId && cardData && myPlayerState.brews >= cardData.brewCost) {
+                      colyseusRoom.send("buyCard", {
+                        cardId: cardId,
+                        handSlotIndex: i,
+                      });
+                      buyAttempted = true;
                     } else {
-                        console.log("Not enough brews!");
-                        // Snap back to original position
-                        gameObject.x = gameObject.getData('startX');
-                        gameObject.y = gameObject.getData('startY');
-                        break; // Exit loop
+                        // Not enough brews or cardData missing
+                        console.log("Shop: Drag-to-buy failed (not enough brews or card data missing).");
                     }
+                  }
+                  break;
                 }
+              }
             }
 
-            // If not bought (dropped outside or on full slot), snap back
-            if (!bought) {
-                gameObject.x = gameObject.getData('startX');
-                gameObject.y = gameObject.getData('startY');
+            // Check battlefield slots (No battlefield drop from shop)
+            // This part can be removed if shop cards can only go to hand.
+            // If shop cards *can* go to battlefield, this logic is fine.
+            // For now, let's assume shop cards only go to hand.
+
+            if (!buyAttempted) {
+              // Snap back if not bought
+              if (gameObject.active) {
+                gameObject.x = gameObject.getData("startX");
+                gameObject.y = gameObject.getData("startY");
+              }
             }
         }
-         // Add logic here if hand cards become draggable later
-    });
-
-
-    // --- Continue Button (No longer Confirm Selection) ---
-    this.confirmButton = this.add.text(
-        centerX,
-        gameHeight - 50, // Adjusted position slightly
-        "Continue", // Changed text
-        {
-          fontFamily: "Arial Black",
-          fontSize: 40,
-          color: "#00ff00", // Always enabled color
-          stroke: "#000000",
-          strokeThickness: 6,
-          align: "center",
-        }
-      )
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true }); // Always interactive
-
-    this.confirmButton.on('pointerdown', () => {
-        this.confirmSelection(); // Renamed function, but logic is simpler now
-    });
-    this.confirmButton.on('pointerover', () => this.confirmButton.setColor('#55ff55'));
-    this.confirmButton.on('pointerout', () => this.confirmButton.setColor('#00ff00'));
-
-    // Remove initial updateUI call for button state, as it's always active now
-    // this.updateUI();
-    this.updateUI(); // Still needed to set initial brew text
+        gameObject.setData('isBeingDragged', false); // Reset drag flag
+      }
+    );
   }
 
-  // REMOVE toggleCardSelection method entirely
-  // private toggleCardSelection(cardObject: Phaser.GameObjects.Text) { ... }
-
-  private updateUI() {
-    // Update Brews Text in Navbar
-    this.brewText.setText(`Brews: ${this.playerBrews}`);
-
-    // Confirm/Continue button state is now always active, no update needed here
+  private updateRefreshButtonState() {
+    if (!colyseusRoom || !this.refreshButton || !this.refreshButton.active) return;
+    
+    const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId) as ClientPlayerState | undefined; // Cast for type safety
+    if (!myPlayerState) return;
+    
+    // Update text with current cost
+    this.refreshButton.setText(`Refresh Shop: ${myPlayerState.shopRefreshCost} 🍺`);
+    
+    // Enable/disable based on whether player has enough brews AND is not ready AND is in Shop phase
+    const canRefresh = myPlayerState.brews >= myPlayerState.shopRefreshCost &&
+                    !myPlayerState.isReady && // Player cannot refresh if they are ready
+                    colyseusRoom.state.currentPhase === Phase.Shop;
+    
+    if (canRefresh) {
+      this.refreshButton.setColor("#FFFFFF");
+      this.refreshButton.setBackgroundColor("#4444AA");
+      this.refreshButton.setInteractive({ useHandCursor: true });
+    } else {
+      this.refreshButton.setColor("#AAAAAA");
+      this.refreshButton.setBackgroundColor("#555555");
+      this.refreshButton.disableInteractive();
+    }
   }
+  
+  private setupColyseusListeners() {
+    if (!colyseusRoom || !colyseusRoom.sessionId) return;
+    const $ = getStateCallbacks(colyseusRoom);
+    const myPlayerId = colyseusRoom.sessionId;
 
-  // Renamed and simplified confirmSelection
-  private confirmSelection() {
-    console.log("Continuing to Preparation Phase...");
-    // State (hand/battlefield) is already updated in the registry via drag-and-drop buys.
-    // We just need to save the current brew count.
-    this.registry.set('playerBrews', this.playerBrews); // Save potentially updated brew count
-
-    this.scene.start("Preparation", {
-        // No need to pass hand/battlefield, Prep will read from registry
-        // Pass brews/day in case Prep needs it immediately, though registry is preferred
-        playerBrews: this.playerBrews,
-        currentDay: this.currentDay
-    });
-  }
-
-  // Helper to create card text objects (can be reused)
-  private createCardText(
-      cardInstance: CardInstance,
-      x: number, y: number,
-      width: number, height: number,
-      bgColor: string
-  ): Phaser.GameObjects.Text {
-      // Show current/max HP only if damaged, otherwise just max HP
-      const hpDisplay = cardInstance.currentHp < cardInstance.health
-          ? `${cardInstance.currentHp}/${cardInstance.health}`
-          : `${cardInstance.health}`;
-
-      return this.add.text(
-          x, y,
-          `${cardInstance.name}\nAtk: ${cardInstance.attack}\nHP: ${hpDisplay}\nSpd: ${cardInstance.speed}`,
-          {
-              fontFamily: "Arial",
-              fontSize: 14, // Adjust as needed
-              color: "#ffffff",
-              backgroundColor: bgColor,
-              padding: { x: 5, y: 3 },
-              align: "center",
-              fixedWidth: width,
-              fixedHeight: height,
-              wordWrap: { width: width - 10 }
+    this.phaseListenerUnsub = $(colyseusRoom.state).listen(
+      "currentPhase",
+      (currentPhase) => {
+        if (!this.scene.isActive()) return;
+        if (currentPhase === Phase.Preparation) {
+          if (this.scene.isActive()) {
+            this.scene.stop();
+            this.scene.start("Preparation");
           }
-      ).setOrigin(0.5);
+        } else if (currentPhase !== Phase.Shop) {
+          if (this.scene.isActive()) {
+            this.scene.stop();
+            this.scene.start("Lobby");
+          }
+        }
+        this.updateWaitingStatus();
+      }
+    );
+
+    colyseusRoom.state.players.forEach((player: any, sessionId: string) => { // Cast to any or use ClientPlayerState
+      const unsub = $(player as ClientPlayerState).listen("isReady", () => {
+        if (this.scene.isActive()) this.updateWaitingStatus();
+      });
+      this.playerStateListenersUnsub.set(sessionId, unsub);
+    });
+
+    this.listeners.push(
+      $(colyseusRoom.state.players).onAdd((player: any, sessionId: string) => { // Cast to any or use ClientPlayerState
+        if (this.playerStateListenersUnsub.has(sessionId)) {
+          this.playerStateListenersUnsub.get(sessionId)?.();
+        }
+        const unsub = $(player as ClientPlayerState).listen("isReady", () => {
+          if (this.scene.isActive()) this.updateWaitingStatus();
+        });
+        this.playerStateListenersUnsub.set(sessionId, unsub);
+        if (this.scene.isActive()) this.updateWaitingStatus();
+      })
+    );
+
+    this.listeners.push(
+      $(colyseusRoom.state.players).onRemove((player: any, sessionId: string) => {
+        this.playerStateListenersUnsub.get(sessionId)?.();
+        this.playerStateListenersUnsub.delete(sessionId);
+        if (this.scene.isActive()) this.updateWaitingStatus();
+      })
+    );
+
+    // Listen for card data responses
+    this.listeners.push(
+      colyseusRoom.onMessage("cardsByIds", (data: { [cardId: string]: CardData }) => {
+        if (this.scene.isActive()) {
+          // Update the global cache
+          Object.entries(data).forEach(([cardId, cardData]) => {
+            globalCardDataCache.set(cardId, cardData);
+          });
+          
+          // Update shop display with the new data
+          const centerX = this.cameras.main.centerX;
+          const centerY = this.cameras.main.centerY;
+          const gameWidth = this.cameras.main.width;
+          this.createShopCardsDisplay(centerX, centerY, gameWidth);
+        }
+      })
+    );
+
+    const myPlayerState = colyseusRoom.state.players.get(myPlayerId);
+    if (myPlayerState) {
+      const onShopOffersChanged = () => {
+        if (!this.scene.isActive()) return;
+        // Request data for any new shop cards
+        this.requestMissingCardData();
+        // Immediate update with what data we have
+        const centerX = this.cameras.main.centerX;
+        const centerY = this.cameras.main.centerY;
+        const gameWidth = this.cameras.main.width;
+        this.createShopCardsDisplay(centerX, centerY, gameWidth);
+      };
+      this.shopOfferListenersUnsub.push(
+        $(myPlayerState.shopOfferIds).onAdd(onShopOffersChanged)
+      );
+      this.shopOfferListenersUnsub.push(
+        $(myPlayerState.shopOfferIds).onRemove(onShopOffersChanged)
+      );
+      onShopOffersChanged(); // Initial call
+      
+      // Add listeners for brews and shopRefreshCost to update refresh button state
+      this.listeners.push(
+        $(myPlayerState).listen("brews", () => {
+          if (this.scene.isActive()) this.updateRefreshButtonState();
+        })
+      );
+      
+      this.listeners.push(
+        $(myPlayerState).listen("shopRefreshCost", () => {
+          if (this.scene.isActive()) this.updateRefreshButtonState();
+        })
+      );
+    }
+  }
+
+  private cleanupListeners() {
+    console.log("Shop Scene: Cleaning up listeners.");
+    this.phaseListenerUnsub?.();
+    this.phaseListenerUnsub = null;
+
+    this.playerStateListenersUnsub.forEach((unsub) => unsub());
+    this.playerStateListenersUnsub.clear();
+
+    this.shopOfferListenersUnsub.forEach((unsub) => unsub());
+    this.shopOfferListenersUnsub = [];
+
+    this.listeners.forEach((unsub) => unsub());
+    this.listeners = [];
+
+    this.input.off("dragstart");
+    this.input.off("drag");
+    this.input.off("dragend");
+    this.continueButton?.off("pointerdown");
+    this.continueButton?.off("pointerover");
+    this.continueButton?.off("pointerout");
+  }
+
+  private updateWaitingStatus() {
+    if (
+      !colyseusRoom ||
+      !colyseusRoom.sessionId ||
+      !this.continueButton ||
+      !this.waitingText ||
+      !this.scene.isActive()
+    )
+      return;
+
+    const myPlayerState = colyseusRoom.state.players.get(
+      colyseusRoom.sessionId
+    );
+    if (!myPlayerState) return;
+
+    let allPlayersReady = true;
+    colyseusRoom.state.players.forEach((player: any) => { // Cast to any or use ClientPlayerState
+      if (!(player as ClientPlayerState).isReady) allPlayersReady = false;
+    });
+
+    const amReady = myPlayerState.isReady;
+    const isShopPhase = colyseusRoom.state.currentPhase === Phase.Shop;
+    const canInteract = isShopPhase; // Player can always interact with the button in Shop phase if it's enabled
+
+    this.continueButton.setInteractive(canInteract);
+    
+    if (amReady) {
+      this.continueButton.setText("Cancel Ready").setColor("#ff8800"); // Orange for cancel
+    } else {
+      this.continueButton.setText("Continue").setColor("#00ff00"); // Green for continue
+    }
+    // Ensure disabled color is applied if interaction is not allowed (e.g. wrong phase, though canInteract handles this for Shop)
+    if (!canInteract) {
+        this.continueButton.setColor("#888888").disableInteractive();
+    }
+
+
+    if (amReady && !allPlayersReady && isShopPhase) {
+      this.waitingText
+        .setText("Waiting for other player(s)...")
+        .setVisible(true);
+      // Button text is already "Cancel Ready"
+    } else if (!isShopPhase) {
+      this.waitingText
+        .setText(`Waiting for ${colyseusRoom.state.currentPhase} phase...`)
+        .setVisible(true);
+      this.continueButton.setText("Continue").setColor("#888888").disableInteractive(); // Disable if not shop phase
+    } else {
+      this.waitingText.setVisible(false);
+      // Button text is "Continue" or "Cancel Ready" based on amReady
+    }
+
+    this.shopCardObjects.forEach((cardObj) => {
+      if (cardObj.input) cardObj.input.enabled = !amReady && isShopPhase; // Can only interact with cards if not ready
+    });
+
+    // Update refresh button interactability based on ready state
+    this.updateRefreshButtonState(); // Call this to ensure refresh button is disabled if player is ready
+  }
+
+  shutdown() {
+    console.log("Shop scene shutting down.");
+    this.cleanupListeners();
+
+    this.shopCardObjects.forEach((obj) => obj.destroy());
+    this.shopCardObjects = [];
+
+    this.continueButton?.destroy();
+    this.waitingText?.destroy();
+    this.refreshButton?.off("pointerdown");
+    this.refreshButton?.off("pointerover");
+    this.refreshButton?.off("pointerout");
+    this.refreshButton?.destroy();
+    this.toggleShopButton?.destroy();
+    this.shopOffersContainer?.destroy(); // Destroy container which holds background and cards
+
+    // Unregister the shutdown event listener for this scene
+    this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 }

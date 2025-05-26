@@ -1,5 +1,8 @@
 import { Scene } from "phaser";
 
+// @ts-ignore
+const isProd = import.meta.env.PROD;
+
 export class Preloader extends Scene {
   constructor() {
     super("Preloader");
@@ -36,7 +39,7 @@ export class Preloader extends Scene {
     );
 
     //  Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
-    this.load.on("progress", (progress) => {
+    this.load.on("progress", (progress: number) => {
       //  Update the progress bar (our bar is 464px wide, so 100% = 464px)
       bar.width = 4 + 460 * progress;
     });
@@ -44,28 +47,17 @@ export class Preloader extends Scene {
 
   preload() {
     //  Load the assets for the game - Replace with your own assets
-    this.load.setPath("/.proxy/assets");
-
-    // Load the alphabet images
-    const alphabetArray = "abcd".split(""); // efghijklmnopqrstuvwxyz
-
-    alphabetArray.forEach((letter) => {
-      this.load.image(letter, `${letter}.png`);
-    });
-
-    this.load.image("smile", "smile.png");
-    this.load.image("alien", "alien.png");
+    const assetPath = "/assets"; // Standardized path
+    this.load.setPath(assetPath);
     this.load.image("logo", "logo.png");
-    this.load.image("nought_1", "nought.png");
-    this.load.image("nought_2", "nought.png");
-    this.load.image("nought_3", "nought.png");
-    this.load.image("cross_1", "cross.png");
-    this.load.image("cross_2", "cross.png");
-    this.load.image("cross_3", "cross.png");
-    this.load.image("grid", "grid.png");
 
-    // Load card data
-    this.load.json("cardData", "data/cards.json");
+    // Remove loading of card data as it's now on the server
+    // this.load.json("cardData", "data/cards.json");
+
+    // Load card sprites
+    this.load.image("cardFullTier1", "CardFullTier1.png");
+    this.load.image("cardMinionTier1", "CardMinionTier1.png");
+    this.load.image("lola_art", "lola.png"); // Load card art
   }
 
   create() {

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Legends of the Friendgroup</title>
+
+    <style>
+    html, body {
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        background-color: black;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #gameParent {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        position: relative; /* For #guide positioning */
+        /* Default to width-constrained scaling (e.g. portrait or tall viewport) */
+        /* Height is 9/16 of the viewport width */
+        width: 100vw;
+        height: calc(100vw * 9 / 16);
+    }
+
+    /* Media query for when viewport is wider than 16:9 (e.g. landscape viewport) */
+    /* In this case, width is 16/9 of the viewport height */
+    @media (min-aspect-ratio: 16/9) {
+        #gameParent {
+            height: 100vh;
+            width: calc(100vh * 16 / 9);
+        }
+    }
+
+    #guide { /* This is an <img> tag */
+        position: absolute;
+        /* Make the #guide img fill the #gameParent container */
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        /* object-fit: fill; /* Optional: if the guide image itself needs to stretch */
+    }
+
+    canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+</style>
+  <script type="module" crossorigin src="/assets/index-CrQMDrXD.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/phaser-CdQw7D6z.js">
+</head>
+<body>
+    <div id="gameParent"><img id="guide" src="assets/1280x720-trans.png"></div>
+  </body>
+</html>

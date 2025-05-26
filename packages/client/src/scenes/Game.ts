@@ -1,9 +1,9 @@
 import { Scene } from "phaser";
-import { Room, Client, getStateCallbacks } from "colyseus.js";
+import { Room, Client } from "colyseus.js";
 import { getUserName } from "../utils/discordSDK";
 
 export class Game extends Scene {
-  room: Room;
+  room!: Room;
 
   constructor() {
     super("Game");
@@ -17,15 +17,13 @@ export class Game extends Scene {
 
     await this.connect();
 
-    const $ = getStateCallbacks(this.room);
-
-    $(this.room.state).draggables.onAdd((draggable: any, draggableId: string) => {
+    this.room.state.draggables.onAdd((draggable: any, draggableId: string) => {
       const image = this.add.image(draggable.x, draggable.y, draggableId).setInteractive();
       image.name = draggableId;
       image.setScale(0.8);
 
       this.input.setDraggable(image);
-      image.on("drag", (pointer, dragX, dragY) => {
+      image.on("drag", (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
         if (!this.room) {
           return;
         }
@@ -49,11 +47,6 @@ export class Game extends Scene {
           y: image.y,
         });
       });
-
-      $(draggable).onChange(() => {
-        image.x = draggable.x;
-        image.y = draggable.y;
-      });
     });
 
     this.add
@@ -71,7 +64,7 @@ export class Game extends Scene {
     const client = new Client(`${url}`);
 
     try {
-      this.room = await client.joinOrCreate("game", {
+      this.room = await client.joinOrCreate("some_other_room", {
         // Let's send our client screen dimensions to the server for initial positioning
         screenWidth: this.game.config.width,
         screenHeight: this.game.config.height,

@@ -6,6 +6,35 @@ This project template is designed to be used in conjunction with our [Creating M
 
 You need to have Node.js v21 or higher version.
 
+## Digital Ocean Deployment
+
+To deploy to a Digital Ocean droplet:
+
+1. Clone this repository to your droplet
+2. Ensure Docker and Docker Compose are installed:
+   ```
+   sudo apt update
+   sudo apt install docker.io docker-compose -y
+   sudo systemctl enable docker
+   sudo systemctl start docker
+   ```
+3. Create a `.env` file with your Discord application credentials:
+   ```
+   VITE_CLIENT_ID=your_discord_client_id
+   CLIENT_SECRET=your_discord_client_secret
+   ```
+4. Make the deployment script executable:
+   ```
+   chmod +x deploy.sh
+   ```
+5. Run the deployment script:
+   ```
+   ./deploy.sh
+   ```
+6. Your application will be available at:
+   - Client: http://your-droplet-ip:8080
+   - Server: http://your-droplet-ip:4001
+
 ## Template Project Structure
 
 We have provided a default project structure to get you started. This is as follows:

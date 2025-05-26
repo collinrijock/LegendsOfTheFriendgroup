@@ -8,12 +8,17 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
+    "@rollup/plugin-terser": "^0.4.4",
+    "terser": "^5.39.2",
     "typescript": "^5.3.3",
     "vite": "^5.0.8"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^1.4.3",
-    "colyseus.js": "^0.16.0",
-    "phaser": "^3.87.0"
+    "colyseus.js": "^0.16.17",
+    "phaser": "^3.87.0",
+    "rollup-plugin-terser": "^7.0.2"
   }
 }

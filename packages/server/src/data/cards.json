@@ -1,0 +1,275 @@
+[
+  {
+    "id": "quick_jab_01",
+    "name": "Dart Monkey",
+    "attack": 2,
+    "speed": 3,
+    "health": 8,
+    "brewCost": 4,
+    "description": "Fast but frail.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "tanky_boi_01",
+    "name": "Sleepy Snorlax",
+    "attack": 3,
+    "speed": 8,
+    "health": 25,
+    "brewCost": 5,
+    "description": "Takes a beating.",
+    "rarity": "common",
+    "artUrl": "lola.png",
+    "effects": [
+      {
+        "effectId": "gainBrewsOnBattleStart",
+        "trigger": "BATTLE_START",
+        "description": "At battle start, gain 2 brews.",
+        "config": {
+          "amount": 2
+        }
+      }
+    ]
+  },
+  {
+    "id": "tanky_boi_02",
+    "name": "FNAF Security Guard",
+    "attack": 3,
+    "speed": 7,
+    "health": 20,
+    "brewCost": 5,
+    "description": "Takes a beating.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "glass_cannon_01",
+    "name": "Deagle David",
+    "attack": 12,
+    "speed": 6,
+    "health": 4,
+    "brewCost": 5,
+    "description": "Hits hard, dies fast.",
+    "rarity": "common",
+    "artUrl": "lola.png",
+    "effects": [
+      {
+        "effectId": "lifestealOnAttack",
+        "trigger": "ON_ATTACK",
+        "description": "When this unit attacks, 50% chance to restore 3 health to you.",
+        "config": {
+          "chance": 0.5,
+          "amount": 3
+        }
+      }
+    ]
+  },
+  {
+    "id": "balanced_bud_01",
+    "name": "Kobak",
+    "attack": 6,
+    "speed": 6,
+    "health": 12,
+    "brewCost": 6,
+    "description": "Good all-around.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "balanced_bud_02",
+    "name": "Bareem",
+    "attack": 5,
+    "speed": 6,
+    "health": 14,
+    "brewCost": 6,
+    "description": "Good all-around.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "speedy_scout_01",
+    "name": "Chicken Jockey",
+    "attack": 2,
+    "speed": 3,
+    "health": 4,
+    "brewCost": 3,
+    "description": "Attacks quickly.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "speedy_scout_02",
+    "name": "Scary Zomboid",
+    "attack": 4,
+    "speed": 5.5,
+    "health": 5,
+    "brewCost": 3,
+    "description": "Attacks quickly.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "bruiser_01",
+    "name": "Darius",
+    "attack": 9,
+    "speed": 8,
+    "health": 18,
+    "brewCost": 7,
+    "description": "Tough and hits reasonably hard.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "bruiser_02",
+    "name": "Buff Correll",
+    "attack": 7,
+    "speed": 7,
+    "health": 18,
+    "brewCost": 7,
+    "description": "Tough and hits reasonably hard.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "sniper_01",
+    "name": "Low Orbit Ion Cannon",
+    "attack": 24,
+    "speed": 14,
+    "health": 12,
+    "brewCost": 8,
+    "description": "Slow wind-up, big impact. While alive, enemy units with 10+ Attack have a 50% chance to miss.",
+    "rarity": "rare",
+    "artUrl": "lola.png",
+    "effects": [
+      {
+        "effectId": "missAuraAgainstHighAttack",
+        "trigger": "WHILE_ALIVE",
+        "description": "While alive, enemy units with 10+ Attack have a 50% chance to miss.",
+        "config": {
+          "attackThreshold": 10,
+          "missChance": 0.5
+        }
+      }
+    ]
+  },
+  {
+    "id": "swarm_ling_01",
+    "name": "Baby Pig",
+    "attack": 1,
+    "speed": 3,
+    "health": 6,
+    "brewCost": 1,
+    "description": "Cheap and fast, but weak.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "raccoon_01",
+    "name": "Peanote Botar Raccoon ",
+    "attack": 2,
+    "speed": 3.5,
+    "health": 9,
+    "brewCost": 3,
+    "description": "Cheap and fast, but weak.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "swarm_ling_02",
+    "name": "Starfruit Tree",
+    "attack": 1,
+    "speed": 10,
+    "health": 15,
+    "brewCost": 1,
+    "description": "Cheap and tanky, but weak.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "guardian_01",
+    "name": "Mistah Lobstah",
+    "attack": 4,
+    "speed": 9,
+    "health": 32,
+    "brewCost": 9,
+    "description": "A defensive wall.",
+    "rarity": "rare",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "berserker_01",
+    "name": "Saxton Hale",
+    "attack": 8,
+    "speed": 4,
+    "health": 16,
+    "brewCost": 12,
+    "description": "Expensive but very powerful. When this unit dies, it deals 5 damage to ALL units.",
+    "rarity": "legend",
+    "artUrl": "lola.png",
+    "effects": [
+      {
+        "effectId": "aoeDamageOnDeath",
+        "trigger": "ON_DEATH",
+        "description": "When this unit dies, it deals 5 damage to ALL units.",
+        "config": {
+          "damage": 5
+        }
+      }
+    ]
+  },
+  {
+    "id": "brigade_beamer_01",
+    "name": "Brigade Beamer",
+    "attack": 4,
+    "speed": 6,
+    "health": 7,
+    "brewCost": 4,
+    "description": "Chill with collin.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "minigunner_01",
+    "name": "Minigunner",
+    "attack": 2,
+    "speed": 2,
+    "health": 10,
+    "brewCost": 10,
+    "description": "Pew pew pew.",
+    "rarity": "rare",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "humonculated_chungorian_01",
+    "name": "Humonculated Chungorian",
+    "attack": 16,
+    "speed": 10,
+    "health": 32,
+    "brewCost": 15,
+    "description": "Strong and chunky",
+    "rarity": "legend",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "hobgoblin_01",
+    "name": "Hobgoblin",
+    "attack": 2,
+    "speed": 4.5,
+    "health": 8,
+    "brewCost": 2,
+    "description": "Strong and chunky",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  },
+  {
+    "id": "party_potato_01",
+    "name": "Party Potato",
+    "attack": 1,
+    "speed": 3.5,
+    "health": 8,
+    "brewCost": 2,
+    "description": "Cheap and well rounded.",
+    "rarity": "common",
+    "artUrl": "lola.png"
+  }
+]
