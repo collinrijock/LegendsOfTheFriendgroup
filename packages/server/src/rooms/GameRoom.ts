@@ -5,6 +5,8 @@ import {
   PlayerState,
   CardInstanceSchema,
   Phase,
+  EffectTrigger, // Added
+  CardEffectSchema, // Added
 } from "../schemas/GameState";
 // Add fs module import for reading JSON
 import * as fs from 'fs';
@@ -42,10 +44,88 @@ export class GameRoom extends Room<GameState> {
   matchTimerInterval: Delayed | null = null; // For match-long timer
   
   private cardAttackReadiness: Map<string, number> = new Map(); // instanceId -> msToNextAttack
+
+  // --- Card Effect System ---
+  private effectHandlers: Map<string, (
+    ownerPlayer: PlayerState,
+    effectSourceCard: CardInstanceSchema,
+    effect: CardEffectSchema,
+    // Additional context for specific triggers
+    targetCard?: CardInstanceSchema,
+    actualDamageDealt?: number, // Not used by initial effects, but good for future
+    opponentPlayer?: PlayerState
+  ) => void> = new Map();
+
+  private registerEffects() {
+    // Effect: At battle start, gain (X number) brews.
+    this.effectHandlers.set("gainBrewsOnBattleStart", (ownerPlayer, effectSourceCard, effect) => {
+      const amount = parseInt(effect.config.get("amount") || "0");
+      if (amount > 0) {
+        ownerPlayer.brews += amount;
+        console.log(`[EFFECT] ${ownerPlayer.username} gains ${amount} brews from ${effectSourceCard.name} (${effect.effectId}). New brews: ${ownerPlayer.brews}`);
+        // Optionally broadcast a message to clients about this effect
+        // this.broadcast("effectTriggered", { playerId: ownerPlayer.sessionId, cardId: effectSourceCard.instanceId, effectId: effect.effectId, details: `Gained ${amount} brews.` });
+      }
+    });
+
+    // Effect: When this unit attacks, it has a 50% chance to restore (X number) life to your face.
+    this.effectHandlers.set("lifestealOnAttack", (ownerPlayer, effectSourceCard, effect) => {
+      const chance = parseFloat(effect.config.get("chance") || "0");
+      const amount = parseInt(effect.config.get("amount") || "0");
+      if (Math.random() < chance && amount > 0) {
+        ownerPlayer.health = Math.min(100, ownerPlayer.health + amount); // Assuming max health is 100
+        console.log(`[EFFECT] ${effectSourceCard.name} (${effect.effectId}) healed ${ownerPlayer.username} for ${amount}. New health: ${ownerPlayer.health}`);
+        // this.broadcast("effectTriggered", { playerId: ownerPlayer.sessionId, cardId: effectSourceCard.instanceId, effectId: effect.effectId, details: `Healed for ${amount}.` });
+      }
+    });
+    
+    // Effect: When this unit dies, it will deal (X number) damage to ALL units.
+    this.effectHandlers.set("aoeDamageOnDeath", (ownerPlayer, effectSourceCard, effect) => {
+        const damage = parseInt(effect.config.get("damage") || "0");
+        if (damage <= 0) return;
+
+        console.log(`[EFFECT] ${effectSourceCard.name} (${effect.effectId}) died, dealing ${damage} AoE damage.`);
+        // this.broadcast("effectTriggered", { playerId: ownerPlayer.sessionId, cardId: effectSourceCard.instanceId, effectId: effect.effectId, details: `Dealt ${damage} AoE damage on death.` });
+
+        this.state.players.forEach(player => {
+            const cardsToDamageInstances: CardInstanceSchema[] = [];
+            player.battlefield.forEach(cardOnBoard => { // Renamed to avoid conflict with outer 'effectSourceCard'
+                // Ensure the card is not the source card itself (it's already "dead" conceptually)
+                // and that it's currently alive before this AoE.
+                if (cardOnBoard.instanceId !== effectSourceCard.instanceId && cardOnBoard.currentHp > 0) {
+                    cardsToDamageInstances.push(cardOnBoard);
+                }
+            });
+
+            cardsToDamageInstances.forEach(targetCard => {
+                const oldHp = targetCard.currentHp;
+                targetCard.currentHp = Math.max(0, oldHp - damage);
+                console.log(`    [AoE On Death] ${targetCard.name} (P: ${player.username}) takes ${damage} damage. HP: ${oldHp} -> ${targetCard.currentHp}`);
+                // Broadcast individual damage events if needed by client for animation
+                this.broadcast("battleDamageEvent", { // Generic damage event
+                    targetInstanceId: targetCard.instanceId,
+                    damageDealt: damage,
+                    newHp: targetCard.currentHp,
+                    sourceEffectId: effect.effectId,
+                });
+
+                if (targetCard.currentHp <= 0) {
+                    console.log(`    [AoE On Death] ${targetCard.name} (P: ${player.username}) died from AoE.`);
+                    // Note: Further ON_DEATH effects from these newly dead cards will be handled
+                    // if the main death processing loop is re-entrant or iterative.
+                    // For now, this effect applies damage. Subsequent deaths are handled by the main `endBattle` logic.
+                }
+            });
+        });
+    });
+    // Note: "missAuraAgainstHighAttack" (WHILE_ALIVE) is handled directly in attack resolution logic, not via a typical handler call.
+  }
+  // --- End Card Effect System ---
+
   private generatePlayerShopOffers(player: PlayerState) {
     player.shopOfferIds.clear(); // Clear previous offers
     let availableCards = [
-      ...cardDatabase.filter((card: { isLegend: boolean; brewCost: number }) => !card.isLegend), // Ensure type for brewCost
+      ...cardDatabase.filter((card: { rarity: string; brewCost: number }) => card.rarity !== "legend"), // Ensure type for brewCost and use rarity
     ];
 
     // --- New Logic for Day-Based Filtering ---
@@ -86,6 +166,8 @@ export class GameRoom extends Room<GameState> {
     this.setState(new GameState());
     this.state.currentPhase = Phase.Lobby;
     this.state.currentDay = 0;
+
+    this.registerEffects(); // Initialize effect handlers
 
     // Add getAllCards message handler
     this.onMessage("getAllCards", (client) => {
@@ -899,7 +981,40 @@ export class GameRoom extends Room<GameState> {
   
   // --- Battle Logic ---
 
-  startBattle() {
+// --- Card Effect System: Helper to apply effects for a given trigger ---
+private applyEffectsForTrigger(
+  trigger: EffectTrigger,
+  ownerPlayer: PlayerState,
+  effectSourceCard: CardInstanceSchema,
+  // Optional context arguments, specific to the trigger
+  targetCard?: CardInstanceSchema,
+  actualDamageDealt?: number, // Not used by initial effects, but good for future
+  opponentPlayer?: PlayerState
+) {
+  // For ON_DEATH, the card's HP is already <= 0. For other triggers, card must be alive.
+  if (trigger !== EffectTrigger.ON_DEATH && effectSourceCard.currentHp <= 0) {
+      return;
+  }
+
+  effectSourceCard.effects.forEach(effect => {
+      if (effect.trigger === trigger.toString()) { // Compare with string representation of enum
+          const handler = this.effectHandlers.get(effect.effectId);
+          if (handler) {
+              try {
+                  console.log(`[EFFECT TRIGGER] Applying effect "${effect.effectId}" for card ${effectSourceCard.name} (Owner: ${ownerPlayer.username}) due to trigger: ${trigger}`);
+                  handler(ownerPlayer, effectSourceCard, effect, targetCard, actualDamageDealt, opponentPlayer);
+              } catch (e) {
+                  console.error(`Error executing effect handler for ${effect.effectId} on card ${effectSourceCard.instanceId}:`, e);
+              }
+          } else {
+              console.warn(`No handler registered for effectId: ${effect.effectId}`);
+          }
+      }
+  });
+}
+// --- End Card Effect System ---
+
+startBattle() {
     console.log("Starting Battle Phase!");
     // this.state.battleTimer = 45; // Old: Set battle duration using battleTimer
     this.state.phaseTimer = BATTLE_DURATION; // New: Set phaseTimer for battle
@@ -908,13 +1023,24 @@ export class GameRoom extends Room<GameState> {
     // if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Old name
     if (this.battleTickInterval) this.battleTickInterval.clear(); // New name
 
+    // --- Apply BATTLE_START effects ---
+    this.state.players.forEach(player => {
+        player.battlefield.forEach(card => {
+            if (card.currentHp > 0) { // Only for living cards
+                this.applyEffectsForTrigger(EffectTrigger.BATTLE_START, player, card);
+            }
+        });
+    });
+    // --- End BATTLE_START effects ---
+
     // --- Initialize card attack readiness ---
     this.cardAttackReadiness.clear();
     this.state.players.forEach((player) => {
       player.battlefield.forEach((card) => {
         if (card.currentHp > 0) {
           // Ensure speed is positive to avoid infinite loops or zero division if speed is 0
-          const speedInMs = (card.speed > 0 ? card.speed : 1.5) * 1000; // Default to 1.5s if speed is 0 or less
+          const effectiveSpeed = card.getEffectiveSpeed(); // Use effective speed
+          const speedInMs = (effectiveSpeed > 0 ? effectiveSpeed : 1.5) * 1000; // Default to 1.5s if speed is 0 or less
           this.cardAttackReadiness.set(card.instanceId, speedInMs);
         }
       });
@@ -956,15 +1082,28 @@ export class GameRoom extends Room<GameState> {
                         // Card is ready to attack
                         if (livingOpponentCards.length > 0) {
                             const targetCard = livingOpponentCards[Math.floor(Math.random() * livingOpponentCards.length)];
-                            pendingAttacksThisTick.push({
-                                attackerPlayerId: currentPlayerId,
-                                attackerCard: attackerCard,
-                                targetPlayerId: opponentId,
-                                targetCard: targetCard,
-                            });
+                            
+                            // --- Apply ON_ATTACK effects for the attacker ---
+                            // Ensure attacker is alive before triggering its ON_ATTACK effects
+                            if (attackerCard.currentHp > 0) {
+                                this.applyEffectsForTrigger(EffectTrigger.ON_ATTACK, currentPlayer, attackerCard, targetCard, undefined, opponentPlayer);
+                            }
+                            // --- End ON_ATTACK effects ---
+
+                            // Check if attacker is still alive after its own ON_ATTACK effects (e.g. self-damage effect)
+                            // and if target is still alive (ON_ATTACK could have killed it, though unlikely for initial effects)
+                            if (attackerCard.currentHp > 0 && targetCard.currentHp > 0) {
+                                pendingAttacksThisTick.push({
+                                    attackerPlayerId: currentPlayerId,
+                                    attackerCard: attackerCard,
+                                    targetPlayerId: opponentId,
+                                    targetCard: targetCard,
+                                });
+                            }
                         }
                         // Reset timer for next attack, accounting for any "overdue" time
-                        const speedInMs = (attackerCard.speed > 0 ? attackerCard.speed : 1.5) * 1000;
+                        const effectiveSpeed = attackerCard.getEffectiveSpeed(); // Use effective speed
+                        const speedInMs = (effectiveSpeed > 0 ? effectiveSpeed : 1.5) * 1000;
                         this.cardAttackReadiness.set(attackerCard.instanceId, speedInMs + timeToNextAttack);
                     } else {
                         // Update timer if not yet ready
@@ -980,9 +1119,36 @@ export class GameRoom extends Room<GameState> {
         pendingAttacksThisTick.forEach(attack => {
             // Attacker and target references (attack.attackerCard, attack.targetCard) are from the state when pendingAttacksThisTick was populated.
             // Their currentHp is relevant for their own survival but attack value is fixed for this tick.
-            if (attack.attackerCard.currentHp > 0) { // Attacker must still be alive to deal damage
+            if (attack.attackerCard.currentHp > 0 && attack.targetCard.currentHp > 0) { // Attacker and target must be alive
+                
+                // --- Check for missAuraAgainstHighAttack effect from opponent's cards ---
+                let attackMisses = false;
+                const targetPlayer = this.state.players.get(attack.targetPlayerId);
+                if (targetPlayer) {
+                    targetPlayer.battlefield.forEach(opponentCard => {
+                        if (opponentCard.currentHp > 0) { // Aura provider must be alive
+                            opponentCard.effects.forEach(effect => {
+                                if (effect.effectId === "missAuraAgainstHighAttack" && effect.trigger === EffectTrigger.WHILE_ALIVE.toString()) {
+                                    const attackThreshold = parseInt(effect.config.get("attackThreshold") || "0");
+                                    const missChance = parseFloat(effect.config.get("missChance") || "0");
+                                    if (attack.attackerCard.getEffectiveAttack() >= attackThreshold) {
+                                        if (Math.random() < missChance) {
+                                            attackMisses = true;
+                                            console.log(`[EFFECT] Attack from ${attack.attackerCard.name} (Player: ${this.state.players.get(attack.attackerPlayerId)?.username}) misses target ${attack.targetCard.name} (Player: ${targetPlayer.username}) due to ${opponentCard.name}'s missAura!`);
+                                            // this.broadcast("effectTriggered", { details: `${attack.attackerCard.name} attack missed due to ${opponentCard.name}'s aura.`});
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        if (attackMisses) return; // Stop checking other opponent cards if already missed
+                    });
+                }
+                if (attackMisses) return; // Skip this attack if it misses
+                // --- End missAuraAgainstHighAttack check ---
+
                 const targetInstanceId = attack.targetCard.instanceId;
-                const damageFromThisAttack = attack.attackerCard.attack;
+                const damageFromThisAttack = attack.attackerCard.getEffectiveAttack(); // Use effective attack
 
                 if (!damageToApplyToTargets.has(targetInstanceId)) {
                     damageToApplyToTargets.set(targetInstanceId, { totalDamage: 0, sources: [] });
@@ -1211,11 +1377,11 @@ export class GameRoom extends Room<GameState> {
 
     // Calculate face damage based on opponent survivors' attack stat
     const p1FaceDamage = player2Survivors.reduce(
-      (sum, card) => sum + card.attack,
+      (sum, card) => sum + card.getEffectiveAttack(), // Use effective attack
       0
     );
     const p2FaceDamage = player1Survivors.reduce(
-      (sum, card) => sum + card.attack,
+      (sum, card) => sum + card.getEffectiveAttack(), // Use effective attack
       0
     );
 
@@ -1318,24 +1484,33 @@ export class GameRoom extends Room<GameState> {
       "endBattle: Removing dead cards from server battlefield state..."
     );
     const p1DeadKeys: string[] = [];
+    const p1CardsToProcessForDeathEffects: CardInstanceSchema[] = [];
     player1.battlefield.forEach((card, key) => {
       if (card.currentHp <= 0) {
-        console.log(
-          `  Marking P1 card for removal: ${card.name} (Key: ${key})`
-        );
+        p1CardsToProcessForDeathEffects.push(card); // Collect cards that died this turn
         p1DeadKeys.push(key);
       }
     });
+    // Apply ON_DEATH effects for player 1's cards that died
+    p1CardsToProcessForDeathEffects.forEach(card => {
+        console.log(`  Processing ON_DEATH for P1 card: ${card.name}`);
+        this.applyEffectsForTrigger(EffectTrigger.ON_DEATH, player1, card, undefined, undefined, player2);
+    });
     p1DeadKeys.forEach((key) => player1.battlefield.delete(key));
 
+
     const p2DeadKeys: string[] = [];
+    const p2CardsToProcessForDeathEffects: CardInstanceSchema[] = [];
     player2.battlefield.forEach((card, key) => {
       if (card.currentHp <= 0) {
-        console.log(
-          `  Marking P2 card for removal: ${card.name} (Key: ${key})`
-        );
+        p2CardsToProcessForDeathEffects.push(card); // Collect cards that died this turn
         p2DeadKeys.push(key);
       }
+    });
+    // Apply ON_DEATH effects for player 2's cards that died
+    p2CardsToProcessForDeathEffects.forEach(card => {
+        console.log(`  Processing ON_DEATH for P2 card: ${card.name}`);
+        this.applyEffectsForTrigger(EffectTrigger.ON_DEATH, player2, card, undefined, undefined, player1);
     });
     p2DeadKeys.forEach((key) => player2.battlefield.delete(key));
     console.log("endBattle: Finished removing dead cards from server state.");

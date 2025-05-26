@@ -16,6 +16,8 @@ export interface CardRenderData {
   brewCost?: number;
   artUrl?: string;
   instanceId?: string;
+  rarity?: string; // Replaced isLegend (if it was present, added if not)
+  statBuffs?: Map<string, number>; // Optional: Stores modifications to stats
 }
 
 // Text style constants
@@ -71,6 +73,15 @@ export function createCardGameObject(
     return container;
   }
 
+  // Calculate effective stats
+  const effectiveAttack = cardData.attack + (cardData.statBuffs?.get("attack") || 0);
+  // Client-side speed interpretation: lower is faster (cooldown time)
+  // So a positive "speed" buff from statBuffs should decrease this value.
+  const effectiveSpeed = Math.max(0.1, cardData.speed - (cardData.statBuffs?.get("speed") || 0));
+  const effectiveMaxHealth = cardData.health + (cardData.statBuffs?.get("health") || 0);
+  const currentHp = cardData.currentHp !== undefined ? cardData.currentHp : effectiveMaxHealth;
+
+
   // Main card image
   const cardTextureKey = type === "full" ? "cardFullTier1" : "cardMinionTier1";
   const cardImage = scene.add.image(0, 0, cardTextureKey).setOrigin(0.5);
@@ -121,21 +132,21 @@ export function createCardGameObject(
 
     // Attack (left)
     const attackText = scene.add
-      .text(-displayCardWidth / 2 + 32, statsYBase, `${cardData.attack}`, {
+      .text(-displayCardWidth / 2 + 32, statsYBase, `${effectiveAttack}`, { // Use effectiveAttack
         ...statTextStyle,
         fontSize: 16,
       })
       .setOrigin(0, 0.5);
     container.add(attackText);
+    container.setData("attackTextObject", attackText);
+
 
     // HP (right)
-    const currentHp =
-      cardData.currentHp !== undefined ? cardData.currentHp : cardData.health;
     const hpText = scene.add
       .text(
         displayCardWidth / 2 - 18,
         statsYBase,
-        `${currentHp}/${cardData.health}`,
+        `${currentHp}/${effectiveMaxHealth}`, // Use currentHp and effectiveMaxHealth
         {
           ...statTextStyle,
           fontSize: 16,
@@ -148,12 +159,14 @@ export function createCardGameObject(
 
     // Speed (bottom)
     const speedText = scene.add
-      .text(0, displayCardHeight / 2 - 50, `${cardData.speed}`, {
+      .text(0, displayCardHeight / 2 - 50, `${effectiveSpeed.toFixed(1)}`, { // Use effectiveSpeed
         ...statTextStyle,
         fontSize: 16,
       })
       .setOrigin(0.5, 1);
     container.add(speedText);
+    container.setData("speedTextObject", speedText);
+
 
     // Brew Cost (top-right)
     if (cardData.brewCost !== undefined) {
@@ -186,21 +199,20 @@ export function createCardGameObject(
 
     // Attack (below art, left)
     const attackText = scene.add
-      .text(-displayCardWidth / 2 + 25, statsYBase + 5, `${cardData.attack}`, {
+      .text(-displayCardWidth / 2 + 25, statsYBase + 5, `${effectiveAttack}`, { // Use effectiveAttack
         ...statTextStyle,
         fontSize: 18,
       })
       .setOrigin(0.5);
     container.add(attackText);
+    container.setData("attackTextObject", attackText);
 
     // HP (below art, right) - SWAPPED from speed position
-    const currentHp =
-      cardData.currentHp !== undefined ? cardData.currentHp : cardData.health;
     const hpText = scene.add
       .text(
         displayCardWidth / 2 - 34,
         statsYBase + 5,
-        `${currentHp}/${cardData.health}`,
+        `${currentHp}/${effectiveMaxHealth}`, // Use currentHp and effectiveMaxHealth
         {
           ...statTextStyle,
           fontSize: 18,
@@ -213,12 +225,14 @@ export function createCardGameObject(
 
     // Speed (bottom-right on sprite) - SWAPPED from HP position
     const speedText = scene.add
-      .text(0, displayCardHeight / 2 - 16, `${cardData.speed}`, {
+      .text(0, displayCardHeight / 2 - 16, `${effectiveSpeed.toFixed(1)}`, { // Use effectiveSpeed
         ...statTextStyle,
         fontSize: 14,
       })
       .setOrigin(0.5);
     container.add(speedText);
+    container.setData("speedTextObject", speedText);
+
 
     // Cooldown Bar elements for battlefield cards
     const cooldownBarY = displayCardHeight / 2 - 15;
@@ -241,9 +255,15 @@ export function createCardGameObject(
     container.setData("cooldownBarBg", cooldownBarBg);
     container.setData("cooldownBarFill", cooldownBarFill);
     container.setData("attackCooldownTimer", 0);
-    container.setData("maxAttackCooldown", 0);
+    // Store effectiveSpeed (in ms for cooldown) for battle logic
+    container.setData("maxAttackCooldown", (effectiveSpeed > 0 ? effectiveSpeed : 1.5) * 1000);
     container.setData("cooldownBarBaseWidth", cooldownBarWidth);
   }
+  // Store statBuffs on the container so updateCardHpVisuals can access it if needed
+  container.setData("statBuffs", cardData.statBuffs);
+  // Store base health as well, in case it's needed for comparison or buff calculation display
+  container.setData("baseHealth", cardData.health);
+
 
   return container;
 }
@@ -254,7 +274,8 @@ export function createCardGameObject(
 export function updateCardHpVisuals(
   cardContainer: Phaser.GameObjects.Container,
   currentHp: number,
-  maxHealth: number
+  // maxHealth parameter is now effectiveMaxHealth
+  effectiveMaxHealth: number
 ) {
   if (!cardContainer || !cardContainer.active) return;
 
@@ -266,8 +287,8 @@ export function updateCardHpVisuals(
   ) as Phaser.GameObjects.Image;
 
   if (hpText && hpText.active) {
-    hpText.setText(`${currentHp}/${maxHealth}`);
-    const hpPercent = maxHealth > 0 ? currentHp / maxHealth : 0;
+    hpText.setText(`${currentHp}/${effectiveMaxHealth}`);
+    const hpPercent = effectiveMaxHealth > 0 ? currentHp / effectiveMaxHealth : 0;
     if (currentHp <= 0) {
       hpText.setColor("#ff0000");
     } else if (hpPercent < 0.3) {

@@ -286,7 +286,8 @@ export class Shop extends Scene {
         speed: cardData.speed,
         health: cardData.health,
         brewCost: cardData.brewCost,
-        artUrl: cardData.artUrl
+        artUrl: cardData.artUrl,
+        statBuffs: new Map<string, number>() // Shop offers don't have buffs yet
       };
 
       // Use the utility function to create the card

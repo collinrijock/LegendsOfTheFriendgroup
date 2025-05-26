@@ -67,11 +67,73 @@ class GameRoom extends colyseus_1.Room {
         this.genericPhaseTimerInterval = null; // New: For Shop and Preparation phase timers
         this.matchTimerInterval = null; // For match-long timer
         this.cardAttackReadiness = new Map(); // instanceId -> msToNextAttack
+        // --- Card Effect System ---
+        this.effectHandlers = new Map();
     }
+    registerEffects() {
+        // Effect: At battle start, gain (X number) brews.
+        this.effectHandlers.set("gainBrewsOnBattleStart", (ownerPlayer, effectSourceCard, effect) => {
+            const amount = parseInt(effect.config.get("amount") || "0");
+            if (amount > 0) {
+                ownerPlayer.brews += amount;
+                console.log(`[EFFECT] ${ownerPlayer.username} gains ${amount} brews from ${effectSourceCard.name} (${effect.effectId}). New brews: ${ownerPlayer.brews}`);
+                // Optionally broadcast a message to clients about this effect
+                // this.broadcast("effectTriggered", { playerId: ownerPlayer.sessionId, cardId: effectSourceCard.instanceId, effectId: effect.effectId, details: `Gained ${amount} brews.` });
+            }
+        });
+        // Effect: When this unit attacks, it has a 50% chance to restore (X number) life to your face.
+        this.effectHandlers.set("lifestealOnAttack", (ownerPlayer, effectSourceCard, effect) => {
+            const chance = parseFloat(effect.config.get("chance") || "0");
+            const amount = parseInt(effect.config.get("amount") || "0");
+            if (Math.random() < chance && amount > 0) {
+                ownerPlayer.health = Math.min(100, ownerPlayer.health + amount); // Assuming max health is 100
+                console.log(`[EFFECT] ${effectSourceCard.name} (${effect.effectId}) healed ${ownerPlayer.username} for ${amount}. New health: ${ownerPlayer.health}`);
+                // this.broadcast("effectTriggered", { playerId: ownerPlayer.sessionId, cardId: effectSourceCard.instanceId, effectId: effect.effectId, details: `Healed for ${amount}.` });
+            }
+        });
+        // Effect: When this unit dies, it will deal (X number) damage to ALL units.
+        this.effectHandlers.set("aoeDamageOnDeath", (ownerPlayer, effectSourceCard, effect) => {
+            const damage = parseInt(effect.config.get("damage") || "0");
+            if (damage <= 0)
+                return;
+            console.log(`[EFFECT] ${effectSourceCard.name} (${effect.effectId}) died, dealing ${damage} AoE damage.`);
+            // this.broadcast("effectTriggered", { playerId: ownerPlayer.sessionId, cardId: effectSourceCard.instanceId, effectId: effect.effectId, details: `Dealt ${damage} AoE damage on death.` });
+            this.state.players.forEach(player => {
+                const cardsToDamageInstances = [];
+                player.battlefield.forEach(cardOnBoard => {
+                    // Ensure the card is not the source card itself (it's already "dead" conceptually)
+                    // and that it's currently alive before this AoE.
+                    if (cardOnBoard.instanceId !== effectSourceCard.instanceId && cardOnBoard.currentHp > 0) {
+                        cardsToDamageInstances.push(cardOnBoard);
+                    }
+                });
+                cardsToDamageInstances.forEach(targetCard => {
+                    const oldHp = targetCard.currentHp;
+                    targetCard.currentHp = Math.max(0, oldHp - damage);
+                    console.log(`    [AoE On Death] ${targetCard.name} (P: ${player.username}) takes ${damage} damage. HP: ${oldHp} -> ${targetCard.currentHp}`);
+                    // Broadcast individual damage events if needed by client for animation
+                    this.broadcast("battleDamageEvent", {
+                        targetInstanceId: targetCard.instanceId,
+                        damageDealt: damage,
+                        newHp: targetCard.currentHp,
+                        sourceEffectId: effect.effectId,
+                    });
+                    if (targetCard.currentHp <= 0) {
+                        console.log(`    [AoE On Death] ${targetCard.name} (P: ${player.username}) died from AoE.`);
+                        // Note: Further ON_DEATH effects from these newly dead cards will be handled
+                        // if the main death processing loop is re-entrant or iterative.
+                        // For now, this effect applies damage. Subsequent deaths are handled by the main `endBattle` logic.
+                    }
+                });
+            });
+        });
+        // Note: "missAuraAgainstHighAttack" (WHILE_ALIVE) is handled directly in attack resolution logic, not via a typical handler call.
+    }
+    // --- End Card Effect System ---
     generatePlayerShopOffers(player) {
         player.shopOfferIds.clear(); // Clear previous offers
         let availableCards = [
-            ...cardDatabase.filter((card) => !card.isLegend), // Ensure type for brewCost
+            ...cardDatabase.filter((card) => card.rarity !== "legend"), // Ensure type for brewCost and use rarity
         ];
         // --- New Logic for Day-Based Filtering ---
         if (this.state.currentDay >= 1 && this.state.currentDay <= 3) {
@@ -106,6 +168,7 @@ class GameRoom extends colyseus_1.Room {
         this.setState(new GameState_1.GameState());
         this.state.currentPhase = GameState_1.Phase.Lobby;
         this.state.currentDay = 0;
+        this.registerEffects(); // Initialize effect handlers
         // Add getAllCards message handler
         this.onMessage("getAllCards", (client) => {
             client.send("allCards", cardDatabase);
@@ -673,6 +736,34 @@ class GameRoom extends colyseus_1.Room {
         console.log(`Phase is now ${this.state.currentPhase}. Day: ${this.state.currentDay}. Players reset to not ready. Phase Timer: ${this.state.phaseTimer}`);
     }
     // --- Battle Logic ---
+    // --- Card Effect System: Helper to apply effects for a given trigger ---
+    applyEffectsForTrigger(trigger, ownerPlayer, effectSourceCard, 
+    // Optional context arguments, specific to the trigger
+    targetCard, actualDamageDealt, // Not used by initial effects, but good for future
+    opponentPlayer) {
+        // For ON_DEATH, the card's HP is already <= 0. For other triggers, card must be alive.
+        if (trigger !== GameState_1.EffectTrigger.ON_DEATH && effectSourceCard.currentHp <= 0) {
+            return;
+        }
+        effectSourceCard.effects.forEach(effect => {
+            if (effect.trigger === trigger.toString()) { // Compare with string representation of enum
+                const handler = this.effectHandlers.get(effect.effectId);
+                if (handler) {
+                    try {
+                        console.log(`[EFFECT TRIGGER] Applying effect "${effect.effectId}" for card ${effectSourceCard.name} (Owner: ${ownerPlayer.username}) due to trigger: ${trigger}`);
+                        handler(ownerPlayer, effectSourceCard, effect, targetCard, actualDamageDealt, opponentPlayer);
+                    }
+                    catch (e) {
+                        console.error(`Error executing effect handler for ${effect.effectId} on card ${effectSourceCard.instanceId}:`, e);
+                    }
+                }
+                else {
+                    console.warn(`No handler registered for effectId: ${effect.effectId}`);
+                }
+            }
+        });
+    }
+    // --- End Card Effect System ---
     startBattle() {
         console.log("Starting Battle Phase!");
         // this.state.battleTimer = 45; // Old: Set battle duration using battleTimer
@@ -681,13 +772,23 @@ class GameRoom extends colyseus_1.Room {
         // if (this.battleTimerInterval) this.battleTimerInterval.clear(); // Old name
         if (this.battleTickInterval)
             this.battleTickInterval.clear(); // New name
+        // --- Apply BATTLE_START effects ---
+        this.state.players.forEach(player => {
+            player.battlefield.forEach(card => {
+                if (card.currentHp > 0) { // Only for living cards
+                    this.applyEffectsForTrigger(GameState_1.EffectTrigger.BATTLE_START, player, card);
+                }
+            });
+        });
+        // --- End BATTLE_START effects ---
         // --- Initialize card attack readiness ---
         this.cardAttackReadiness.clear();
         this.state.players.forEach((player) => {
             player.battlefield.forEach((card) => {
                 if (card.currentHp > 0) {
                     // Ensure speed is positive to avoid infinite loops or zero division if speed is 0
-                    const speedInMs = (card.speed > 0 ? card.speed : 1.5) * 1000; // Default to 1.5s if speed is 0 or less
+                    const effectiveSpeed = card.getEffectiveSpeed(); // Use effective speed
+                    const speedInMs = (effectiveSpeed > 0 ? effectiveSpeed : 1.5) * 1000; // Default to 1.5s if speed is 0 or less
                     this.cardAttackReadiness.set(card.instanceId, speedInMs);
                 }
             });
@@ -718,15 +819,26 @@ class GameRoom extends colyseus_1.Room {
                                 // Card is ready to attack
                                 if (livingOpponentCards.length > 0) {
                                     const targetCard = livingOpponentCards[Math.floor(Math.random() * livingOpponentCards.length)];
-                                    pendingAttacksThisTick.push({
-                                        attackerPlayerId: currentPlayerId,
-                                        attackerCard: attackerCard,
-                                        targetPlayerId: opponentId,
-                                        targetCard: targetCard,
-                                    });
+                                    // --- Apply ON_ATTACK effects for the attacker ---
+                                    // Ensure attacker is alive before triggering its ON_ATTACK effects
+                                    if (attackerCard.currentHp > 0) {
+                                        this.applyEffectsForTrigger(GameState_1.EffectTrigger.ON_ATTACK, currentPlayer, attackerCard, targetCard, undefined, opponentPlayer);
+                                    }
+                                    // --- End ON_ATTACK effects ---
+                                    // Check if attacker is still alive after its own ON_ATTACK effects (e.g. self-damage effect)
+                                    // and if target is still alive (ON_ATTACK could have killed it, though unlikely for initial effects)
+                                    if (attackerCard.currentHp > 0 && targetCard.currentHp > 0) {
+                                        pendingAttacksThisTick.push({
+                                            attackerPlayerId: currentPlayerId,
+                                            attackerCard: attackerCard,
+                                            targetPlayerId: opponentId,
+                                            targetCard: targetCard,
+                                        });
+                                    }
                                 }
                                 // Reset timer for next attack, accounting for any "overdue" time
-                                const speedInMs = (attackerCard.speed > 0 ? attackerCard.speed : 1.5) * 1000;
+                                const effectiveSpeed = attackerCard.getEffectiveSpeed(); // Use effective speed
+                                const speedInMs = (effectiveSpeed > 0 ? effectiveSpeed : 1.5) * 1000;
                                 this.cardAttackReadiness.set(attackerCard.instanceId, speedInMs + timeToNextAttack);
                             }
                             else {
@@ -741,9 +853,37 @@ class GameRoom extends colyseus_1.Room {
                 pendingAttacksThisTick.forEach(attack => {
                     // Attacker and target references (attack.attackerCard, attack.targetCard) are from the state when pendingAttacksThisTick was populated.
                     // Their currentHp is relevant for their own survival but attack value is fixed for this tick.
-                    if (attack.attackerCard.currentHp > 0) { // Attacker must still be alive to deal damage
+                    if (attack.attackerCard.currentHp > 0 && attack.targetCard.currentHp > 0) { // Attacker and target must be alive
+                        // --- Check for missAuraAgainstHighAttack effect from opponent's cards ---
+                        let attackMisses = false;
+                        const targetPlayer = this.state.players.get(attack.targetPlayerId);
+                        if (targetPlayer) {
+                            targetPlayer.battlefield.forEach(opponentCard => {
+                                if (opponentCard.currentHp > 0) { // Aura provider must be alive
+                                    opponentCard.effects.forEach(effect => {
+                                        var _a;
+                                        if (effect.effectId === "missAuraAgainstHighAttack" && effect.trigger === GameState_1.EffectTrigger.WHILE_ALIVE.toString()) {
+                                            const attackThreshold = parseInt(effect.config.get("attackThreshold") || "0");
+                                            const missChance = parseFloat(effect.config.get("missChance") || "0");
+                                            if (attack.attackerCard.getEffectiveAttack() >= attackThreshold) {
+                                                if (Math.random() < missChance) {
+                                                    attackMisses = true;
+                                                    console.log(`[EFFECT] Attack from ${attack.attackerCard.name} (Player: ${(_a = this.state.players.get(attack.attackerPlayerId)) === null || _a === void 0 ? void 0 : _a.username}) misses target ${attack.targetCard.name} (Player: ${targetPlayer.username}) due to ${opponentCard.name}'s missAura!`);
+                                                    // this.broadcast("effectTriggered", { details: `${attack.attackerCard.name} attack missed due to ${opponentCard.name}'s aura.`});
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                                if (attackMisses)
+                                    return; // Stop checking other opponent cards if already missed
+                            });
+                        }
+                        if (attackMisses)
+                            return; // Skip this attack if it misses
+                        // --- End missAuraAgainstHighAttack check ---
                         const targetInstanceId = attack.targetCard.instanceId;
-                        const damageFromThisAttack = attack.attackerCard.attack;
+                        const damageFromThisAttack = attack.attackerCard.getEffectiveAttack(); // Use effective attack
                         if (!damageToApplyToTargets.has(targetInstanceId)) {
                             damageToApplyToTargets.set(targetInstanceId, { totalDamage: 0, sources: [] });
                         }
@@ -910,8 +1050,10 @@ class GameRoom extends colyseus_1.Room {
         }
         // --- End Winner/Loser/Draw Determination ---
         // Calculate face damage based on opponent survivors' attack stat
-        const p1FaceDamage = player2Survivors.reduce((sum, card) => sum + card.attack, 0);
-        const p2FaceDamage = player1Survivors.reduce((sum, card) => sum + card.attack, 0);
+        const p1FaceDamage = player2Survivors.reduce((sum, card) => sum + card.getEffectiveAttack(), // Use effective attack
+        0);
+        const p2FaceDamage = player1Survivors.reduce((sum, card) => sum + card.getEffectiveAttack(), // Use effective attack
+        0);
         // --- Log Calculated Damage ---
         console.log(`endBattle: Calculated Face Damage for Player 1 (Server): ${p1FaceDamage} (from ${player2Survivors.length} P2 survivors)`);
         console.log(`endBattle: Calculated Face Damage for Player 2 (Server): ${p2FaceDamage} (from ${player1Survivors.length} P1 survivors)`);
@@ -961,19 +1103,31 @@ class GameRoom extends colyseus_1.Room {
         // --- Remove Dead Cards from Battlefield State (Server Authority) ---
         console.log("endBattle: Removing dead cards from server battlefield state...");
         const p1DeadKeys = [];
+        const p1CardsToProcessForDeathEffects = [];
         player1.battlefield.forEach((card, key) => {
             if (card.currentHp <= 0) {
-                console.log(`  Marking P1 card for removal: ${card.name} (Key: ${key})`);
+                p1CardsToProcessForDeathEffects.push(card); // Collect cards that died this turn
                 p1DeadKeys.push(key);
             }
         });
+        // Apply ON_DEATH effects for player 1's cards that died
+        p1CardsToProcessForDeathEffects.forEach(card => {
+            console.log(`  Processing ON_DEATH for P1 card: ${card.name}`);
+            this.applyEffectsForTrigger(GameState_1.EffectTrigger.ON_DEATH, player1, card, undefined, undefined, player2);
+        });
         p1DeadKeys.forEach((key) => player1.battlefield.delete(key));
         const p2DeadKeys = [];
+        const p2CardsToProcessForDeathEffects = [];
         player2.battlefield.forEach((card, key) => {
             if (card.currentHp <= 0) {
-                console.log(`  Marking P2 card for removal: ${card.name} (Key: ${key})`);
+                p2CardsToProcessForDeathEffects.push(card); // Collect cards that died this turn
                 p2DeadKeys.push(key);
             }
+        });
+        // Apply ON_DEATH effects for player 2's cards that died
+        p2CardsToProcessForDeathEffects.forEach(card => {
+            console.log(`  Processing ON_DEATH for P2 card: ${card.name}`);
+            this.applyEffectsForTrigger(GameState_1.EffectTrigger.ON_DEATH, player2, card, undefined, undefined, player1);
         });
         p2DeadKeys.forEach((key) => player2.battlefield.delete(key));
         console.log("endBattle: Finished removing dead cards from server state.");

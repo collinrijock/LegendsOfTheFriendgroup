@@ -18,7 +18,7 @@ import {
   MINION_CARD_HEIGHT,
   FULL_CARD_WIDTH,
   FULL_CARD_HEIGHT,
-  CardRenderData
+  CardRenderData,
 } from "../utils/renderCardUtils";
 
 // Remove CardUIData as ClientCardInstance can be used
@@ -66,6 +66,14 @@ export class BoardView extends Scene {
   private sellZoneRect!: Phaser.GameObjects.Rectangle;
   private sellZoneText!: Phaser.GameObjects.Text;
   private brewGainText!: Phaser.GameObjects.Text;
+
+  // Properties for enlarged card display
+  private enlargedCardDisplay!: Phaser.GameObjects.Container;
+  private enlargedCardBackground!: Phaser.GameObjects.Rectangle;
+  private enlargedCardVisual!: Phaser.GameObjects.Container | null;
+  private enlargedCardEffectsText!: Phaser.GameObjects.Text;
+  private enlargedCardBuffsText!: Phaser.GameObjects.Text;
+  // End enlarged card display properties
 
   // Navbar elements
   private playerHealthText!: Phaser.GameObjects.Text;
@@ -119,6 +127,34 @@ export class BoardView extends Scene {
     console.log("BoardView creating...");
     this.createNavbar();
     this.createSellZone(); // Add this line to create the sell zone
+
+    // Initialize enlarged card display container
+    this.enlargedCardDisplay = this.add.container(this.cameras.main.centerX, this.cameras.main.centerY)
+      .setVisible(false)
+      .setDepth(3000); // Very high depth to be on top of everything
+
+    this.enlargedCardBackground = this.add.rectangle(0, 0, 300, 450, 0x000000, 0.9) // Example size, will adjust
+      .setStrokeStyle(2, 0xffffff);
+    this.enlargedCardDisplay.add(this.enlargedCardBackground);
+
+    // Placeholder for the card visual itself, will be added dynamically
+    this.enlargedCardVisual = null;
+
+    const effectsAndBuffsTextStyle = {
+      fontFamily: "Arial",
+      fontSize: "14px",
+      color: "#ffffff",
+      wordWrap: { width: 280, useAdvancedWrap: true }, // Adjust width as needed
+      align: "left" as const,
+    };
+
+    this.enlargedCardEffectsText = this.add.text(0, 0, "", effectsAndBuffsTextStyle).setOrigin(0.5, 0);
+    this.enlargedCardDisplay.add(this.enlargedCardEffectsText);
+
+    this.enlargedCardBuffsText = this.add.text(0, 0, "", effectsAndBuffsTextStyle).setOrigin(0.5, 0);
+    this.enlargedCardDisplay.add(this.enlargedCardBuffsText);
+    // End enlarged card display initialization
+
     this.setupColyseusListeners();
     // Ensure this scene is rendered below other UI scenes like Shop, Prep, Battle
     // this.scene.sendToBack(); // REMOVE THIS LINE
@@ -414,8 +450,13 @@ export class BoardView extends Scene {
                         : MINION_CARD_WIDTH - 10;
                     cooldownBarFill.setSize(cooldownBarBaseWidth, 6); // Use the retrieved width value
 
+                    const effectiveSpeed =
+                      cardSchema.speed -
+                      (cardSchema.statBuffs?.get("speed") || 0);
                     const maxCooldown =
-                      (cardSchema.speed > 0 ? cardSchema.speed : 1.5) * 1000;
+                      (effectiveSpeed > 0
+                        ? Math.max(0.1, effectiveSpeed)
+                        : 1.5) * 1000;
                     cardContainer.setData("maxAttackCooldown", maxCooldown);
                     cardContainer.setData("attackCooldownTimer", maxCooldown);
                   } else {
@@ -611,11 +652,22 @@ export class BoardView extends Scene {
             );
 
             // Reset attacker's visual cooldown timer
-            const attackerMaxCooldown = attackerCard.getData(
-              "maxAttackCooldown"
-            ) as number;
-            if (attackerMaxCooldown > 0) {
+            const attackerCardSchema = colyseusRoom!.state.players
+              .get(message.attackerPlayerId)
+              ?.battlefield.get(attackerCard.getData("slotKey") as string);
+            if (attackerCardSchema) {
+              const attackerEffectiveSpeed =
+                attackerCardSchema.speed -
+                (attackerCardSchema.statBuffs?.get("speed") || 0);
+              const attackerMaxCooldown =
+                (attackerEffectiveSpeed > 0
+                  ? Math.max(0.1, attackerEffectiveSpeed)
+                  : 1.5) * 1000;
+
+              // Update the container's maxAttackCooldown if it changed due to buffs
+              attackerCard.setData("maxAttackCooldown", attackerMaxCooldown);
               attackerCard.setData("attackCooldownTimer", attackerMaxCooldown);
+
               const fillBar = attackerCard.getData(
                 "cooldownBarFill"
               ) as Phaser.GameObjects.Rectangle;
@@ -624,9 +676,9 @@ export class BoardView extends Scene {
                 MINION_CARD_WIDTH - 10; // Fallback
               if (fillBar) fillBar.setSize(attackerCooldownBarBaseWidth, 6); // Reset fill bar to full using setSize
             }
-
-            // Client-side visual update for target card's HP
-            const targetCardOwnerId = targetCard.getData(
+          } else {
+            console.warn(
+              "BoardView: Attacker or target not found/active for battleAttackEvent",
               "ownerSessionId"
             ) as string;
             const targetCardSlotKey = targetCard.getData("slotKey") as string;
@@ -669,11 +721,6 @@ export class BoardView extends Scene {
                 `BoardView: battleAttackEvent - Target card container data inconsistent or not on battlefield. Owner: ${targetCardOwnerId}, Area: ${targetCardArea}, Slot: ${targetCardSlotKey}`
               );
             }
-          } else {
-            console.warn(
-              "BoardView: Attacker or target not found/active for battleAttackEvent",
-              message
-            );
           }
         }
       )
@@ -699,13 +746,24 @@ export class BoardView extends Scene {
       return;
     }
 
-    this.playerVisuals.forEach((playerData) => {
-      playerData.battlefield.forEach((cardContainer) => {
+    this.playerVisuals.forEach((playerData, playerId) => {
+      // Added playerId
+      playerData.battlefield.forEach((cardContainer, slotKey) => {
+        // Added slotKey
         if (!cardContainer.active) return;
 
+        const cardSchema = colyseusRoom!.state.players
+          .get(playerId)
+          ?.battlefield.get(slotKey);
+        if (!cardSchema) return; // Card might have been removed
+
+        const effectiveSpeed =
+          cardSchema.speed - (cardSchema.statBuffs?.get("speed") || 0);
         const maxCooldown = cardContainer.getData(
+          // Use maxAttackCooldown from container, set by createCardGameObject
           "maxAttackCooldown"
-        ) as number;
+        ) as number; // This was set using effectiveSpeed initially
+
         let currentTimer = cardContainer.getData(
           "attackCooldownTimer"
         ) as number;
@@ -819,10 +877,54 @@ export class BoardView extends Scene {
         cardSchema.instanceId
       );
       if (cardContainer) {
-        this.updateCardHpVisuals(cardContainer, newHp, cardSchema.health);
+        const effectiveMaxHealth =
+          cardSchema.health + (cardSchema.statBuffs?.get("health") || 0);
+        this.updateCardHpVisuals(cardContainer, newHp, effectiveMaxHealth);
       }
     });
     newUnsubs.push(hpUnsub);
+
+    // Listen to statBuffs changes to update visuals
+    const statBuffsUnsub = $(cardSchema.statBuffs).onChange(() => {
+      const cardContainer = this.getCardGameObjectByInstanceId(
+        cardSchema.instanceId
+      );
+      if (cardContainer) {
+        // Re-render the card's text elements to reflect new effective stats
+        const effectiveAttack =
+          cardSchema.attack + (cardSchema.statBuffs?.get("attack") || 0);
+        const effectiveSpeed = Math.max(
+          0.1,
+          cardSchema.speed - (cardSchema.statBuffs?.get("speed") || 0)
+        );
+        const effectiveMaxHealth =
+          cardSchema.health + (cardSchema.statBuffs?.get("health") || 0);
+
+        const attackText = cardContainer.getData(
+          "attackTextObject"
+        ) as Phaser.GameObjects.Text;
+        if (attackText) attackText.setText(`${effectiveAttack}`);
+
+        const speedText = cardContainer.getData(
+          "speedTextObject"
+        ) as Phaser.GameObjects.Text;
+        if (speedText) speedText.setText(`${effectiveSpeed.toFixed(1)}`);
+
+        // Update HP text and visuals
+        this.updateCardHpVisuals(
+          cardContainer,
+          cardSchema.currentHp,
+          effectiveMaxHealth
+        );
+
+        // Update cooldown data if speed changed
+        const newMaxCooldownMs =
+          (effectiveSpeed > 0 ? effectiveSpeed : 1.5) * 1000;
+        cardContainer.setData("maxAttackCooldown", newMaxCooldownMs);
+        // Optionally reset current cooldown timer or adjust proportionally
+      }
+    });
+    newUnsubs.push(statBuffsUnsub);
 
     // Add other card-specific listeners here if needed in the future
     // e.g., $(cardSchema).listen("attack", ...)
@@ -1054,15 +1156,21 @@ export class BoardView extends Scene {
       currentHp: cardSchema.currentHp,
       brewCost: cardSchema.brewCost,
       artUrl: cardSchema.artUrl,
-      instanceId: cardSchema.instanceId
+      instanceId: cardSchema.instanceId,
+      statBuffs: cardSchema.statBuffs, // Pass statBuffs
     };
 
     const cardType = area === "hand" ? "full" : "minion";
-    const container = createCardGameObject(this, cardRenderData, cardType, isObscured);
-    
+    const container = createCardGameObject(
+      this,
+      cardRenderData,
+      cardType,
+      isObscured
+    );
+
     // Position the container
     container.setPosition(x, y);
-    
+
     return container;
   }
 
@@ -1126,13 +1234,27 @@ export class BoardView extends Scene {
       hitAreaCallback: Phaser.Geom.Rectangle.Contains,
       useHandCursor: true,
     });
+    console.log(`BoardView: Card ${cardContainer.getData('instanceId')} interactive set. Enabled: ${cardContainer.input?.enabled}`); // Log interactivity status
     this.input.setDraggable(cardContainer);
     // Explicitly ensure input is enabled for the draggable card container
     if (cardContainer.input) {
       cardContainer.input.enabled = true;
     }
-
+    
+    cardContainer.on('pointerover', () => {
+      // Don't show enlarged view if a drag operation is active on any card
+      if (this.input.activePointer.isDown && this.input.manager.dragTarget) {
+        return;
+      }
+      this.showEnlargedCard(cardContainer);
+    });
+    
+    cardContainer.on('pointerout', () => {
+      this.hideEnlargedCard();
+    });
+    
     cardContainer.on("dragstart", (pointer: Phaser.Input.Pointer) => {
+      this.hideEnlargedCard(); // Hide enlarged view when starting a drag
       // Guard: Only allow drag actions if in Shop or Preparation phase
       if (
         this.currentPhase !== Phase.Shop &&
@@ -1143,13 +1265,14 @@ export class BoardView extends Scene {
         // The card remains draggable by Phaser's definition, but our custom dragstart logic won't run.
         return;
       }
-
+  
       // If drag is allowed (Shop or Preparation phase):
       // Ensure the object still has an active input handler before proceeding
       if (!cardContainer.input || !cardContainer.input.enabled) {
         return;
       }
-
+      this.hideEnlargedCard(); // Hide enlarged view when starting a drag
+  
       this.children.bringToTop(cardContainer);
       cardContainer.setAlpha(0.7);
       cardContainer.setData("isDragging", true);
@@ -1166,7 +1289,7 @@ export class BoardView extends Scene {
       );
       // Original area and slotKey are already set in cardContainer.data when it's created/updated
     });
-
+  
     cardContainer.on(
       "drag",
       (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
@@ -1599,7 +1722,164 @@ export class BoardView extends Scene {
     }
     return { handLayout, battlefieldLayout };
   }
+  
+  private showEnlargedCard(hoveredCardContainer: Phaser.GameObjects.Container) {
+    const instanceId = hoveredCardContainer.getData("instanceId") as string;
+    console.log(`BoardView: showEnlargedCard called for card ${instanceId}`);
 
+    if (!colyseusRoom || !colyseusRoom.state || !this.scene.isActive()) {
+      console.warn(`BoardView: showEnlargedCard - Colyseus room/state not available or scene inactive for ${instanceId}.`);
+      return;
+    }
+
+    const ownerSessionId = hoveredCardContainer.getData("ownerSessionId") as string;
+    const area = hoveredCardContainer.getData("area") as "hand" | "battlefield";
+    const slotKey = hoveredCardContainer.getData("slotKey") as string;
+
+    console.log(`BoardView: showEnlargedCard - Hovered card details: instanceId=${instanceId}, ownerSessionId=${ownerSessionId}, area=${area}, slotKey=${slotKey}`);
+
+    const playerState = colyseusRoom.state.players.get(ownerSessionId) as ClientPlayerState | undefined;
+    if (!playerState) {
+      console.warn(`BoardView: showEnlargedCard - Player state not found for owner ${ownerSessionId}.`);
+      return;
+    }
+
+    const cardCollection = area === "hand" ? playerState.hand : playerState.battlefield;
+    const cardSchema = cardCollection.get(slotKey) as ClientCardInstance | undefined;
+
+    if (!cardSchema || cardSchema.instanceId !== instanceId) {
+      console.warn(`BoardView: Card schema not found or mismatch for enlarged display. Expected InstanceId: ${instanceId}, Area: ${area}, SlotKey: ${slotKey}, Owner: ${ownerSessionId}`);
+      if (cardSchema) {
+          console.warn(`BoardView: Found cardSchema with instanceId: ${cardSchema.instanceId} instead.`);
+      } else {
+          console.warn(`BoardView: cardSchema is undefined in collection for slotKey ${slotKey}.`);
+      }
+      console.warn(`BoardView: Looked in playerState.${area}. Collection size: ${cardCollection?.size}. Keys: ${cardCollection ? JSON.stringify(Array.from(cardCollection.keys())) : 'undefined'}`);
+      return;
+    }
+    console.log(`BoardView: showEnlargedCard - Found card schema for ${cardSchema.name} (${instanceId})`);
+
+    // Clear previous card visual if any
+    if (this.enlargedCardVisual && this.enlargedCardVisual.active) {
+      this.enlargedCardVisual.destroy();
+    }
+    this.enlargedCardVisual = null;
+
+    // Create and add the new enlarged card visual
+    const cardRenderData: CardRenderData = {
+        name: cardSchema.name,
+        attack: cardSchema.attack,
+        speed: cardSchema.speed,
+        health: cardSchema.health,
+        currentHp: cardSchema.currentHp,
+        brewCost: cardSchema.brewCost,
+        artUrl: cardSchema.artUrl,
+        instanceId: cardSchema.instanceId,
+        rarity: cardSchema.rarity,
+        statBuffs: cardSchema.statBuffs,
+    };
+    this.enlargedCardVisual = createCardGameObject(this, cardRenderData, 'full', false);
+    this.enlargedCardVisual.setScale(1.5); // Scale it up
+    this.enlargedCardDisplay.add(this.enlargedCardVisual);
+    this.enlargedCardVisual.setPosition(0, -this.enlargedCardBackground.height / 2 + (FULL_CARD_HEIGHT * 1.5) / 2 + 10);
+
+    // Effects Text
+    let effectsContent = "Effects:\n";
+    if (cardSchema.effects && cardSchema.effects.length > 0) {
+      cardSchema.effects.forEach(effect => {
+        effectsContent += `- ${effect.description}\n`;
+      });
+    } else {
+      effectsContent += "- None\n";
+    }
+    this.enlargedCardEffectsText.setText(effectsContent);
+    const effectsTextY = this.enlargedCardVisual.y + (FULL_CARD_HEIGHT * 1.5) / 2 + 10;
+    this.enlargedCardEffectsText.setPosition(0, effectsTextY);
+
+    // Buffs Text
+    let buffsContent = "Buffs:\n";
+    if (cardSchema.statBuffs && cardSchema.statBuffs.size > 0) {
+      cardSchema.statBuffs.forEach((value, key) => {
+        buffsContent += `- ${key.charAt(0).toUpperCase() + key.slice(1)}: ${value > 0 ? '+' : ''}${value}\n`;
+      });
+    } else {
+      buffsContent += "- None\n";
+    }
+    this.enlargedCardBuffsText.setText(buffsContent);
+    const buffsTextY = this.enlargedCardEffectsText.y + this.enlargedCardEffectsText.height + 5;
+    this.enlargedCardBuffsText.setPosition(0, buffsTextY);
+
+    // Adjust background size
+    const totalContentHeight = (FULL_CARD_HEIGHT * 1.5) + 20 + this.enlargedCardEffectsText.height + 5 + this.enlargedCardBuffsText.height + 20;
+    this.enlargedCardBackground.setSize(300, Math.max(450, totalContentHeight));
+    if (this.enlargedCardVisual) {
+        this.enlargedCardVisual.setPosition(0, -this.enlargedCardBackground.height / 2 + (FULL_CARD_HEIGHT * 1.5) / 2 + 10);
+    }
+
+    // Refined positioning logic
+    const hoveredCardActualWidth = hoveredCardContainer.getData('displayCardWidth') as number || FULL_CARD_WIDTH;
+
+    let displayX = hoveredCardContainer.x + (hoveredCardActualWidth / 2) + (this.enlargedCardBackground.width / 2) + 10;
+    let displayY = hoveredCardContainer.y;
+
+    // Check right boundary
+    if (displayX + this.enlargedCardBackground.width / 2 > this.cameras.main.width) {
+        displayX = hoveredCardContainer.x - (hoveredCardActualWidth / 2) - (this.enlargedCardBackground.width / 2) - 10;
+    }
+    // Check left boundary (if placing to the left made it go off-screen left)
+    if (displayX - this.enlargedCardBackground.width / 2 < 0) {
+        displayX = this.enlargedCardBackground.width / 2 + 5; // Add a small margin
+    }
+
+    // Vertical boundary checks
+    if (displayY - this.enlargedCardBackground.height / 2 < 0) {
+        displayY = this.enlargedCardBackground.height / 2 + 5; // Add a small margin
+    }
+    if (displayY + this.enlargedCardBackground.height / 2 > this.cameras.main.height) {
+        displayY = this.cameras.main.height - this.enlargedCardBackground.height / 2 - 5; // Add a small margin
+    }
+    this.enlargedCardDisplay.setPosition(displayX, displayY);
+    console.log(`BoardView: showEnlargedCard - Positioning enlarged display at X=${displayX}, Y=${displayY} for card ${cardSchema.name}`);
+  
+    this.enlargedCardDisplay.setAlpha(0); // Start transparent for fade-in
+    this.enlargedCardDisplay.setVisible(true);
+    this.children.bringToTop(this.enlargedCardDisplay); // Ensure it's on top
+  
+    // Stop any existing tweens on the enlargedCardDisplay before starting a new one
+    this.tweens.killTweensOf(this.enlargedCardDisplay);
+    this.tweens.add({
+      targets: this.enlargedCardDisplay,
+      alpha: 1,
+      duration: 200, // Adjust duration as needed
+      ease: 'Power2'
+    });
+  
+    console.log(`BoardView: showEnlargedCard - Enlarged display for ${cardSchema.name} is now visible.`);
+  }
+  
+  private hideEnlargedCard() {
+    if (this.enlargedCardDisplay && this.enlargedCardDisplay.visible) {
+      console.log("BoardView: hideEnlargedCard called.");
+      // Stop any existing tweens on the enlargedCardDisplay before starting a new one
+      this.tweens.killTweensOf(this.enlargedCardDisplay);
+      this.tweens.add({
+        targets: this.enlargedCardDisplay,
+        alpha: 0,
+        duration: 150, // Adjust duration as needed
+        ease: 'Power2',
+        onComplete: () => {
+          if (this.enlargedCardDisplay) { // Check if still exists
+            this.enlargedCardDisplay.setVisible(false);
+            if (this.enlargedCardVisual && this.enlargedCardVisual.active) {
+              this.enlargedCardVisual.destroy();
+            }
+            this.enlargedCardVisual = null;
+          }
+        }
+      });
+    }
+  }
+  
   private isSlotEmpty(
     sessionId: string,
     area: "hand" | "battlefield",
@@ -1935,11 +2215,18 @@ export class BoardView extends Scene {
     this.input.off("dragleave");
     this.input.off("drop");
   }
-
+  
   shutdown() {
     console.log("BoardView shutting down...");
+    this.hideEnlargedCard(); // Hide and clean up enlarged display
+    if (this.enlargedCardDisplay && this.enlargedCardDisplay.active) {
+        this.enlargedCardDisplay.destroy(); // Destroy the main container
+    }
+    // this.enlargedCardVisual is handled by hideEnlargedCard or if it's part of enlargedCardDisplay
+    // this.enlargedCardBackground, this.enlargedCardEffectsText, this.enlargedCardBuffsText are children of enlargedCardDisplay
+  
     this.cleanupListeners();
-
+  
     // Unregister the shutdown event listener for this scene
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }

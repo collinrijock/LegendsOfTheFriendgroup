@@ -7,7 +7,7 @@
     "health": 8,
     "brewCost": 4,
     "description": "Fast but frail.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -18,8 +18,18 @@
     "health": 25,
     "brewCost": 5,
     "description": "Takes a beating.",
-    "isLegend": false,
-    "artUrl": "lola.png"
+    "rarity": "common",
+    "artUrl": "lola.png",
+    "effects": [
+      {
+        "effectId": "gainBrewsOnBattleStart",
+        "trigger": "BATTLE_START",
+        "description": "At battle start, gain 2 brews.",
+        "config": {
+          "amount": 2
+        }
+      }
+    ]
   },
   {
     "id": "tanky_boi_02",
@@ -29,7 +39,7 @@
     "health": 20,
     "brewCost": 5,
     "description": "Takes a beating.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -40,8 +50,19 @@
     "health": 4,
     "brewCost": 5,
     "description": "Hits hard, dies fast.",
-    "isLegend": false,
-    "artUrl": "lola.png"
+    "rarity": "common",
+    "artUrl": "lola.png",
+    "effects": [
+      {
+        "effectId": "lifestealOnAttack",
+        "trigger": "ON_ATTACK",
+        "description": "When this unit attacks, 50% chance to restore 3 health to you.",
+        "config": {
+          "chance": 0.5,
+          "amount": 3
+        }
+      }
+    ]
   },
   {
     "id": "balanced_bud_01",
@@ -51,7 +72,7 @@
     "health": 12,
     "brewCost": 6,
     "description": "Good all-around.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -62,7 +83,7 @@
     "health": 14,
     "brewCost": 6,
     "description": "Good all-around.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -73,7 +94,7 @@
     "health": 4,
     "brewCost": 3,
     "description": "Attacks quickly.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -84,7 +105,7 @@
     "health": 5,
     "brewCost": 3,
     "description": "Attacks quickly.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -95,7 +116,7 @@
     "health": 18,
     "brewCost": 7,
     "description": "Tough and hits reasonably hard.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -106,7 +127,7 @@
     "health": 18,
     "brewCost": 7,
     "description": "Tough and hits reasonably hard.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -116,9 +137,20 @@
     "speed": 14,
     "health": 12,
     "brewCost": 8,
-    "description": "Slow wind-up, big impact.",
-    "isLegend": false,
-    "artUrl": "lola.png"
+    "description": "Slow wind-up, big impact. While alive, enemy units with 10+ Attack have a 50% chance to miss.",
+    "rarity": "rare",
+    "artUrl": "lola.png",
+    "effects": [
+      {
+        "effectId": "missAuraAgainstHighAttack",
+        "trigger": "WHILE_ALIVE",
+        "description": "While alive, enemy units with 10+ Attack have a 50% chance to miss.",
+        "config": {
+          "attackThreshold": 10,
+          "missChance": 0.5
+        }
+      }
+    ]
   },
   {
     "id": "swarm_ling_01",
@@ -128,7 +160,7 @@
     "health": 6,
     "brewCost": 1,
     "description": "Cheap and fast, but weak.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -139,7 +171,7 @@
     "health": 9,
     "brewCost": 3,
     "description": "Cheap and fast, but weak.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -150,7 +182,7 @@
     "health": 15,
     "brewCost": 1,
     "description": "Cheap and tanky, but weak.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -161,7 +193,7 @@
     "health": 32,
     "brewCost": 9,
     "description": "A defensive wall.",
-    "isLegend": false,
+    "rarity": "rare",
     "artUrl": "lola.png"
   },
   {
@@ -171,9 +203,19 @@
     "speed": 4,
     "health": 16,
     "brewCost": 12,
-    "description": "Expensive but very powerful.",
-    "isLegend": false,
-    "artUrl": "lola.png"
+    "description": "Expensive but very powerful. When this unit dies, it deals 5 damage to ALL units.",
+    "rarity": "legend",
+    "artUrl": "lola.png",
+    "effects": [
+      {
+        "effectId": "aoeDamageOnDeath",
+        "trigger": "ON_DEATH",
+        "description": "When this unit dies, it deals 5 damage to ALL units.",
+        "config": {
+          "damage": 5
+        }
+      }
+    ]
   },
   {
     "id": "brigade_beamer_01",
@@ -183,7 +225,7 @@
     "health": 7,
     "brewCost": 4,
     "description": "Chill with collin.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -194,7 +236,7 @@
     "health": 10,
     "brewCost": 10,
     "description": "Pew pew pew.",
-    "isLegend": false,
+    "rarity": "rare",
     "artUrl": "lola.png"
   },
   {
@@ -205,7 +247,7 @@
     "health": 32,
     "brewCost": 15,
     "description": "Strong and chunky",
-    "isLegend": false,
+    "rarity": "legend",
     "artUrl": "lola.png"
   },
   {
@@ -216,7 +258,7 @@
     "health": 8,
     "brewCost": 2,
     "description": "Strong and chunky",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   },
   {
@@ -227,7 +269,7 @@
     "health": 8,
     "brewCost": 2,
     "description": "Cheap and well rounded.",
-    "isLegend": false,
+    "rarity": "common",
     "artUrl": "lola.png"
   }
 ]

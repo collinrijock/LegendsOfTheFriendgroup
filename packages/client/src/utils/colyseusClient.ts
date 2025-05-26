@@ -27,7 +27,7 @@ export interface CardData {
   health: number;
   brewCost: number;
   description: string;
-  isLegend: boolean;
+  rarity: string; // Replaced isLegend
   artUrl: string; // URL or key for card art
 }
 export let globalCardDataCache: Map<string, CardData> = new Map();

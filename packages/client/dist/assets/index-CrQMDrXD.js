@@ -48,8 +48,8 @@ const _ScaleFlow = class _ScaleFlow {
     __publicField(this, "canvas");
     __publicField(this, "parent");
     __publicField(this, "guide");
-    const width = config2.width;
-    const height = config2.height;
+    const width = config2.width || _ScaleFlow.width;
+    const height = config2.height || _ScaleFlow.height;
     _ScaleFlow.width = width;
     _ScaleFlow.height = height;
     _ScaleFlow.center = new Phaser$1.Math.Vector2(width / 2, height / 2);
@@ -143,9 +143,9 @@ __publicField(_ScaleFlow, "scaleManager");
 __publicField(_ScaleFlow, "cameras");
 __publicField(_ScaleFlow, "gameZone");
 __publicField(_ScaleFlow, "uiZone");
-__publicField(_ScaleFlow, "width");
-__publicField(_ScaleFlow, "height");
-__publicField(_ScaleFlow, "center");
+__publicField(_ScaleFlow, "width", 1600);
+__publicField(_ScaleFlow, "height", 900);
+__publicField(_ScaleFlow, "center", new Phaser$1.Math.Vector2(1600 / 2, 900 / 2));
 __publicField(_ScaleFlow, "isLandscape");
 __publicField(_ScaleFlow, "scaleFactor", 1);
 __publicField(_ScaleFlow, "scaleFactor2", 1);
@@ -21931,6 +21931,32 @@ var __decorateClass = /* @__PURE__ */ __name((decorators, target2, key, kind) =>
   if (result) __defProp2(target2, key, result);
   return result;
 }, "__decorateClass");
+const _CardEffectSchema = class _CardEffectSchema extends umdExports.Schema {
+  constructor() {
+    super(...arguments);
+    this.effectId = "";
+    this.trigger = "BATTLE_START";
+    this.description = "";
+    this.config = new umdExports.MapSchema();
+  }
+  // Flexible configuration for the effect (e.g., amount, chance, targetType)
+  // Using string for values to allow numbers, booleans, or other simple types as strings.
+  // Handler functions will parse these strings.
+};
+__name(_CardEffectSchema, "CardEffectSchema");
+let CardEffectSchema = _CardEffectSchema;
+__decorateClass([
+  umdExports.type("string")
+], CardEffectSchema.prototype, "effectId");
+__decorateClass([
+  umdExports.type("string")
+], CardEffectSchema.prototype, "trigger");
+__decorateClass([
+  umdExports.type("string")
+], CardEffectSchema.prototype, "description");
+__decorateClass([
+  umdExports.type({ map: "string" })
+], CardEffectSchema.prototype, "config");
 var _a8;
 const _CardInstanceSchema = (_a8 = class extends umdExports.Schema {
   constructor() {
@@ -21944,8 +21970,12 @@ const _CardInstanceSchema = (_a8 = class extends umdExports.Schema {
     this.currentHp = 0;
     this.brewCost = 0;
     this.description = "";
-    this.isLegend = false;
+    this.rarity = "common";
+    this.artUrl = "";
+    this.statBuffs = new umdExports.MapSchema();
+    this.effects = new umdExports.ArraySchema();
   }
+  // --- End Card Effects ---
   // Helper to create from client-like data
   static fromCardData(data, instanceId) {
     const card = new _a8();
@@ -21958,8 +21988,36 @@ const _CardInstanceSchema = (_a8 = class extends umdExports.Schema {
     card.currentHp = data.health;
     card.brewCost = data.brewCost;
     card.description = data.description;
-    card.isLegend = data.isLegend;
+    card.rarity = data.rarity || "common";
+    card.artUrl = data.artUrl || "lola.png";
+    card.statBuffs = new umdExports.MapSchema();
+    if (data.effects && Array.isArray(data.effects)) {
+      data.effects.forEach((effectData) => {
+        const effect = new CardEffectSchema();
+        effect.effectId = effectData.effectId || "";
+        effect.trigger = effectData.trigger || "BATTLE_START";
+        effect.description = effectData.description || "";
+        if (effectData.config && typeof effectData.config === "object") {
+          for (const key in effectData.config) {
+            effect.config.set(key, String(effectData.config[key]));
+          }
+        }
+        card.effects.push(effect);
+      });
+    }
     return card;
+  }
+  // Methods to get effective stats (base + buffs)
+  // These are not part of the schema sent to client, but used server-side.
+  getEffectiveAttack() {
+    return this.attack + (this.statBuffs.get("attack") || 0);
+  }
+  getEffectiveSpeed() {
+    const rawEffectiveSpeed = this.speed - (this.statBuffs.get("speed") || 0);
+    return Math.max(0.1, rawEffectiveSpeed);
+  }
+  getEffectiveHealth() {
+    return this.health + (this.statBuffs.get("health") || 0);
   }
 }, __name(_a8, "_CardInstanceSchema"), _a8);
 __decorateClass([
@@ -21990,8 +22048,17 @@ __decorateClass([
   umdExports.type("string")
 ], _CardInstanceSchema.prototype, "description");
 __decorateClass([
-  umdExports.type("boolean")
-], _CardInstanceSchema.prototype, "isLegend");
+  umdExports.type("string")
+], _CardInstanceSchema.prototype, "rarity");
+__decorateClass([
+  umdExports.type("string")
+], _CardInstanceSchema.prototype, "artUrl");
+__decorateClass([
+  umdExports.type({ map: "number" })
+], _CardInstanceSchema.prototype, "statBuffs");
+__decorateClass([
+  umdExports.type([CardEffectSchema])
+], _CardInstanceSchema.prototype, "effects");
 let CardInstanceSchema = _CardInstanceSchema;
 const _PlayerState = class _PlayerState extends umdExports.Schema {
   constructor() {
@@ -22395,10 +22462,9 @@ const _MainMenu = class _MainMenu extends phaserExports.Scene {
     let scaleY = this.cameras.main.height / bg.height + 0.2;
     let scale = Math.max(scaleX, scaleY);
     bg.setScale(scale).setScrollFactor(0);
-    this.add.text(Number(this.game.config.width) * 0.5, 300, "Legends of the Friendgroup", {
+    this.add.text(Number(this.game.config.width) * 0.5, 100, "Legends of the Friendgroup", {
       fontFamily: "Arial Black",
       fontSize: 58,
-      // yellow
       color: "#ffff00",
       stroke: "#000000",
       strokeThickness: 8,
@@ -22481,6 +22547,7 @@ const _Preloader = class _Preloader extends phaserExports.Scene {
     this.load.image("logo", "logo.png");
     this.load.image("cardFullTier1", "CardFullTier1.png");
     this.load.image("cardMinionTier1", "CardMinionTier1.png");
+    this.load.image("lola_art", "lola.png");
   }
   create() {
     this.scene.start("MainMenu");
@@ -22825,8 +22892,212 @@ const _Lobby = class _Lobby extends phaserExports.Scene {
 };
 __name(_Lobby, "Lobby");
 let Lobby = _Lobby;
-const CARD_WIDTH = 120;
-const CARD_HEIGHT = 168;
+const FULL_CARD_WIDTH$1 = 120;
+const FULL_CARD_HEIGHT$1 = 168;
+const MINION_CARD_WIDTH$1 = 100;
+const MINION_CARD_HEIGHT$1 = 140;
+const nameTextStyle = {
+  fontFamily: "Arial",
+  color: "#ffffff",
+  stroke: "#000000",
+  strokeThickness: 4,
+  align: "center"
+};
+const statTextStyle = {
+  fontFamily: "Arial",
+  color: "#ffffff",
+  stroke: "#000000",
+  strokeThickness: 3
+};
+const ART_NATIVE_WIDTH = 56;
+const ART_NATIVE_HEIGHT = 37;
+function createCardGameObject(scene, cardData, type, isObscured = false) {
+  var _a9, _b, _c;
+  const container = scene.add.container(0, 0);
+  const displayCardWidth = type === "full" ? FULL_CARD_WIDTH$1 : MINION_CARD_WIDTH$1;
+  const displayCardHeight = type === "full" ? FULL_CARD_HEIGHT$1 : MINION_CARD_HEIGHT$1;
+  container.setData("displayCardWidth", displayCardWidth);
+  container.setData("displayCardHeight", displayCardHeight);
+  if (isObscured) {
+    const cardBack = scene.add.image(0, 0, "cardBack").setOrigin(0.5).setDisplaySize(displayCardWidth, displayCardHeight);
+    container.add(cardBack);
+    return container;
+  }
+  const effectiveAttack = cardData.attack + (((_a9 = cardData.statBuffs) == null ? void 0 : _a9.get("attack")) || 0);
+  const effectiveSpeed = Math.max(0.1, cardData.speed - (((_b = cardData.statBuffs) == null ? void 0 : _b.get("speed")) || 0));
+  const effectiveMaxHealth = cardData.health + (((_c = cardData.statBuffs) == null ? void 0 : _c.get("health")) || 0);
+  const currentHp = cardData.currentHp !== void 0 ? cardData.currentHp : effectiveMaxHealth;
+  const cardTextureKey = type === "full" ? "cardFullTier1" : "cardMinionTier1";
+  const cardImage = scene.add.image(0, 0, cardTextureKey).setOrigin(0.5);
+  cardImage.setDisplaySize(displayCardWidth, displayCardHeight);
+  container.add(cardImage);
+  container.setData("mainCardImage", cardImage);
+  const artKey = cardData.artUrl ? cardData.artUrl.replace(".png", "_art") : "lola_art";
+  const artImage = scene.add.image(0, 0, artKey).setOrigin(0.5);
+  let artDisplayAreaWidth;
+  let artDisplayAreaHeight;
+  let artYPosition;
+  if (type === "full") {
+    artDisplayAreaWidth = displayCardWidth * 0.63;
+    artDisplayAreaHeight = displayCardHeight * 0.4;
+    artYPosition = -displayCardHeight * 0.3;
+  } else {
+    artDisplayAreaWidth = displayCardWidth * 0.75;
+    artDisplayAreaHeight = displayCardHeight * 0.45;
+    artYPosition = -displayCardHeight * 0.18;
+  }
+  const artScale = Math.min(
+    artDisplayAreaWidth / ART_NATIVE_WIDTH,
+    artDisplayAreaHeight / ART_NATIVE_HEIGHT
+  );
+  artImage.setScale(artScale);
+  artImage.setPosition(0, artYPosition);
+  container.add(artImage);
+  if (type === "full") {
+    const nameText = scene.add.text(0, artYPosition + artImage.displayHeight / 2 - 5, cardData.name, {
+      ...nameTextStyle,
+      fontSize: 16,
+      wordWrap: { width: displayCardWidth }
+    }).setOrigin(0.5, 0);
+    container.add(nameText);
+    const statsYBase = nameText.y + nameText.height + 13;
+    const attackText = scene.add.text(-displayCardWidth / 2 + 32, statsYBase, `${effectiveAttack}`, {
+      // Use effectiveAttack
+      ...statTextStyle,
+      fontSize: 16
+    }).setOrigin(0, 0.5);
+    container.add(attackText);
+    container.setData("attackTextObject", attackText);
+    const hpText = scene.add.text(
+      displayCardWidth / 2 - 18,
+      statsYBase,
+      `${currentHp}/${effectiveMaxHealth}`,
+      // Use currentHp and effectiveMaxHealth
+      {
+        ...statTextStyle,
+        fontSize: 16,
+        color: "#00ff00"
+      }
+    ).setOrigin(1, 0.5);
+    container.add(hpText);
+    container.setData("hpTextObject", hpText);
+    const speedText = scene.add.text(0, displayCardHeight / 2 - 50, `${effectiveSpeed.toFixed(1)}`, {
+      // Use effectiveSpeed
+      ...statTextStyle,
+      fontSize: 16
+    }).setOrigin(0.5, 1);
+    container.add(speedText);
+    container.setData("speedTextObject", speedText);
+    if (cardData.brewCost !== void 0) {
+      const costText = scene.add.text(
+        displayCardWidth / 2 - 8,
+        -displayCardHeight / 2 + 8,
+        `${cardData.brewCost}B`,
+        {
+          ...statTextStyle,
+          fontSize: 14,
+          color: "#ffff00"
+        }
+      ).setOrigin(1, 0);
+      container.add(costText);
+    }
+  } else {
+    const nameText = scene.add.text(0, -displayCardHeight / 2 - 10, cardData.name, {
+      ...nameTextStyle,
+      fontSize: 14,
+      wordWrap: { width: displayCardWidth }
+    }).setOrigin(0.5, 0);
+    container.add(nameText);
+    const statsYBase = artYPosition + artImage.displayHeight / 2 + 27;
+    const attackText = scene.add.text(-displayCardWidth / 2 + 25, statsYBase + 5, `${effectiveAttack}`, {
+      // Use effectiveAttack
+      ...statTextStyle,
+      fontSize: 18
+    }).setOrigin(0.5);
+    container.add(attackText);
+    container.setData("attackTextObject", attackText);
+    const hpText = scene.add.text(
+      displayCardWidth / 2 - 34,
+      statsYBase + 5,
+      `${currentHp}/${effectiveMaxHealth}`,
+      // Use currentHp and effectiveMaxHealth
+      {
+        ...statTextStyle,
+        fontSize: 18,
+        color: "#88ff88"
+      }
+    ).setOrigin(0.5);
+    container.add(hpText);
+    container.setData("hpTextObject", hpText);
+    const speedText = scene.add.text(0, displayCardHeight / 2 - 16, `${effectiveSpeed.toFixed(1)}`, {
+      // Use effectiveSpeed
+      ...statTextStyle,
+      fontSize: 14
+    }).setOrigin(0.5);
+    container.add(speedText);
+    container.setData("speedTextObject", speedText);
+    const cooldownBarY = displayCardHeight / 2 - 15;
+    const cooldownBarWidth = displayCardWidth - 10;
+    const cooldownBarBg = scene.add.rectangle(0, cooldownBarY, cooldownBarWidth, 6, 0, 0.5).setVisible(false);
+    const cooldownBarFill = scene.add.rectangle(
+      -cooldownBarWidth / 2,
+      cooldownBarY,
+      cooldownBarWidth,
+      6,
+      4521796
+    ).setOrigin(0, 0.5).setVisible(false);
+    container.add(cooldownBarBg);
+    container.add(cooldownBarFill);
+    container.setData("cooldownBarBg", cooldownBarBg);
+    container.setData("cooldownBarFill", cooldownBarFill);
+    container.setData("attackCooldownTimer", 0);
+    container.setData("maxAttackCooldown", (effectiveSpeed > 0 ? effectiveSpeed : 1.5) * 1e3);
+    container.setData("cooldownBarBaseWidth", cooldownBarWidth);
+  }
+  container.setData("statBuffs", cardData.statBuffs);
+  container.setData("baseHealth", cardData.health);
+  return container;
+}
+__name(createCardGameObject, "createCardGameObject");
+function updateCardHpVisuals(cardContainer, currentHp, effectiveMaxHealth) {
+  if (!cardContainer || !cardContainer.active) return;
+  const hpText = cardContainer.getData(
+    "hpTextObject"
+  );
+  const mainCardImage = cardContainer.getData(
+    "mainCardImage"
+  );
+  if (hpText && hpText.active) {
+    hpText.setText(`${currentHp}/${effectiveMaxHealth}`);
+    const hpPercent = effectiveMaxHealth > 0 ? currentHp / effectiveMaxHealth : 0;
+    if (currentHp <= 0) {
+      hpText.setColor("#ff0000");
+    } else if (hpPercent < 0.3) {
+      hpText.setColor("#ff8888");
+    } else if (hpPercent < 0.6) {
+      hpText.setColor("#ffff88");
+    } else {
+      hpText.setColor("#88ff88");
+    }
+  }
+  const isVisuallyDead = cardContainer.alpha < 1;
+  if (currentHp <= 0) {
+    if (!isVisuallyDead) {
+      cardContainer.setAlpha(0.6);
+      if (mainCardImage && mainCardImage.active && typeof mainCardImage.setTint === "function") {
+        mainCardImage.setTint(7829367);
+      }
+    }
+  } else {
+    if (isVisuallyDead) {
+      cardContainer.setAlpha(1);
+      if (mainCardImage && mainCardImage.active && typeof mainCardImage.clearTint === "function") {
+        mainCardImage.clearTint();
+      }
+    }
+  }
+}
+__name(updateCardHpVisuals, "updateCardHpVisuals");
 const _Shop = class _Shop extends phaserExports.Scene {
   constructor() {
     super("Shop");
@@ -22886,10 +23157,12 @@ const _Shop = class _Shop extends phaserExports.Scene {
     const refreshCost = (myPlayerState == null ? void 0 : myPlayerState.shopRefreshCost) || 2;
     this.refreshButton = this.add.text(gameWidth - 150, 180, `Refresh: ${refreshCost} 🍺`, {
       fontFamily: "Arial",
-      fontSize: 18,
+      fontSize: 22,
+      // Increased from 18
       color: "#FFFFFF",
       backgroundColor: "#4444AA",
-      padding: { x: 10, y: 5 }
+      padding: { x: 15, y: 8 }
+      // Increased padding
     }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
     this.refreshButton.on("pointerdown", () => {
       const myPlayerState2 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(colyseusRoom.sessionId);
@@ -22922,20 +23195,37 @@ const _Shop = class _Shop extends phaserExports.Scene {
       const myPlayerState2 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(
         colyseusRoom.sessionId
       );
-      if (colyseusRoom && myPlayerState2 && !myPlayerState2.isReady && colyseusRoom.state.currentPhase === Phase.Shop) {
-        colyseusRoom.send("playerReady");
+      if (colyseusRoom && myPlayerState2 && colyseusRoom.state.currentPhase === Phase.Shop) {
+        if (myPlayerState2.isReady) {
+          colyseusRoom.send("playerUnready");
+        } else {
+          colyseusRoom.send("playerReady");
+        }
       }
     });
     this.continueButton.on("pointerover", () => {
       var _a10;
-      if ((_a10 = this.continueButton.input) == null ? void 0 : _a10.enabled)
-        this.continueButton.setColor("#55ff55");
+      if ((_a10 = this.continueButton.input) == null ? void 0 : _a10.enabled) {
+        const myPlayerState2 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(colyseusRoom.sessionId);
+        if (myPlayerState2 == null ? void 0 : myPlayerState2.isReady) {
+          this.continueButton.setColor("#ffaa55");
+        } else {
+          this.continueButton.setColor("#55ff55");
+        }
+      }
     });
     this.continueButton.on("pointerout", () => {
       var _a10;
-      if ((_a10 = this.continueButton.input) == null ? void 0 : _a10.enabled)
-        this.continueButton.setColor("#00ff00");
-      else this.continueButton.setColor("#888888");
+      if ((_a10 = this.continueButton.input) == null ? void 0 : _a10.enabled) {
+        const myPlayerState2 = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(colyseusRoom.sessionId);
+        if (myPlayerState2 == null ? void 0 : myPlayerState2.isReady) {
+          this.continueButton.setColor("#ff8800");
+        } else {
+          this.continueButton.setColor("#00ff00");
+        }
+      } else {
+        this.continueButton.setColor("#888888");
+      }
     });
     this.waitingText = this.add.text(centerX, gameHeight - 20, "", {
       fontFamily: "Arial",
@@ -22995,10 +23285,10 @@ const _Shop = class _Shop extends phaserExports.Scene {
     const shopCardSpacing = 20;
     const numOffers = shopOfferIds.length > 0 ? shopOfferIds.length : 4;
     const shopY = centerY;
-    const totalShopWidth = numOffers * CARD_WIDTH + (numOffers - 1) * shopCardSpacing;
-    const startShopX = centerX - totalShopWidth / 2 + CARD_WIDTH / 2;
+    const totalShopWidth = numOffers * FULL_CARD_WIDTH$1 + (numOffers - 1) * shopCardSpacing;
+    const startShopX = centerX - totalShopWidth / 2 + FULL_CARD_WIDTH$1 / 2;
     const bgWidth = totalShopWidth + shopCardSpacing * 2;
-    const bgHeight = CARD_HEIGHT + shopCardSpacing * 2;
+    const bgHeight = FULL_CARD_HEIGHT$1 + shopCardSpacing * 2;
     if (this.shopOffersBackground && this.shopOffersBackground.active) {
       this.shopOffersBackground.destroy();
     }
@@ -23017,60 +23307,20 @@ const _Shop = class _Shop extends phaserExports.Scene {
         console.warn(`Shop: Card data not found for ID: ${cardId}`);
         return;
       }
-      const cardX = startShopX + index * (CARD_WIDTH + shopCardSpacing);
-      const cardContainer = this.add.container(cardX, shopY);
-      const cardImage = this.add.image(0, 0, "cardFullTier1").setOrigin(0.5).setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
-      cardContainer.add(cardImage);
-      const nameText = this.add.text(0, -20, cardData.name, {
-        fontFamily: "Arial",
-        fontSize: 16,
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 4,
-        align: "center",
-        wordWrap: { width: CARD_WIDTH - 20 }
-      }).setOrigin(0.5, 0.5);
-      cardContainer.add(nameText);
-      const attackText = this.add.text(-120 / 2 + 32, CARD_HEIGHT * 0.03, `${cardData.attack}`, {
-        fontFamily: "Arial",
-        fontSize: 16,
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 3
-      }).setOrigin(0, 0.5);
-      cardContainer.add(attackText);
-      const healthText = this.add.text(CARD_WIDTH / 2 - 18, 6, `${cardData.health}/${cardData.health}`, {
-        fontFamily: "Arial",
-        fontSize: 16,
-        color: "#00ff00",
-        stroke: "#000000",
-        strokeThickness: 3
-      }).setOrigin(1, 0.5);
-      cardContainer.add(healthText);
-      const speedText = this.add.text(0, CARD_HEIGHT / 2 - 50, `${cardData.speed}`, {
-        fontFamily: "Arial",
-        fontSize: 16,
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 3
-      }).setOrigin(0.5, 1);
-      cardContainer.add(speedText);
-      const costText = this.add.text(
-        CARD_WIDTH / 2 - 8,
-        -168 / 2 + 8,
-        `${cardData.brewCost}B`,
-        {
-          fontFamily: "Arial",
-          fontSize: 14,
-          color: "#ffff00",
-          stroke: "#000000",
-          strokeThickness: 3,
-          align: "right"
-        }
-      ).setOrigin(1, 0);
-      cardContainer.add(costText);
-      cardContainer.setSize(CARD_WIDTH, CARD_HEIGHT);
-      cardContainer.setSize(CARD_WIDTH, CARD_HEIGHT);
+      const cardX = startShopX + index * (FULL_CARD_WIDTH$1 + shopCardSpacing);
+      const cardRenderData = {
+        name: cardData.name,
+        attack: cardData.attack,
+        speed: cardData.speed,
+        health: cardData.health,
+        brewCost: cardData.brewCost,
+        artUrl: cardData.artUrl,
+        statBuffs: /* @__PURE__ */ new Map()
+        // Shop offers don't have buffs yet
+      };
+      const cardContainer = createCardGameObject(this, cardRenderData, "full", false);
+      cardContainer.setPosition(cardX, shopY);
+      cardContainer.setSize(FULL_CARD_WIDTH$1, FULL_CARD_HEIGHT$1);
       cardContainer.setInteractive({ useHandCursor: true });
       cardContainer.setData("cardId", cardData.id);
       cardContainer.setData("cardData", cardData);
@@ -23293,8 +23543,9 @@ const _Shop = class _Shop extends phaserExports.Scene {
     if (!colyseusRoom || !this.refreshButton || !this.refreshButton.active) return;
     const myPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
     if (!myPlayerState) return;
-    this.refreshButton.setText(`Refresh: ${myPlayerState.shopRefreshCost} 🍺`);
-    const canRefresh = myPlayerState.brews >= myPlayerState.shopRefreshCost && colyseusRoom.state.currentPhase === Phase.Shop;
+    this.refreshButton.setText(`Refresh Shop: ${myPlayerState.shopRefreshCost} 🍺`);
+    const canRefresh = myPlayerState.brews >= myPlayerState.shopRefreshCost && !myPlayerState.isReady && // Player cannot refresh if they are ready
+    colyseusRoom.state.currentPhase === Phase.Shop;
     if (canRefresh) {
       this.refreshButton.setColor("#FFFFFF");
       this.refreshButton.setBackgroundColor("#4444AA");
@@ -23427,22 +23678,28 @@ const _Shop = class _Shop extends phaserExports.Scene {
     });
     const amReady = myPlayerState.isReady;
     const isShopPhase = colyseusRoom.state.currentPhase === Phase.Shop;
-    const canInteract = !amReady && isShopPhase;
+    const canInteract = isShopPhase;
     this.continueButton.setInteractive(canInteract);
-    this.continueButton.setColor(canInteract ? "#00ff00" : "#888888");
+    if (amReady) {
+      this.continueButton.setText("Cancel Ready").setColor("#ff8800");
+    } else {
+      this.continueButton.setText("Continue").setColor("#00ff00");
+    }
+    if (!canInteract) {
+      this.continueButton.setColor("#888888").disableInteractive();
+    }
     if (amReady && !allPlayersReady && isShopPhase) {
       this.waitingText.setText("Waiting for other player(s)...").setVisible(true);
-      this.continueButton.setText("Waiting...");
     } else if (!isShopPhase) {
       this.waitingText.setText(`Waiting for ${colyseusRoom.state.currentPhase} phase...`).setVisible(true);
-      this.continueButton.setText("Continue");
+      this.continueButton.setText("Continue").setColor("#888888").disableInteractive();
     } else {
       this.waitingText.setVisible(false);
-      this.continueButton.setText("Continue");
     }
     this.shopCardObjects.forEach((cardObj) => {
-      if (cardObj.input) cardObj.input.enabled = canInteract;
+      if (cardObj.input) cardObj.input.enabled = !amReady && isShopPhase;
     });
+    this.updateRefreshButtonState();
   }
   shutdown() {
     var _a9, _b, _c, _d, _e, _f, _g, _h;
@@ -23635,14 +23892,19 @@ const _Preparation = class _Preparation extends phaserExports.Scene {
         }
       }
     );
-    colyseusRoom.state.players.forEach((existingPlayer, sessionId) => {
-      if (sessionId !== myPlayerId) {
-        const unsub = $(existingPlayer).listen("isReady", () => {
-          if (this.scene.isActive()) this.updateWaitingStatus();
-        });
-        this.otherPlayerChangeListeners.set(sessionId, unsub);
+    colyseusRoom.state.players.forEach(
+      (existingPlayer, sessionId) => {
+        if (sessionId !== myPlayerId) {
+          const unsub = $(existingPlayer).listen(
+            "isReady",
+            () => {
+              if (this.scene.isActive()) this.updateWaitingStatus();
+            }
+          );
+          this.otherPlayerChangeListeners.set(sessionId, unsub);
+        }
       }
-    });
+    );
   }
   cleanupListeners() {
     var _a9, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
@@ -23744,19 +24006,14 @@ const _Preparation = class _Preparation extends phaserExports.Scene {
     this.updateStartButtonState();
     if (amReady && !allPlayersReady) {
       this.waitingText.setText("Waiting for other player(s)...").setVisible(true);
-      this.startBattleButton.setText("Waiting...");
-      this.startBattleButton.disableInteractive().setColor("#888888");
+      this.startBattleButton.setText("Cancel Ready");
     } else {
       this.waitingText.setVisible(false);
       this.startBattleButton.setText("Start Battle");
-      this.updateStartButtonState();
     }
   }
   updateStartButtonState() {
     if (!this.startBattleButton || !this.startBattleButton.active) {
-      console.warn(
-        "updateStartButtonState called but button is null or inactive."
-      );
       return;
     }
     let battlefieldCardsCount = 0;
@@ -23769,37 +24026,87 @@ const _Preparation = class _Preparation extends phaserExports.Scene {
         }
       });
     }
-    const canStart = battlefieldCardsCount > 0;
+    const canStartBattle = battlefieldCardsCount > 0;
     const myPlayerState = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(
       colyseusRoom == null ? void 0 : colyseusRoom.sessionId
     );
     const amReady = (myPlayerState == null ? void 0 : myPlayerState.isReady) ?? false;
     const isPrepPhase = (colyseusRoom == null ? void 0 : colyseusRoom.state.currentPhase) === Phase.Preparation;
-    const shouldBeEnabled = canStart && !amReady && isPrepPhase;
-    if (shouldBeEnabled) {
-      this.startBattleButton.setColor("#00ff00");
-      this.startBattleButton.setInteractive({ useHandCursor: true });
-      this.startBattleButton.off("pointerdown");
-      this.startBattleButton.once("pointerdown", this.confirmPreparation, this);
-      this.startBattleButton.on(
-        "pointerover",
-        () => this.startBattleButton.setColor("#55ff55")
-      );
-      this.startBattleButton.on(
-        "pointerout",
-        () => this.startBattleButton.setColor("#00ff00")
-      );
-    } else {
-      if (this.waitingText && !this.waitingText.visible) {
+    this.startBattleButton.off("pointerdown").off("pointerover").off("pointerout");
+    this.startBattleButton.on("pointerdown", () => {
+      if (!colyseusRoom || !colyseusRoom.sessionId) return;
+      const currentMyPlayerState = colyseusRoom.state.players.get(colyseusRoom.sessionId);
+      if (currentMyPlayerState && colyseusRoom.state.currentPhase === Phase.Preparation) {
+        if (currentMyPlayerState.isReady) {
+          colyseusRoom.send("playerUnready");
+        } else {
+          if (canStartBattle) {
+            this.confirmPreparation();
+          } else {
+            console.log("Preparation: Cannot start battle, no cards on battlefield.");
+          }
+        }
+      }
+    });
+    this.startBattleButton.on("pointerover", () => {
+      var _a9;
+      if ((_a9 = this.startBattleButton.input) == null ? void 0 : _a9.enabled) {
+        const currentMyPlayerState = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(colyseusRoom.sessionId);
+        const currentAmReady = (currentMyPlayerState == null ? void 0 : currentMyPlayerState.isReady) ?? false;
+        if (currentAmReady) {
+          this.startBattleButton.setColor("#ffaa55");
+        } else {
+          this.startBattleButton.setColor("#55ff55");
+        }
+      }
+    });
+    this.startBattleButton.on("pointerout", () => {
+      var _a9;
+      const currentMyPlayerState = colyseusRoom == null ? void 0 : colyseusRoom.state.players.get(colyseusRoom.sessionId);
+      const currentAmReady = (currentMyPlayerState == null ? void 0 : currentMyPlayerState.isReady) ?? false;
+      const currentIsPrepPhase = (colyseusRoom == null ? void 0 : colyseusRoom.state.currentPhase) === Phase.Preparation;
+      if (!currentIsPrepPhase) {
+        this.startBattleButton.setColor("#888888");
+      } else {
+        if (currentAmReady) {
+          this.startBattleButton.setColor("#ff8800");
+        } else {
+          let currentBattlefieldCardsCount = 0;
+          const currentBoardView = this.scene.get("BoardView");
+          if (currentBoardView && currentBoardView.scene.isActive()) {
+            const layoutData = currentBoardView.getLocalPlayerLayoutData();
+            layoutData.forEach((entry) => {
+              if (entry.area === "battlefield") currentBattlefieldCardsCount++;
+            });
+          }
+          const currentCanStartBattle = currentBattlefieldCardsCount > 0;
+          if (currentCanStartBattle) {
+            this.startBattleButton.setColor("#00ff00");
+          } else {
+            this.startBattleButton.setColor("#888888");
+          }
+        }
+      }
+      if (!((_a9 = this.startBattleButton.input) == null ? void 0 : _a9.enabled) && this.startBattleButton.active) {
         this.startBattleButton.setColor("#888888");
       }
-      this.startBattleButton.disableInteractive();
-      this.startBattleButton.off("pointerdown");
-      this.startBattleButton.off("pointerover");
-      this.startBattleButton.off("pointerout");
+    });
+    if (!isPrepPhase) {
+      this.startBattleButton.setText("Start Battle").setColor("#888888").disableInteractive();
+    } else {
+      if (amReady) {
+        this.startBattleButton.setText("Cancel Ready").setColor("#ff8800").setInteractive({ useHandCursor: true });
+      } else {
+        this.startBattleButton.setText("Start Battle");
+        if (canStartBattle) {
+          this.startBattleButton.setColor("#00ff00").setInteractive({ useHandCursor: true });
+        } else {
+          this.startBattleButton.setColor("#888888").disableInteractive();
+        }
+      }
     }
   }
-  // Called when the "Start Battle" button is clicked
+  // Called when the "Start Battle" button is clicked AND player is NOT ready
   confirmPreparation() {
     if (!colyseusRoom) return;
     console.log("Confirming preparation layout...");
@@ -23852,6 +24159,7 @@ const _Battle = class _Battle extends phaserExports.Scene {
     __publicField(this, "phaseListenerUnsubscribe", null);
   }
   create() {
+    var _a9;
     this.scene.launch("background");
     this.battleOver = false;
     if (!colyseusRoom || !colyseusRoom.state || !colyseusRoom.sessionId) {
@@ -23868,22 +24176,16 @@ const _Battle = class _Battle extends phaserExports.Scene {
     }
     const centerX = this.cameras.main.centerX;
     const centerY = this.cameras.main.centerY;
-    const gameHeight = this.cameras.main.height;
+    this.cameras.main.height;
     this.cameras.main.width;
-    this.resultText = this.add.text(centerX, centerY, "", {
+    this.resultText = (_a9 = this.add.text(centerX, centerY, "", {
       fontFamily: "Arial Black",
       fontSize: 64,
       color: "#ffffff",
       stroke: "#000000",
       strokeThickness: 8,
       align: "center"
-    }).setOrigin(0.5).setAlpha(0);
-    this.statusText = this.add.text(centerX, gameHeight - 50, "", {
-      fontFamily: "Arial",
-      fontSize: 24,
-      color: "#ffff00",
-      align: "center"
-    }).setOrigin(0.5).setAlpha(0);
+    }).setOrigin(0.5).setAlpha(0)) == null ? void 0 : _a9.setDepth(1500);
     this.setupColyseusListeners();
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
@@ -23955,7 +24257,7 @@ const _Battle = class _Battle extends phaserExports.Scene {
     const finalResultMessage = `${mainMessage}
 ${winnerInfoMessage}`;
     if ((_a9 = this.resultText) == null ? void 0 : _a9.active) {
-      this.resultText.setText(finalResultMessage).setColor(resultColor).setAlpha(1);
+      this.resultText.setText(finalResultMessage).setColor(resultColor).setAlpha(1).setDepth(1500);
     }
     if ((_b = this.statusText) == null ? void 0 : _b.active) {
       this.statusText.setText("Waiting for next round...").setAlpha(1);
@@ -24070,6 +24372,13 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     __publicField(this, "sellZoneRect");
     __publicField(this, "sellZoneText");
     __publicField(this, "brewGainText");
+    // Properties for enlarged card display
+    __publicField(this, "enlargedCardDisplay");
+    __publicField(this, "enlargedCardBackground");
+    __publicField(this, "enlargedCardVisual");
+    __publicField(this, "enlargedCardEffectsText");
+    __publicField(this, "enlargedCardBuffsText");
+    // End enlarged card display properties
     // Navbar elements
     __publicField(this, "playerHealthText");
     __publicField(this, "opponentHealthText");
@@ -24094,48 +24403,7 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     )}`;
   }
   updateCardHpVisuals(cardContainer, currentHp, maxHealth) {
-    if (!cardContainer || !cardContainer.active) return;
-    const hpText = cardContainer.getData(
-      "hpTextObject"
-    );
-    const mainCardImage = cardContainer.getData(
-      "mainCardImage"
-    );
-    if (hpText && hpText.active) {
-      hpText.setText(`${currentHp}/${maxHealth}`);
-      const hpPercent = maxHealth > 0 ? currentHp / maxHealth : 0;
-      if (currentHp <= 0) {
-        hpText.setColor("#ff0000");
-      } else if (hpPercent < 0.3) {
-        hpText.setColor("#ff8888");
-      } else if (hpPercent < 0.6) {
-        hpText.setColor("#ffff88");
-      } else {
-        hpText.setColor("#88ff88");
-      }
-    }
-    const isVisuallyDead = cardContainer.alpha < 1;
-    if (currentHp <= 0) {
-      if (!isVisuallyDead) {
-        cardContainer.setAlpha(0.6);
-        if (mainCardImage && mainCardImage.active && typeof mainCardImage.setTint === "function") {
-          mainCardImage.setTint(7829367);
-        }
-      }
-    } else {
-      if (isVisuallyDead) {
-        cardContainer.setAlpha(1);
-        if (mainCardImage && mainCardImage.active && typeof mainCardImage.clearTint === "function") {
-          mainCardImage.clearTint();
-        } else if (mainCardImage && mainCardImage.active) {
-          console.warn(
-            "BoardView: updateCardHpVisuals - clearTint method not found on mainCardImage for card.",
-            cardContainer.getData("instanceId"),
-            mainCardImage
-          );
-        }
-      }
-    }
+    updateCardHpVisuals(cardContainer, currentHp, maxHealth);
   }
   preload() {
     if (!this.textures.exists("cardBack")) {
@@ -24152,6 +24420,22 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     console.log("BoardView creating...");
     this.createNavbar();
     this.createSellZone();
+    this.enlargedCardDisplay = this.add.container(this.cameras.main.centerX, this.cameras.main.centerY).setVisible(false).setDepth(3e3);
+    this.enlargedCardBackground = this.add.rectangle(0, 0, 300, 450, 0, 0.9).setStrokeStyle(2, 16777215);
+    this.enlargedCardDisplay.add(this.enlargedCardBackground);
+    this.enlargedCardVisual = null;
+    const effectsAndBuffsTextStyle = {
+      fontFamily: "Arial",
+      fontSize: "14px",
+      color: "#ffffff",
+      wordWrap: { width: 280, useAdvancedWrap: true },
+      // Adjust width as needed
+      align: "left"
+    };
+    this.enlargedCardEffectsText = this.add.text(0, 0, "", effectsAndBuffsTextStyle).setOrigin(0.5, 0);
+    this.enlargedCardDisplay.add(this.enlargedCardEffectsText);
+    this.enlargedCardBuffsText = this.add.text(0, 0, "", effectsAndBuffsTextStyle).setOrigin(0.5, 0);
+    this.enlargedCardDisplay.add(this.enlargedCardBuffsText);
     this.setupColyseusListeners();
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
@@ -24347,6 +24631,7 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
             );
           }
           const processCardVisualsPostBattle = /* @__PURE__ */ __name((cardContainer, cardSchema, ownerSessionId, slotKey) => {
+            var _a9;
             if (!cardContainer.active) return;
             const cooldownBarBg = cardContainer.getData(
               "cooldownBarBg"
@@ -24366,7 +24651,8 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
                     );
                     const cooldownBarBaseWidth = typeof storedWidth === "number" ? storedWidth : MINION_CARD_WIDTH - 10;
                     cooldownBarFill.setSize(cooldownBarBaseWidth, 6);
-                    const maxCooldown = (cardSchema.speed > 0 ? cardSchema.speed : 1.5) * 1e3;
+                    const effectiveSpeed = cardSchema.speed - (((_a9 = cardSchema.statBuffs) == null ? void 0 : _a9.get("speed")) || 0);
+                    const maxCooldown = (effectiveSpeed > 0 ? Math.max(0.1, effectiveSpeed) : 1.5) * 1e3;
                     cardContainer.setData("maxAttackCooldown", maxCooldown);
                     cardContainer.setData("attackCooldownTimer", maxCooldown);
                   } else {
@@ -24485,6 +24771,7 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
       colyseusRoom.onMessage(
         "battleAttackEvent",
         (message) => {
+          var _a9, _b;
           if (this.currentPhase !== Phase.Battle || !this.scene.isActive())
             return;
           console.log("BoardView: Received battleAttackEvent", message);
@@ -24504,10 +24791,11 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
               message.targetInstanceId,
               message.damageDealt
             );
-            const attackerMaxCooldown = attackerCard.getData(
-              "maxAttackCooldown"
-            );
-            if (attackerMaxCooldown > 0) {
+            const attackerCardSchema = (_a9 = colyseusRoom.state.players.get(message.attackerPlayerId)) == null ? void 0 : _a9.battlefield.get(attackerCard.getData("slotKey"));
+            if (attackerCardSchema) {
+              const attackerEffectiveSpeed = attackerCardSchema.speed - (((_b = attackerCardSchema.statBuffs) == null ? void 0 : _b.get("speed")) || 0);
+              const attackerMaxCooldown = (attackerEffectiveSpeed > 0 ? Math.max(0.1, attackerEffectiveSpeed) : 1.5) * 1e3;
+              attackerCard.setData("maxAttackCooldown", attackerMaxCooldown);
               attackerCard.setData("attackCooldownTimer", attackerMaxCooldown);
               const fillBar = attackerCard.getData(
                 "cooldownBarFill"
@@ -24515,7 +24803,9 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
               const attackerCooldownBarBaseWidth = attackerCard.getData("cooldownBarBaseWidth") || MINION_CARD_WIDTH - 10;
               if (fillBar) fillBar.setSize(attackerCooldownBarBaseWidth, 6);
             }
-            const targetCardOwnerId = targetCard.getData(
+          } else {
+            console.warn(
+              "BoardView: Attacker or target not found/active for battleAttackEvent",
               "ownerSessionId"
             );
             const targetCardSlotKey = targetCard.getData("slotKey");
@@ -24545,11 +24835,6 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
                 `BoardView: battleAttackEvent - Target card container data inconsistent or not on battlefield. Owner: ${targetCardOwnerId}, Area: ${targetCardArea}, Slot: ${targetCardSlotKey}`
               );
             }
-          } else {
-            console.warn(
-              "BoardView: Attacker or target not found/active for battleAttackEvent",
-              message
-            );
           }
         }
       )
@@ -24567,10 +24852,15 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     if (!this.scene.isActive() || this.currentPhase !== Phase.Battle || !colyseusRoom || !colyseusRoom.state) {
       return;
     }
-    this.playerVisuals.forEach((playerData) => {
-      playerData.battlefield.forEach((cardContainer) => {
+    this.playerVisuals.forEach((playerData, playerId) => {
+      playerData.battlefield.forEach((cardContainer, slotKey) => {
+        var _a9, _b;
         if (!cardContainer.active) return;
+        const cardSchema = (_a9 = colyseusRoom.state.players.get(playerId)) == null ? void 0 : _a9.battlefield.get(slotKey);
+        if (!cardSchema) return;
+        cardSchema.speed - (((_b = cardSchema.statBuffs) == null ? void 0 : _b.get("speed")) || 0);
         const maxCooldown = cardContainer.getData(
+          // Use maxAttackCooldown from container, set by createCardGameObject
           "maxAttackCooldown"
         );
         let currentTimer = cardContainer.getData(
@@ -24659,14 +24949,46 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     }
     const newUnsubs = [];
     const hpUnsub = $(cardSchema).listen("currentHp", (newHp, oldHp) => {
+      var _a9;
       const cardContainer = this.getCardGameObjectByInstanceId(
         cardSchema.instanceId
       );
       if (cardContainer) {
-        this.updateCardHpVisuals(cardContainer, newHp, cardSchema.health);
+        const effectiveMaxHealth = cardSchema.health + (((_a9 = cardSchema.statBuffs) == null ? void 0 : _a9.get("health")) || 0);
+        this.updateCardHpVisuals(cardContainer, newHp, effectiveMaxHealth);
       }
     });
     newUnsubs.push(hpUnsub);
+    const statBuffsUnsub = $(cardSchema.statBuffs).onChange(() => {
+      var _a9, _b, _c;
+      const cardContainer = this.getCardGameObjectByInstanceId(
+        cardSchema.instanceId
+      );
+      if (cardContainer) {
+        const effectiveAttack = cardSchema.attack + (((_a9 = cardSchema.statBuffs) == null ? void 0 : _a9.get("attack")) || 0);
+        const effectiveSpeed = Math.max(
+          0.1,
+          cardSchema.speed - (((_b = cardSchema.statBuffs) == null ? void 0 : _b.get("speed")) || 0)
+        );
+        const effectiveMaxHealth = cardSchema.health + (((_c = cardSchema.statBuffs) == null ? void 0 : _c.get("health")) || 0);
+        const attackText = cardContainer.getData(
+          "attackTextObject"
+        );
+        if (attackText) attackText.setText(`${effectiveAttack}`);
+        const speedText = cardContainer.getData(
+          "speedTextObject"
+        );
+        if (speedText) speedText.setText(`${effectiveSpeed.toFixed(1)}`);
+        this.updateCardHpVisuals(
+          cardContainer,
+          cardSchema.currentHp,
+          effectiveMaxHealth
+        );
+        const newMaxCooldownMs = (effectiveSpeed > 0 ? effectiveSpeed : 1.5) * 1e3;
+        cardContainer.setData("maxAttackCooldown", newMaxCooldownMs);
+      }
+    });
+    newUnsubs.push(statBuffsUnsub);
     if (newUnsubs.length > 0) {
       this.cardSchemaListeners.set(cardSchema.instanceId, newUnsubs);
     }
@@ -24827,144 +25149,26 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     return startX + slotIndex * (currentCardWidth + SLOT_SPACING);
   }
   createCardGameObject(cardSchema, x, y, isObscured, isLocalPlayer, area) {
-    const container = this.add.container(x, y);
-    const displayCardWidth = area === "hand" ? FULL_CARD_WIDTH : MINION_CARD_WIDTH;
-    const displayCardHeight = area === "hand" ? FULL_CARD_HEIGHT : MINION_CARD_HEIGHT;
-    container.setData("displayCardWidth", displayCardWidth);
-    container.setData("displayCardHeight", displayCardHeight);
-    if (isObscured) {
-      const backWidth = area === "hand" ? FULL_CARD_WIDTH : MINION_CARD_WIDTH;
-      const backHeight = area === "hand" ? FULL_CARD_HEIGHT : MINION_CARD_HEIGHT;
-      const cardBack = this.add.image(0, 0, "cardBack").setOrigin(0.5).setDisplaySize(backWidth, backHeight);
-      container.add(cardBack);
-      return container;
-    }
-    const cardTextureKey = area === "hand" ? "cardFullTier1" : "cardMinionTier1";
-    const cardImage = this.add.image(0, 0, cardTextureKey).setOrigin(0.5);
-    cardImage.setDisplaySize(displayCardWidth, displayCardHeight);
-    container.add(cardImage);
-    container.setData("mainCardImage", cardImage);
-    if (area === "hand") {
-      const nameText = this.add.text(0, -20, cardSchema.name, {
-        // Middle center, moved up
-        fontFamily: "Arial",
-        fontSize: 16,
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 4,
-        align: "center",
-        wordWrap: { width: displayCardWidth - 20 }
-      }).setOrigin(0.5, 0.5);
-      container.add(nameText);
-      const attackText = this.add.text(
-        -100 / 2 + 32,
-        MINION_CARD_HEIGHT * 0.03,
-        `${cardSchema.attack}`,
-        {
-          fontFamily: "Arial",
-          fontSize: 16,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 4
-        }
-      ).setOrigin(0, 0.5);
-      container.add(attackText);
-      const hpText = this.add.text(
-        MINION_CARD_WIDTH / 2 - 18,
-        6,
-        `${cardSchema.currentHp}  ${cardSchema.health}`,
-        {
-          fontFamily: "Arial",
-          fontSize: 16,
-          color: "#00ff00",
-          stroke: "#000000",
-          strokeThickness: 4
-        }
-      ).setOrigin(1, 0.5);
-      container.add(hpText);
-      container.setData("hpTextObject", hpText);
-      const speedText = this.add.text(0, displayCardHeight / 2 - 50, `${cardSchema.speed}`, {
-        fontFamily: "Arial",
-        fontSize: 16,
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 3
-      }).setOrigin(0.5, 1);
-      container.add(speedText);
-    } else {
-      const nameText = this.add.text(
-        0,
-        -displayCardHeight / 2 + 5,
-        // 12px from top
-        cardSchema.name,
-        {
-          fontFamily: "Arial",
-          fontSize: 14,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 4,
-          align: "center",
-          wordWrap: { width: displayCardWidth }
-        }
-      ).setOrigin(0.5, 0);
-      container.add(nameText);
-      const attackText = this.add.text(-displayCardWidth / 2 + 32, 32, `${cardSchema.attack}`, {
-        // Middle-left
-        fontFamily: "Arial",
-        fontSize: 16,
-        // Value only
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 4
-      }).setOrigin(0, 0.5);
-      container.add(attackText);
-      const speedText = this.add.text(
-        0,
-        43,
-        // 30px from top
-        `${cardSchema.speed}`,
-        {
-          fontFamily: "Arial",
-          fontSize: 14,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 3
-        }
-      ).setOrigin(1, 0);
-      container.add(speedText);
-      const hpText = this.add.text(
-        displayCardWidth / 2 - 10,
-        displayCardHeight / 2 - 30,
-        // 30px from bottom
-        `${cardSchema.currentHp}/${cardSchema.health}`,
-        {
-          fontFamily: "Arial",
-          fontSize: 14,
-          color: "#00ff00",
-          stroke: "#000000",
-          strokeThickness: 3
-        }
-      ).setOrigin(1, 1);
-      container.add(hpText);
-      container.setData("hpTextObject", hpText);
-      const cooldownBarY = displayCardHeight / 2 - 15;
-      const cooldownBarWidth = displayCardWidth - 10;
-      const cooldownBarBg = this.add.rectangle(0, cooldownBarY, cooldownBarWidth, 6, 0, 0.5).setVisible(false);
-      const cooldownBarFill = this.add.rectangle(
-        -cooldownBarWidth / 2,
-        cooldownBarY,
-        cooldownBarWidth,
-        6,
-        4521796
-      ).setOrigin(0, 0.5).setVisible(false);
-      container.add(cooldownBarBg);
-      container.add(cooldownBarFill);
-      container.setData("cooldownBarBg", cooldownBarBg);
-      container.setData("cooldownBarFill", cooldownBarFill);
-      container.setData("attackCooldownTimer", 0);
-      container.setData("maxAttackCooldown", 0);
-      container.setData("cooldownBarBaseWidth", cooldownBarWidth);
-    }
+    const cardRenderData = {
+      name: cardSchema.name,
+      attack: cardSchema.attack,
+      speed: cardSchema.speed,
+      health: cardSchema.health,
+      currentHp: cardSchema.currentHp,
+      brewCost: cardSchema.brewCost,
+      artUrl: cardSchema.artUrl,
+      instanceId: cardSchema.instanceId,
+      statBuffs: cardSchema.statBuffs
+      // Pass statBuffs
+    };
+    const cardType = area === "hand" ? "full" : "minion";
+    const container = createCardGameObject(
+      this,
+      cardRenderData,
+      cardType,
+      isObscured
+    );
+    container.setPosition(x, y);
     return container;
   }
   getCardGameObjectByInstanceId(instanceId) {
@@ -24990,6 +25194,7 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     return { x, y };
   }
   makeCardInteractive(cardContainer) {
+    var _a9;
     const cardWidth = cardContainer.getData("displayCardWidth");
     const cardHeight = cardContainer.getData("displayCardHeight");
     if (!cardWidth || !cardHeight) {
@@ -25010,17 +25215,29 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
       hitAreaCallback: Phaser.Geom.Rectangle.Contains,
       useHandCursor: true
     });
+    console.log(`BoardView: Card ${cardContainer.getData("instanceId")} interactive set. Enabled: ${(_a9 = cardContainer.input) == null ? void 0 : _a9.enabled}`);
     this.input.setDraggable(cardContainer);
     if (cardContainer.input) {
       cardContainer.input.enabled = true;
     }
+    cardContainer.on("pointerover", () => {
+      if (this.input.activePointer.isDown && this.input.manager.dragTarget) {
+        return;
+      }
+      this.showEnlargedCard(cardContainer);
+    });
+    cardContainer.on("pointerout", () => {
+      this.hideEnlargedCard();
+    });
     cardContainer.on("dragstart", (pointer) => {
+      this.hideEnlargedCard();
       if (this.currentPhase !== Phase.Shop && this.currentPhase !== Phase.Preparation) {
         return;
       }
       if (!cardContainer.input || !cardContainer.input.enabled) {
         return;
       }
+      this.hideEnlargedCard();
       this.children.bringToTop(cardContainer);
       cardContainer.setAlpha(0.7);
       cardContainer.setData("isDragging", true);
@@ -25366,6 +25583,136 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
     }
     return { handLayout, battlefieldLayout };
   }
+  showEnlargedCard(hoveredCardContainer) {
+    const instanceId = hoveredCardContainer.getData("instanceId");
+    console.log(`BoardView: showEnlargedCard called for card ${instanceId}`);
+    if (!colyseusRoom || !colyseusRoom.state || !this.scene.isActive()) {
+      console.warn(`BoardView: showEnlargedCard - Colyseus room/state not available or scene inactive for ${instanceId}.`);
+      return;
+    }
+    const ownerSessionId = hoveredCardContainer.getData("ownerSessionId");
+    const area = hoveredCardContainer.getData("area");
+    const slotKey = hoveredCardContainer.getData("slotKey");
+    console.log(`BoardView: showEnlargedCard - Hovered card details: instanceId=${instanceId}, ownerSessionId=${ownerSessionId}, area=${area}, slotKey=${slotKey}`);
+    const playerState = colyseusRoom.state.players.get(ownerSessionId);
+    if (!playerState) {
+      console.warn(`BoardView: showEnlargedCard - Player state not found for owner ${ownerSessionId}.`);
+      return;
+    }
+    const cardCollection = area === "hand" ? playerState.hand : playerState.battlefield;
+    const cardSchema = cardCollection.get(slotKey);
+    if (!cardSchema || cardSchema.instanceId !== instanceId) {
+      console.warn(`BoardView: Card schema not found or mismatch for enlarged display. Expected InstanceId: ${instanceId}, Area: ${area}, SlotKey: ${slotKey}, Owner: ${ownerSessionId}`);
+      if (cardSchema) {
+        console.warn(`BoardView: Found cardSchema with instanceId: ${cardSchema.instanceId} instead.`);
+      } else {
+        console.warn(`BoardView: cardSchema is undefined in collection for slotKey ${slotKey}.`);
+      }
+      console.warn(`BoardView: Looked in playerState.${area}. Collection size: ${cardCollection == null ? void 0 : cardCollection.size}. Keys: ${cardCollection ? JSON.stringify(Array.from(cardCollection.keys())) : "undefined"}`);
+      return;
+    }
+    console.log(`BoardView: showEnlargedCard - Found card schema for ${cardSchema.name} (${instanceId})`);
+    if (this.enlargedCardVisual && this.enlargedCardVisual.active) {
+      this.enlargedCardVisual.destroy();
+    }
+    this.enlargedCardVisual = null;
+    const cardRenderData = {
+      name: cardSchema.name,
+      attack: cardSchema.attack,
+      speed: cardSchema.speed,
+      health: cardSchema.health,
+      currentHp: cardSchema.currentHp,
+      brewCost: cardSchema.brewCost,
+      artUrl: cardSchema.artUrl,
+      instanceId: cardSchema.instanceId,
+      rarity: cardSchema.rarity,
+      statBuffs: cardSchema.statBuffs
+    };
+    this.enlargedCardVisual = createCardGameObject(this, cardRenderData, "full", false);
+    this.enlargedCardVisual.setScale(1.5);
+    this.enlargedCardDisplay.add(this.enlargedCardVisual);
+    this.enlargedCardVisual.setPosition(0, -this.enlargedCardBackground.height / 2 + FULL_CARD_HEIGHT * 1.5 / 2 + 10);
+    let effectsContent = "Effects:\n";
+    if (cardSchema.effects && cardSchema.effects.length > 0) {
+      cardSchema.effects.forEach((effect) => {
+        effectsContent += `- ${effect.description}
+`;
+      });
+    } else {
+      effectsContent += "- None\n";
+    }
+    this.enlargedCardEffectsText.setText(effectsContent);
+    const effectsTextY = this.enlargedCardVisual.y + FULL_CARD_HEIGHT * 1.5 / 2 + 10;
+    this.enlargedCardEffectsText.setPosition(0, effectsTextY);
+    let buffsContent = "Buffs:\n";
+    if (cardSchema.statBuffs && cardSchema.statBuffs.size > 0) {
+      cardSchema.statBuffs.forEach((value, key) => {
+        buffsContent += `- ${key.charAt(0).toUpperCase() + key.slice(1)}: ${value > 0 ? "+" : ""}${value}
+`;
+      });
+    } else {
+      buffsContent += "- None\n";
+    }
+    this.enlargedCardBuffsText.setText(buffsContent);
+    const buffsTextY = this.enlargedCardEffectsText.y + this.enlargedCardEffectsText.height + 5;
+    this.enlargedCardBuffsText.setPosition(0, buffsTextY);
+    const totalContentHeight = FULL_CARD_HEIGHT * 1.5 + 20 + this.enlargedCardEffectsText.height + 5 + this.enlargedCardBuffsText.height + 20;
+    this.enlargedCardBackground.setSize(300, Math.max(450, totalContentHeight));
+    if (this.enlargedCardVisual) {
+      this.enlargedCardVisual.setPosition(0, -this.enlargedCardBackground.height / 2 + FULL_CARD_HEIGHT * 1.5 / 2 + 10);
+    }
+    const hoveredCardActualWidth = hoveredCardContainer.getData("displayCardWidth") || FULL_CARD_WIDTH;
+    let displayX = hoveredCardContainer.x + hoveredCardActualWidth / 2 + this.enlargedCardBackground.width / 2 + 10;
+    let displayY = hoveredCardContainer.y;
+    if (displayX + this.enlargedCardBackground.width / 2 > this.cameras.main.width) {
+      displayX = hoveredCardContainer.x - hoveredCardActualWidth / 2 - this.enlargedCardBackground.width / 2 - 10;
+    }
+    if (displayX - this.enlargedCardBackground.width / 2 < 0) {
+      displayX = this.enlargedCardBackground.width / 2 + 5;
+    }
+    if (displayY - this.enlargedCardBackground.height / 2 < 0) {
+      displayY = this.enlargedCardBackground.height / 2 + 5;
+    }
+    if (displayY + this.enlargedCardBackground.height / 2 > this.cameras.main.height) {
+      displayY = this.cameras.main.height - this.enlargedCardBackground.height / 2 - 5;
+    }
+    this.enlargedCardDisplay.setPosition(displayX, displayY);
+    console.log(`BoardView: showEnlargedCard - Positioning enlarged display at X=${displayX}, Y=${displayY} for card ${cardSchema.name}`);
+    this.enlargedCardDisplay.setAlpha(0);
+    this.enlargedCardDisplay.setVisible(true);
+    this.children.bringToTop(this.enlargedCardDisplay);
+    this.tweens.killTweensOf(this.enlargedCardDisplay);
+    this.tweens.add({
+      targets: this.enlargedCardDisplay,
+      alpha: 1,
+      duration: 200,
+      // Adjust duration as needed
+      ease: "Power2"
+    });
+    console.log(`BoardView: showEnlargedCard - Enlarged display for ${cardSchema.name} is now visible.`);
+  }
+  hideEnlargedCard() {
+    if (this.enlargedCardDisplay && this.enlargedCardDisplay.visible) {
+      console.log("BoardView: hideEnlargedCard called.");
+      this.tweens.killTweensOf(this.enlargedCardDisplay);
+      this.tweens.add({
+        targets: this.enlargedCardDisplay,
+        alpha: 0,
+        duration: 150,
+        // Adjust duration as needed
+        ease: "Power2",
+        onComplete: /* @__PURE__ */ __name(() => {
+          if (this.enlargedCardDisplay) {
+            this.enlargedCardDisplay.setVisible(false);
+            if (this.enlargedCardVisual && this.enlargedCardVisual.active) {
+              this.enlargedCardVisual.destroy();
+            }
+            this.enlargedCardVisual = null;
+          }
+        }, "onComplete")
+      });
+    }
+  }
   isSlotEmpty(sessionId, area, slotKey, draggedInstanceId) {
     const playerVisuals = this.playerVisuals.get(sessionId);
     if (!playerVisuals) return false;
@@ -25593,6 +25940,10 @@ const _BoardView = class _BoardView extends phaserExports.Scene {
   }
   shutdown() {
     console.log("BoardView shutting down...");
+    this.hideEnlargedCard();
+    if (this.enlargedCardDisplay && this.enlargedCardDisplay.active) {
+      this.enlargedCardDisplay.destroy();
+    }
     this.cleanupListeners();
     this.events.off(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
@@ -25604,8 +25955,8 @@ let BoardView = _BoardView;
   new ScaleFlow({
     type: Phaser.AUTO,
     parent: "gameParent",
-    width: 1280,
-    height: 720,
+    width: 1600,
+    height: 900,
     backgroundColor: "#000000",
     roundPixels: false,
     pixelArt: false,

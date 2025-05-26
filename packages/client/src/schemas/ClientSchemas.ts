@@ -7,6 +7,22 @@ export enum Phase {
     GameOver = "GameOver"
 }
 
+// --- Card Effect System (Client-side) ---
+export enum EffectTrigger {
+    BATTLE_START = "BATTLE_START",
+    ON_ATTACK = "ON_ATTACK",
+    ON_DEATH = "ON_DEATH",
+    WHILE_ALIVE = "WHILE_ALIVE",
+}
+
+export interface ClientCardEffect {
+    effectId: string;
+    trigger: EffectTrigger;
+    description: string;
+    config: Map<string, string>; // Config values are strings, parsed by handlers
+}
+// --- End Card Effect System (Client-side) ---
+
 export interface ClientCardInstance {
     instanceId: string; // Unique ID for this instance
     cardId: string; // Base card type ID (from JSON)
@@ -17,8 +33,10 @@ export interface ClientCardInstance {
     currentHp: number;
     brewCost: number;
     description: string;
-    isLegend: boolean;
+    rarity: string;
     artUrl: string; // URL or key for card art
+    statBuffs: Map<string, number>; // Stores modifications to stats
+    effects: ClientCardEffect[]; // Added effects
 }
 
 export interface ClientPlayerState {
